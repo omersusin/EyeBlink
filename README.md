@@ -53,8 +53,15 @@ Kotlin + Jetpack Compose settings. Components: Core, Blink Animation Engine, Eye
 | Quick Settings tile for one-tap suspend/resume | done |
 | Context engine: screen-on, unlocked, foreground-app blocking | done |
 | Accessibility adapter (bounded play/pause node search) | done |
-| R8 + resource shrinking on release (dex 14.2 MB → 1.45 MB) | done |
+| R8 + resource shrinking on release | done |
+| Per-ABI release splits + App Bundle (50.8 MB → 14.4 MB) | done |
 | Signed release APK (v2/v3, plus detached v4 `.idsig`) | done |
+| Blink detection from MediaPipe face landmarks (on device) | code complete, unrun |
+| Eyelid geometry → normalised openness | done |
+| Guided calibration phase machine (A video / B reading / C deliberate) | done |
+| Personal baseline statistics + gradual merge | done |
+| Hybrid trigger policy (camera-assisted vs camera-free) | done |
+| Local-only baseline storage | done |
 
 **Playback pause/resume is coded but inert.** Cross-app `MediaSession`
 control needs a permission a normal app cannot hold (see *Known platform
@@ -62,24 +69,41 @@ limits*), so `PlaybackController` always reports *unknown* and blinks proceed
 without touching media. The logic is in place and its safety rules are unit
 tested for when that path becomes reachable.
 
-**Not implemented yet:** camera tracking and MediaPipe blink detection, guided
-calibration (Milestone 3), adaptive learning (Milestone 4), Smart Rest /
-Blackout Rest / Distance Focus Rest, per-app compatibility testing, LSPosed
-adapter, MediaProjection.
+**Camera mode has never run.** MediaPipe, the bundled
+`face_landmarker.task` model and CameraX all compile and package, and every
+MediaPipe API used was verified with `javap` against the resolved AAR — but
+no frame has ever been processed on a device. Landmark indices, openness
+thresholds and the phase timings are all *unvalidated against real faces*.
+
+**Not implemented yet:** the calibration screens (UI; the phase logic behind
+them is done and tested), the camera tracking service that feeds the
+detector, Smart Rest / Blackout Rest / Distance Focus Rest, per-app
+compatibility testing, LSPosed adapter, MediaProjection.
 
 The feature list above is the *design target*, not the current state.
 
 ### Tests
 
-15 JVM unit tests, run in CI on every push:
+116 JVM unit tests, run in CI on every push. They cover the parts that can be
+verified without a device:
 
 - `BlinkConfigTest` — pins the documented 140 + 150 + 165 = **455 ms** contract.
-- `InterruptionPolicyTest` — pins the two user-facing safety rules:
-  interruptions stay within 5 s – 10 min, and playback resumes **only** when
-  EyeBlink paused it *and* it is still paused.
+- `InterruptionPolicyTest` — interruptions stay within 5 s – 10 min, and
+  playback resumes **only** when EyeBlink paused it *and* it is still paused.
+- `TriggerPolicyTest` — camera-off/unready/low-confidence/screen-off all fall
+  back to camera-free and never claim real blink detection.
+- `BlinkDetectorTest` — hysteresis, completeness, outlier rejection,
+  dark-frame immunity.
+- `EyeGeometryTest` — scale-invariant aperture mapping, clamping, monotonicity.
+- `BlinkStatisticsTest` — median intervals, tracking-loss rejection, gradual
+  merge, and the blink-rate → break-cadence mapping.
+- `CalibrationSessionTest` — A/B spontaneous vs C instructed separation, phase
+  progression, cancel/restart.
 
-These rules live in `core/InterruptionPolicy.kt`, which has no Android imports
-so it runs without a device or Robolectric.
+All calibration and policy logic is deliberately free of Android types so it
+runs as plain JVM tests. What remains untested is precisely the untestable
+part: CameraX plumbing, MediaPipe runtime behaviour, and anything the user
+sees.
 
 ### Known gaps
 
@@ -96,10 +120,26 @@ Requires JDK 17+ and the Android SDK (compileSdk 35). No SDK is required to
 clone.
 
 ```bash
-./gradlew :app:testDebugUnitTest   # unit tests
-./gradlew :app:assembleDebug       # debug APK
+./gradlew :app:testDebugUnitTest   # 116 unit tests
 ./gradlew :app:lintDebug
+./gradlew :app:assembleDebug
+./gradlew :app:assembleRelease    # per-ABI signed slices
+./gradlew :app:bundleRelease      # .aab for Play
 ```
+
+### Release sizes
+
+MediaPipe's `libmediapipe_tasks_jni.so` is ~11 MB *per ABI*, which made the
+universal APK 50.8 MB. It is now split per ABI:
+
+| Artifact | Size |
+|---|---|
+| `app-arm64-v8a-release.apk` | 14.4 MB |
+| `app-armeabi-v7a-release.apk` | 11.4 MB |
+| `app-x86_64-release.apk` | 16.8 MB |
+| `app-release.aab` (Play) | 24.9 MB |
+
+x86_64 is kept so emulators still work.
 
 ### CI
 
@@ -142,6 +182,7 @@ Superseded runs on the same ref are cancelled automatically.
 | `FOREGROUND_SERVICE` (+ `..._SPECIAL_USE`) | keep the overlay alive | yes |
 | `POST_NOTIFICATIONS` | show the ongoing-service notification | Android 13+ |
 | `PACKAGE_USAGE_STATS` | read foreground app to avoid interrupting calls | optional (grant in Settings) |
+| `CAMERA` | front-camera blink detection during calibration and camera-assisted mode | optional |
 
 ### Known platform limits
 
@@ -153,5 +194,15 @@ Superseded runs on the same ref are cancelled automatically.
 the notification-listener role, or the optional LSPosed hook. Do not remove the
 `SecurityException` catch — it is what keeps the app honest about this.
 
-Camera and Usage Access are requested in-app and are never mandatory; without
-them EyeBlink still blinks on a timer and simply stays quiet during calls.
+### Camera and privacy
+
+Camera permission is optional and never mandatory. Without it EyeBlink blinks
+on a timer and stays quiet during calls; it never claims to detect real blinks.
+
+When granted, frames are processed **on device** by MediaPipe and discarded.
+EyeBlink stores no images, no landmark lists and no recordings, and the
+baseline it derives is kept in local DataStore with no upload path. The only
+persisted artefact is numeric: median blink interval, blink duration,
+complete-blink ratio and sample count.
+
+A visible foreground-service notification is shown while camera tracking runs.
