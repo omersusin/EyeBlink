@@ -91,6 +91,18 @@ android {
         )
     }
 
+    // MediaPipe ships libmediapipe_tasks_jni.so at ~11 MB for every ABI, which
+    // pushed the universal APK to 50 MB. Split per ABI so a device only ever
+    // receives the slice it can run. x86_64 is kept so emulators still work.
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "armeabi-v7a", "x86_64")
+            isUniversalApk = false
+        }
+    }
+
     testOptions {
         unitTests.isReturnDefaultValues = true
     }

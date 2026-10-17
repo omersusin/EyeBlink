@@ -76,28 +76,46 @@ jobs:
       - name: Assemble debug APK
         run: ./gradlew assembleDebug --stacktrace
 
-      # R8 + resource shrinking are enabled on release (see app/build.gradle.kts).
+# R8 + resource shrinking are enabled on release (see app/build.gradle.kts).
       # Signed only when the secrets above were present; otherwise Gradle emits
       # an unsigned release APK rather than failing.
       - name: Assemble release APK
         run: ./gradlew assembleRelease --stacktrace
 
+      # App Bundle: what Play actually consumes. Play serves per-device, so the
+      # bundle carries all ABIs while each install downloads only one slice.
+      - name: Assemble release App Bundle
+        run: ./gradlew bundleRelease --stacktrace
+
       # apksigner is the source of truth. Do NOT look for META-INF/*.RSA:
       # at minSdk 26 AGP emits v2/v3 signatures only, which write an APK
       # Signing Block and no META-INF signature entries at all.
-      - name: Verify release APK
+      - name: Verify release APKs
         run: |
-          APK=app/build/outputs/apk/release/app-release.apk
-          echo "release APK: $(du -h "$APK" | cut -f1)"
-          if "$ANDROID_HOME"/build-tools/35.0.0/apksigner verify --verbose --print-certs "$APK"; then
-            echo "result: SIGNED and verified"
-          else
-            echo "result: unsigned or unverifiable"
-            if [ -n "$KEYSTORE_PASSWORD" ]; then
-              echo "secrets were configured, so a signing failure is a real error"
-              exit 1
-            fi
+          shopt -s nullglob
+          APKS=(app/build/outputs/apk/release/*.apk)
+          if [ ${#APKS[@]} -eq 0 ]; then
+            echo "no release APK produced"; exit 1
           fi
+          for APK in "${APKS[@]}"; do
+            echo "=== $(basename "$APK") ($(du -h "$APK" | cut -f1)) ==="
+            if "$ANDROID_HOME"/build-tools/35.0.0/apksigner verify --verbose --print-certs "$APK"; then
+              echo "  result: SIGNED and verified"
+            else
+              echo "  result: unsigned or unverifiable"
+              if [ -n "$KEYSTORE_PASSWORD" ]; then
+                echo "  secrets were configured, so this is a real error"
+                exit 1
+              fi
+            fi
+          done
+
+      - name: Report artifact sizes
+        run: |
+          echo "release slices:"
+          du -h app/build/outputs/apk/release/*.apk 2>/dev/null || true
+          echo "app bundle:"
+          du -h app/build/outputs/bundle/release/*.aab 2>/dev/null || true
 
       - name: Upload APKs
         uses: actions/upload-artifact@v7
@@ -107,6 +125,7 @@ jobs:
             app/build/outputs/apk/debug/*.apk
             app/build/outputs/apk/release/*.apk
             app/build/outputs/apk/release/*.idsig
+            app/build/outputs/bundle/release/*.aab
           if-no-files-found: error
           retention-days: 30
 
