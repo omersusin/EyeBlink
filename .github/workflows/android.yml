@@ -196,10 +196,11 @@ jobs:
         run: rm -f "$RUNNER_TEMP/eyeblink-release.jks"
 
   # CI used to compile the app and never start it, which is how a crash in Application.onCreate reached a phone.
-  # This job installs a build on an emulator, walks through the app (onboarding, a rest, a blink, the tabs, the
-  # calibration camera, the language list, the theme), lets the engine run with the accessibility service on, and fails
-  # if the app dies or an engine task throws. It runs twice: the debug build, and the minified build, which is the release
-  # build as R8 leaves it - the one that breaks when something is shrunk or renamed that native code or reflection needs.
+  # This job installs a build on an emulator, walks through the app (onboarding, a rest and skipping it, a blink, every tab
+  # and page, the Blink Studio, the app picker, the calibration camera allowed and refused, the language list, the theme),
+  # lets the engine run with the accessibility service on, and fails if the app dies or an engine task throws.
+  # It runs twice: the debug build, and the minified build, which is the release build as R8 leaves it - the one that
+  # breaks when something is shrunk or renamed that native code or reflection needs.
   # Screenshots, UI dumps and logs are kept in the "eyeblink-smoke-<variant>" artifacts. It builds its own APK, so it never
   # sees the signing secrets.
   smoke:

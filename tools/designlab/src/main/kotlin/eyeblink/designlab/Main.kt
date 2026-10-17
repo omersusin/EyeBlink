@@ -75,6 +75,14 @@ fun main(args: Array<String>) {
         val why = "the face model could not be loaded (java.lang.IllegalStateException: Failed to open the model asset)"
         EyeBlinkApp(broken.copy(calibration = broken.calibration.copy(error = why)), NoActions, en, initialPage = Page.CALIBRATION)
     }
+    shot("calib-denied", h = 2300) {
+        val refused = Sample.calibration(CalibrationStage.INTRO)
+        EyeBlinkApp(refused.copy(calibration = refused.calibration.copy(hasCameraPermission = false, cameraDenied = true)), NoActions, en, initialPage = Page.CALIBRATION)
+    }
+    shot("calib-denied-tr", h = 2300) {
+        val refused = Sample.calibration(CalibrationStage.INTRO)
+        EyeBlinkApp(refused.copy(calibration = refused.calibration.copy(hasCameraPermission = false, cameraDenied = true)), NoActions, Strings.TR, initialPage = Page.CALIBRATION)
+    }
     both("apps") { d -> EyeBlinkApp(Sample.state(), NoActions, en, initialTab = Tab.APPS, systemDark = d) }
     both("more") { d -> EyeBlinkApp(Sample.state(), NoActions, en, initialTab = Tab.MORE, systemDark = d) }
     shot("more-tall", h = 2300) { EyeBlinkApp(Sample.state(), NoActions, en, initialTab = Tab.MORE) }

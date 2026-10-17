@@ -368,6 +368,7 @@ class Engine(val app: Application, ports: EnginePorts) {
     fun testCompat(pkg: String) = post { compat.test(pkg) }
 
     fun startCalibration() = post { tracking.stopCamera(); calibrator.start(); syncService(); publish() }
+    fun calibrationCameraDenied() = post { calibrator.cameraDenied(); publish() }
     fun skipCalibrationPhase() = post { calibrator.skipPhase() }
     fun cancelCalibration() = post { calibrator.cancel() }
     fun saveCalibration() = post { calibrator.save(); publish() }

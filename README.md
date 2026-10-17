@@ -116,7 +116,7 @@ Every push is built by GitHub Actions. Open the latest run of **Android CI** and
 - **`eyeblink-apk`** - everything: debug and release APKs per ABI (12 MB `armeabi-v7a`, 18 MB `x86_64` for emulators), a 27 MB App Bundle and the optional LSPosed module.
 
 A second job, **Start it on an emulator**, installs the debug build and a *minified* one (the release build as R8 leaves it, which is where reflection and native callbacks break) on an Android 15 emulator.
-It walks through onboarding, a rest, a blink, the tabs, the calibration camera, the language list and the theme, then lets the engine run with the accessibility service on.
+It walks through onboarding, a rest (and skips it), a blink, every tab and page, the Blink Studio, the app picker, the calibration camera (allowed, then refused) and the language list and theme, then lets the engine run with the accessibility service on.
 It fails the run if the app dies or an engine task throws, and keeps screenshots and logs in `eyeblink-smoke-debug` and `eyeblink-smoke-minified`.
 Release builds are signed (v2 and v3) when the repository has keystore secrets, and CI verifies the signature.
 On first start, onboarding explains each permission; only *Accessibility* (or *Display over other apps*) is required.

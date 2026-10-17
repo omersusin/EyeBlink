@@ -37,7 +37,9 @@ class AndroidActions(private val activity: MainActivity) : UiActions {
         activity.packageManager.getLaunchIntentForPackage(packageName)?.let { activity.startActivity(it) }
     }
 
-    override fun startCalibration() = activity.requestCamera { granted -> if (granted) engine.startCalibration() }
+    override fun startCalibration() = activity.requestCamera { granted ->
+        if (granted) engine.startCalibration() else engine.calibrationCameraDenied()
+    }
     override fun skipCalibrationPhase() = engine.skipCalibrationPhase()
     override fun cancelCalibration() = engine.cancelCalibration()
     override fun saveCalibration() = engine.saveCalibration()

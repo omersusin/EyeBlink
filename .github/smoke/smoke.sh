@@ -45,6 +45,8 @@ snap() {
   fi
 }
 alive() { ashell pidof "$PKG" | grep -Eq '^[0-9]+'; }
+# EyeBlink's overlay window (the rest scene, a blink) exists only while something is being drawn over the screen.
+overlay_up() { ashell dumpsys window windows | grep -Eq 'Window\{[0-9a-f]+ u0 EyeBlink\}'; }
 crash_log() { adb logcat -d -b crash -v threadtime 2>/dev/null | tr -d '\r'; }
 
 # Stack traces from the minified build use R8's short names; give them back their own when the SDK can.
@@ -160,7 +162,21 @@ if tools tap Rest --topmost --timeout 15; then
   if [ "$black" != "n/a" ] && awk -v b="$black" 'BEGIN { exit !(b < 0.5) }'; then
     warn "the rest scene covers only $black of the screen in pure black"
   fi
-  tools tap Skip --timeout 6 || { echo "no Skip button visible; waiting the rest out"; sleep 25; }
+  # The rest scene is an overlay window, which uiautomator does not list, so Skip is pressed where it sits: bottom centre.
+  # "Skipping is always one tap away" is a promise of the app; a rest that cannot be left would be its worst bug.
+  if overlay_up; then echo "the rest scene's window is up"; else warn "no EyeBlink window while resting"; fi
+  tools tapat 0.5 0.93
+  ended=0
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    sleep 0.5
+    if ! overlay_up; then ended=1; break; fi
+  done
+  if [ "$ended" = 1 ]; then
+    echo "Skip ended the rest"
+  else
+    warn "Skip did not close the rest scene; waiting it out"
+    sleep 25
+  fi
   sleep 2
 else
   warn "could not start a rest from the home screen"
@@ -248,7 +264,7 @@ step "Blink Studio and the app picker"
 if tools tap Blink --bottommost --timeout 10; then
   sleep 3
   snap 50-studio
-  tools tap "Tap to blink" --timeout 8 && sleep 2
+  tools tap "Live preview of the blink" --timeout 8 && sleep 2
 fi
 if tools tap Apps --bottommost --timeout 10; then
   sleep 2
@@ -260,6 +276,40 @@ if tools tap Apps --bottommost --timeout 10; then
   fi
 fi
 health "after the studio and the app picker"
+
+# Somebody who says no to the camera has to be told so, not shown the same page again. Revoking the permission ends the
+# app's process; it is started again, asked to calibrate, and Android's question is answered with "Don't allow".
+step "Calibration without the camera"
+adb shell pm revoke "$PKG" android.permission.CAMERA
+adb logcat -c
+timeout 120 adb shell am start -W -n "$PKG/$ACTIVITY" | tail -3
+sleep 6
+if tools tap More --bottommost --timeout 15 && tools tap Calibration --scroll --timeout 15; then
+  sleep 2
+  if tools tap Begin --timeout 10; then
+    sleep 3
+    snap 60-camera-question
+    tools tap "t allow" --timeout 10 && sleep 3
+    explained=no
+    for attempt in 1 2; do
+      snap "6$attempt-camera-refused"
+      if tools has "$OUT/6$attempt-camera-refused.xml" "Camera access was not allowed"; then explained=yes; break; fi
+      adb shell input keyevent KEYCODE_BACK # Android may have opened the app's own settings page in front of it
+      sleep 2
+    done
+    if [ "$explained" = yes ]; then
+      echo "the page explains that the camera was refused"
+    else
+      warn "the calibration page did not explain the refused camera"
+    fi
+  else
+    warn "could not press Begin without the camera permission"
+  fi
+else
+  warn "could not reach the calibration page without the camera permission"
+fi
+adb shell pm grant "$PKG" android.permission.CAMERA
+health "after the camera was refused"
 
 adb logcat -d -v threadtime > "$OUT/logcat-1-walkthrough.txt" 2>&1
 

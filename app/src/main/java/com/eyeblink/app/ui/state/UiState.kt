@@ -89,6 +89,8 @@ data class CalibrationUi(
     val modelReady: Boolean = true,
     /** Why the camera or the face model could not start, when it could not; shown on the intro page. */
     val error: String? = null,
+    /** The camera permission was refused when Begin was pressed; the intro page explains what to do. */
+    val cameraDenied: Boolean = false,
 )
 
 data class PowerUi(

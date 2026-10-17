@@ -7,7 +7,8 @@
     smoke_tools.py tap TEXT [--topmost|--bottommost] [--scroll] [--timeout SEC]
                                                  find TEXT on screen and tap its centre; with --scroll, swipe up a page at
                                                  a time while it is not there yet (the list may be longer than the screen)
-    smoke_tools.py seed PACKAGE                  print a SharedPreferences file that makes EyeBlink start running
+    smoke_tools.py tapat X Y                     tap a point given as shares of the screen (0.5 0.93: bottom centre)
+    smoke_tools.py seed PACKAGE                 print a SharedPreferences file that makes EyeBlink start running
                                                  at once, with PACKAGE selected and a very short interval
     smoke_tools.py ledger [--quiet]              read EyeBlink's SharedPreferences XML from stdin and print what its
                                                  usage ledger recorded; exit 0 when at least one blink was shown
@@ -116,6 +117,15 @@ def scroll_down():
     """One page further down: a finger sliding up the middle of the screen."""
     width, height = screen_size()
     adb("shell", "input", "swipe", str(width // 2), str(int(height * 0.72)), str(width // 2), str(int(height * 0.32)), "350")
+
+
+def tap_at(fraction_x, fraction_y):
+    """Taps a point given as shares of the screen's width and height. For what uiautomator cannot list: EyeBlink's
+    overlay windows (the rest scene) are not part of the app's window tree."""
+    width, height = screen_size()
+    x, y = int(width * fraction_x), int(height * fraction_y)
+    adb("shell", "input", "tap", str(x), str(y))
+    print(f"tapped the screen at {x},{y}")
 
 
 def tap(wanted, where, timeout, scroll=False, max_scrolls=5):
@@ -254,6 +264,10 @@ def main(argv):
             else:
                 sys.exit(f"unknown option {flag}")
         return 0 if tap(wanted, where, timeout, scroll) else 1
+
+    if command == "tapat" and len(rest) == 2:
+        tap_at(float(rest[0]), float(rest[1]))
+        return 0
 
     if command == "seed" and len(rest) == 1:
         sys.stdout.write(seed(rest[0]))

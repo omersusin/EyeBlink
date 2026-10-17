@@ -270,6 +270,13 @@ class Calibrator(
         onChange()
     }
 
+    /** The person said no to the camera. The intro page says so, because a Begin button that does nothing looks broken. */
+    fun cameraDenied() {
+        if (session != null) return
+        ui = CalibrationUi(hasCameraPermission = false, modelReady = faces?.ready == true, cameraDenied = true)
+        onChange()
+    }
+
     private fun onFrame(frame: FaceFrame) {
         val s = session ?: return
         val sample = frame.sample
