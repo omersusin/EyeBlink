@@ -95,7 +95,9 @@ private fun Root(activity: ComponentActivity, actions: UiActions) {
     // Status and navigation bar icons follow the app's theme (not only the phone's), and so does the window behind it all.
     // Keyed on the theme alone: the state above changes twice a second and this must not run that often.
     LaunchedEffect(dark) {
-        val style = if (dark) SystemBarStyle.dark(Color.TRANSPARENT) else SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
+        // The second argument only matters on old Android versions that cannot draw dark bar icons: there a dark
+        // scrim keeps the (white) icons readable on the pale page.
+        val style = if (dark) SystemBarStyle.dark(Color.TRANSPARENT) else SystemBarStyle.light(Color.TRANSPARENT, Color.argb(0x80, 0x1B, 0x1B, 0x1B))
         activity.enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
         activity.window.setBackgroundDrawable(ColorDrawable((if (dark) Moonlit.bg else Daylight.bg).toArgb()))
     }

@@ -72,6 +72,7 @@ fun main(args: Array<String>) {
     shot("calib-result", h = 2300) { EyeBlinkApp(Sample.calibration(CalibrationStage.RESULT), NoActions, en, initialPage = Page.CALIBRATION) }
     both("apps") { d -> EyeBlinkApp(Sample.state(), NoActions, en, initialTab = Tab.APPS, systemDark = d) }
     both("more") { d -> EyeBlinkApp(Sample.state(), NoActions, en, initialTab = Tab.MORE, systemDark = d) }
+    shot("more-tall", h = 2300) { EyeBlinkApp(Sample.state(), NoActions, en, initialTab = Tab.MORE) }
     both("language", timeMs = 2_400) { d -> EyeBlinkApp(Sample.state(), NoActions, en, initialTab = Tab.MORE, initialSheet = com.eyeblink.app.ui.Sheet.LANGUAGE, systemDark = d) }
     both("picker", timeMs = 2_400) { d -> EyeBlinkApp(Sample.state(), NoActions, en, initialTab = Tab.APPS, initialSheet = com.eyeblink.app.ui.Sheet.APPS, systemDark = d) }
     both("studio") { d -> EyeBlinkApp(Sample.state(), NoActions, en, initialTab = Tab.BLINK, systemDark = d) }

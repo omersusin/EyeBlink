@@ -139,6 +139,7 @@ Signing secrets, if you have them, are read from `keystore.properties` (git-igno
 | [`tools/designlab/`](tools/designlab) | the desktop renderer behind the screenshots |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | how it fits together |
 | [`docs/FEASIBILITY.md`](docs/FEASIBILITY.md) | what Android allows, requirement by requirement |
+| [`docs/DEVICE_TEST.md`](docs/DEVICE_TEST.md) | a step-by-step first test on a real phone |
 | [`docs/brand/`](docs/brand) | logo, banner and the script that draws the icons |
 
 ## The look

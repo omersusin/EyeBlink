@@ -23,6 +23,8 @@ import com.eyeblink.app.ui.kit.IconBadge
 import com.eyeblink.app.ui.kit.Icon
 import com.eyeblink.app.ui.kit.Ink
 import com.eyeblink.app.ui.kit.LanguageChip
+import com.eyeblink.app.ui.kit.LidSwitch
+import com.eyeblink.app.ui.kit.SettingRow
 import com.eyeblink.app.ui.kit.P
 import com.eyeblink.app.ui.kit.PillButton
 import com.eyeblink.app.ui.kit.S
@@ -89,7 +91,14 @@ fun MoreScreen(state: UiState, actions: UiActions, onPage: (Page) -> Unit, onLan
             )
         }
 
-        Card(Modifier.reveal(6).fillMaxWidth(), tint = p.coral) {
+        Card(Modifier.reveal(6).fillMaxWidth(), padding = PaddingValues(horizontal = 18.dp, vertical = 6.dp)) {
+            SettingRow(
+                s.t("Start with the phone", "Telefonla birlikte başla"),
+                subtitle = s.t("After a restart, wake EyeBlink again if it was on.", "Yeniden başlatmadan sonra, açıksa EyeBlink'i yeniden uyandır."),
+            ) { LidSwitch(state.settings.startOnBoot, { v -> actions.update { it.copy(startOnBoot = v) } }, description = s.t("Start with the phone", "Telefonla birlikte başla")) }
+        }
+
+        Card(Modifier.reveal(7).fillMaxWidth(), tint = p.coral) {
             SectionHeader(s.t("Emergency stop", "Acil durdurma"), null)
             Spacer(Modifier.height(8.dp))
             EbText(s.t("Instantly switches off every intervention - blinks, rests, camera, brightness changes - and removes anything EyeBlink has drawn. The Quick Settings tile does the same from anywhere.", "Tüm müdahaleleri (göz kırpma, mola, kamera, parlaklık değişiklikleri) anında kapatır ve EyeBlink'in çizdiği her şeyi kaldırır. Hızlı Ayarlar karosu bunu her yerden yapar."), Ink.Caption, color = p.ink)
@@ -97,7 +106,7 @@ fun MoreScreen(state: UiState, actions: UiActions, onPage: (Page) -> Unit, onLan
             PillButton(s.t("Stop everything", "Her şeyi durdur"), { actions.emergencyStop() }, kind = ButtonKind.Danger, icon = Icon.Close, compact = true)
         }
 
-        Row(Modifier.reveal(7).fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.Center) {
+        Row(Modifier.reveal(8).fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.Center) {
             EbText(
                 s.t("About EyeBlink", "EyeBlink hakkında"), Ink.BodyStrong, color = p.sky.text,
                 modifier = Modifier.androidxClickable { onPage(Page.ABOUT) }.padding(10.dp),
