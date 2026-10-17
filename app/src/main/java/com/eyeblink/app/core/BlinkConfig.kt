@@ -11,5 +11,3 @@ data class BlinkConfig(
 ) {
     val totalMs: Long get() = closeMs + holdMs + openMs
 }
-EOF
-echo done

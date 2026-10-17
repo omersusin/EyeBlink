@@ -40,4 +40,56 @@ Kotlin + Jetpack Compose settings. Components: Core, Blink Animation Engine, Eye
 
 ## Status
 
-Technical feasibility evaluation and architecture design in progress. Core animation + scheduling prototype next.
+**Implemented and compiling-ready (not yet built on a device):**
+
+| Component | State |
+|---|---|
+| Hybrid blink animation (gradient eyelids, darken, black hold, reopen) | done |
+| Reduced-motion path (snap closed, no sweep) | done |
+| Adaptive timer scheduling with clamps + cooldown bounds | done |
+| Full-screen overlay via foreground service (`TYPE_APPLICATION_OVERLAY`) | done |
+| Configurable timing + appearance persisted to DataStore | done |
+| Settings UI with live preview, start/stop, master toggle | done |
+| MediaSession pause/resume with state verification | done |
+| Context engine: screen-on, unlocked, foreground-app blocking | done |
+| Accessibility adapter (bounded play/pause node search) | done |
+
+**Not implemented yet:** camera tracking and MediaPipe blink detection, guided
+calibration (Milestone 3), adaptive learning (Milestone 4), LSPosed adapter,
+MediaProjection, Smart Rest / Blackout Rest / Distance Focus Rest, per-app
+compatibility testing, Quick Settings tile.
+
+The feature list above is the *design target*, not the current state.
+
+### Known gaps
+
+- Blink interval is a fixed constant (`BlinkController.DEFAULT_INTERVAL_MS = 20s`);
+  the adaptive interval formula was removed as dead logic.
+- `ContextEngine.foregroundPackage()` needs the user to grant Usage Access;
+  without it, blinks are suppressed entirely (fails safe).
+- Camera-based triggering from the design is absent — timing is timer-only.
+- Nothing here has been run on a device; behaviour is verified by inspection only.
+
+## Build
+
+Requires JDK 17+ and the Android SDK (compileSdk 35). No SDK is required to
+clone.
+
+```bash
+./gradlew :app:testDebugUnitTest   # unit tests
+./gradlew :app:assembleDebug       # debug APK
+./gradlew :app:lintDebug
+```
+
+### Permissions
+
+| Permission | Why | Required? |
+|---|---|---|
+| `SYSTEM_ALERT_WINDOW` | draw the blink overlay | yes |
+| `FOREGROUND_SERVICE` (+ `..._SPECIAL_USE`) | keep the overlay alive | yes |
+| `POST_NOTIFICATIONS` | show the ongoing-service notification | Android 13+ |
+| `MEDIA_CONTENT_CONTROL` | pause/resume media sessions | optional |
+| `PACKAGE_USAGE_STATS` | read foreground app to avoid interrupting calls | optional (granted in Settings) |
+
+Camera and Usage Access are requested in-app and are never mandatory; without
+them EyeBlink still blinks on a timer and simply stays quiet during calls.

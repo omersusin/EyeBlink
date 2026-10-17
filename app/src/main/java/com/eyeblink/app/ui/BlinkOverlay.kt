@@ -6,8 +6,6 @@ import androidx.compose.animation.core.asState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -56,5 +54,3 @@ private fun DrawScope.drawEyelid(top: Boolean, progress: Float, curve: Float, w:
         endY = if (top) lidH else h
     ))
 }
-EOF
-echo done

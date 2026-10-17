@@ -12,5 +12,3 @@ object EyeBlinkColors {
     val textDim = Color(0xFF9A9AA8)
     val danger = Color(0xFFFF5C7A)
 }
-EOF
-echo done
