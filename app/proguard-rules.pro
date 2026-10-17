@@ -32,9 +32,12 @@
 # Graph throws "no caller found on the stack for: ..." - so the face model never loads, in a release build only. Keeping the
 # class keeps the method as it is.
 -keep class com.google.common.flogger.** { *; }
+# Keeping all of Flogger makes R8 look at every class in it, including the optional back ends and annotations that are not
+# on this app's class path.
 -dontwarn com.google.common.flogger.**
-# Belt and braces for the same thing: nothing in FluentLogger may be inlined into its callers.
--neverinline class com.google.common.flogger.FluentLogger { *; }
+-dontwarn com.google.errorprone.annotations.**
+-dontwarn org.checkerframework.**
+-dontwarn javax.annotation.**
 
 # Keep source file + line numbers for readable production stack traces, but
 # hide the original source file name from the class file.

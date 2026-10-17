@@ -96,20 +96,15 @@ class CameraFaceSource(private val app: Application) : FaceSource {
      * (a tablet, an emulator, a camera an OEM keeps for itself) would otherwise only ever show a countdown and no pictures.
      */
     private fun hasFrontCamera(p: ProcessCameraProvider): Boolean {
-        val seen = p.availableCameraInfos.map { lensName(it.lensFacing) }
-        Log.i(TAG, "camera: CameraX can open ${seen.size} camera(s): ${seen.joinToString().ifEmpty { "none" }}")
-        if (p.hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA)) return true
-        val message = "this phone has no front camera EyeBlink can open (CameraX sees: ${seen.joinToString().ifEmpty { "none" }})"
+        val front = p.hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA)
+        val back = p.hasCamera(CameraSelector.DEFAULT_BACK_CAMERA)
+        val total = p.availableCameraInfos.size
+        Log.i(TAG, "camera: CameraX can open $total camera(s); front: ${if (front) "yes" else "no"}, back: ${if (back) "yes" else "no"}")
+        if (front) return true
+        val message = "this phone has no front camera EyeBlink can open (CameraX can open $total camera(s), none of them facing the screen)"
         Log.w(TAG, message)
         lastError = message
         return false
-    }
-
-    private fun lensName(lens: Int) = when (lens) {
-        CameraSelector.LENS_FACING_FRONT -> "front"
-        CameraSelector.LENS_FACING_BACK -> "back"
-        CameraSelector.LENS_FACING_EXTERNAL -> "external"
-        else -> "unknown"
     }
 
     /**
