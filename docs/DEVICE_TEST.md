@@ -13,7 +13,7 @@ Get the build: GitHub → **Actions** → the latest green **Android CI** run �
    Choose a few apps (Instagram, YouTube...) and allow *Accessibility* when asked.
 2. **Ready.** *Today* should offer **Wake EyeBlink**. If it still says "Finish setup" or "One quick step first", the accessibility service is not connected - check *More → Diagnostics → Health*.
 3. **A blink.** Tap **Wake EyeBlink**, then **Blink**. You should see two lids close from the top and bottom - covering the status bar too - hold black for a beat and open again. Touch something while it plays: your touch should still reach the app underneath.
-4. **A rest.** Tap **Rest**. A *Distance Focus* countdown appears on black; tapping *Skip* ends it at once. Switch the style to *Blackout* in *Rhythm* and repeat.
+4. **A rest.** Tap **Rest**. A *Distance focus* countdown appears on black; tapping *Skip* ends it at once. Switch the style to *Blackout* in *Rhythm* and repeat.
 5. **It leaves you alone.** Open YouTube (selected). Wait for the interval: a blink should arrive in about a minute (not while a finger is on the screen, not while typing). Open the phone app or a banking app: nothing should be drawn there.
 6. **The tile.** Add the *EyeBlink* Quick Settings tile. Tap it: everything stops and the overlay is gone. Tap again to resume.
 
