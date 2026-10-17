@@ -27,6 +27,12 @@
 # ship (the graph profiler and graph templates, which a face landmarker never touches). R8 rejects a keep that points at a
 # missing class unless told it is expected.
 -dontwarn com.google.mediapipe.proto.**
+# MediaPipe logs through Flogger, and FluentLogger.forEnclosingClass() finds its caller by looking for its own frame on the
+# stack. R8 inlines that two-line method into the caller, the frame disappears, and the static initialiser of MediaPipe's
+# Graph throws "no caller found on the stack for: ..." - so the face model never loads, in a release build only. Keeping the
+# class keeps the method as it is.
+-keep class com.google.common.flogger.** { *; }
+-dontwarn com.google.common.flogger.**
 
 # Keep source file + line numbers for readable production stack traces, but
 # hide the original source file name from the class file.

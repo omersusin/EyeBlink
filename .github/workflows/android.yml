@@ -263,6 +263,9 @@ jobs:
           profile: pixel_6
           ram-size: 3072M
           disable-animations: false
+          # The runner's own options, plus a front camera: the calibration page opens it, and without one nothing but an
+          # error could ever be seen there. (There is no back camera to ask for, so none is started.)
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-front emulated -camera-back none
           script: bash .github/smoke/smoke.sh
 
       - name: Upload what it saw

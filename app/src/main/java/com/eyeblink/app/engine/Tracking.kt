@@ -228,8 +228,8 @@ class Calibrator(
     private var result: CalibrationResult? = null
     private var tick: Job? = null
     private var blinks = 0
-    private var startedAtMs = 0L
     private var framesSeen = 0
+    private var lastFrameAtMs = 0L
 
     /** Background tracking must not touch the camera while this is true. */
     val running: Boolean get() = session != null
@@ -257,7 +257,7 @@ class Calibrator(
         result = null
         blinks = 0
         framesSeen = 0
-        startedAtMs = nowMs()
+        lastFrameAtMs = nowMs()
         detector = BlinkThresholds().newDetector()
         val started = source.start(CALIBRATION_FPS, { frame, _ -> post { onFrame(frame) } }, { message -> post { abort(message) } })
         if (!started) {
@@ -284,7 +284,8 @@ class Calibrator(
 
     private fun onFrame(frame: FaceFrame) {
         val s = session ?: return
-        if (++framesSeen == 1) Log.i(TAG, "calibration: the first camera picture came ${nowMs() - startedAtMs} ms after Begin, face seen: ${frame.sample != null}")
+        lastFrameAtMs = nowMs()
+        if (++framesSeen == 1) Log.i(TAG, "calibration: the first camera picture arrived, face seen: ${frame.sample != null}")
         val sample = frame.sample
         if (sample != null) {
             s.onSample(sample)
@@ -296,10 +297,11 @@ class Calibrator(
     private fun step() {
         val s = session ?: return
         val now = nowMs()
-        // A camera that another app holds opens "successfully" and then never delivers a picture; say so instead of waiting.
-        if (framesSeen == 0 && now - startedAtMs > NO_FRAMES_MS) {
+        // A camera that another app holds, or that was switched off under the session, opens "successfully" and then never
+        // delivers a picture; say so instead of counting down.
+        if (now - lastFrameAtMs > NO_FRAMES_MS) {
             val said = faces?.lastError?.let { " ($it)" }.orEmpty()
-            abort("no pictures arrived from the camera in ${NO_FRAMES_MS / 1_000} seconds$said")
+            abort((if (framesSeen == 0) "no picture arrived from the camera in" else "the camera stopped delivering pictures for") + " ${NO_FRAMES_MS / 1_000} seconds$said")
             return
         }
         s.onTick(now)

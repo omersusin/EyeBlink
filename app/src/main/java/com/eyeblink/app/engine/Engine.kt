@@ -467,8 +467,11 @@ class Engine(val app: Application, ports: EnginePorts) {
             pollForeground(now)
             val ctx = buildContext(now)
             val input = schedulerInput(ctx, now)
-            val eligible = ctx.screenOn && !ctx.deviceLocked && input.profile != null && !suspended && !calibrator.running
-            tracking.tick(now, eligible)
+            val eligible = ctx.screenOn && !ctx.deviceLocked && input.profile != null && !suspended
+            // While the calibration runs it owns the camera. On its next tick the tracker would find a camera that "should
+            // not be running" (tracking off, or nobody eligible) and stop it, and the calibration would count down without
+            // ever seeing a picture.
+            if (!calibrator.running) tracking.tick(now, eligible)
             sampleBattery(now, ctx)
 
             val step = if (suspended || !windows.available()) {

@@ -82,12 +82,34 @@ class CameraFaceSource(private val app: Application) : FaceSource {
             try {
                 if (ensureLandmarker() == null) { fail(onError, lastError ?: "the face model could not be loaded"); return@execute }
                 val p = ProcessCameraProvider.getInstance(app).get()
+                if (!hasFrontCamera(p)) { fail(onError, lastError); return@execute }
                 main.post { bind(p, fps, onFrame, onError) }
             } catch (e: Throwable) {
                 fail(onError, remember(e, "the camera could not be started"))
             }
         }
         return true
+    }
+
+    /**
+     * Logs which cameras CameraX can open and says so when none of them faces the person: a phone without a front camera
+     * (a tablet, an emulator, a camera an OEM keeps for itself) would otherwise only ever show a countdown and no pictures.
+     */
+    private fun hasFrontCamera(p: ProcessCameraProvider): Boolean {
+        val seen = p.availableCameraInfos.map { lensName(it.lensFacing) }
+        Log.i(TAG, "camera: CameraX can open ${seen.size} camera(s): ${seen.joinToString().ifEmpty { "none" }}")
+        if (p.hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA)) return true
+        val message = "this phone has no front camera EyeBlink can open (CameraX sees: ${seen.joinToString().ifEmpty { "none" }})"
+        Log.w(TAG, message)
+        lastError = message
+        return false
+    }
+
+    private fun lensName(lens: Int) = when (lens) {
+        CameraSelector.LENS_FACING_FRONT -> "front"
+        CameraSelector.LENS_FACING_BACK -> "back"
+        CameraSelector.LENS_FACING_EXTERNAL -> "external"
+        else -> "unknown"
     }
 
     /**

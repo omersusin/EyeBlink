@@ -86,14 +86,58 @@ press() {
   fi
 }
 
+# EyeBlink's saved settings live in its private folder. run-as reaches that folder only for a debuggable build, and the
+# minified build is not one (a debuggable build is optimised less, which once hid a failure that only the real release
+# had), so there the emulator's root shell is used - the image allows it - and the file is given the folder's owner and
+# SELinux label so the app can read and rewrite it.
+ROOT=0
+use_root_when_needed() {
+  if adb shell "run-as $PKG true" >/dev/null 2>&1; then
+    echo "run-as works: the build is debuggable"
+    return
+  fi
+  adb root > /dev/null 2>&1
+  for _ in 1 2 3 4 5; do
+    adb wait-for-device
+    if [ "$(ashell id -u)" = 0 ]; then
+      ROOT=1
+      echo "the build is not debuggable: using the emulator's root shell for its saved settings"
+      return
+    fi
+    sleep 2
+  done
+  warn "no run-as and no root: the saved settings cannot be reached"
+}
+prefs_read() {
+  if [ "$ROOT" = 1 ]; then
+    adb shell "cat /data/data/$PKG/shared_prefs/eyeblink.xml" 2>/dev/null | tr -d '\r'
+  else
+    adb shell "run-as $PKG cat shared_prefs/eyeblink.xml" 2>/dev/null | tr -d '\r'
+  fi
+}
+prefs_write() { # $1 = the file to install as the app's settings
+  if [ "$ROOT" = 1 ]; then
+    local dir=/data/data/$PKG uid label
+    uid=$(ashell stat -c %u "$dir")
+    label=$(ashell ls -dZ "$dir" | awk '{print $1}')
+    adb push "$1" /data/local/tmp/eyeblink-seed.xml > /dev/null
+    adb shell "mkdir -p $dir/shared_prefs && rm -f $dir/shared_prefs/eyeblink.xml.bak && cp /data/local/tmp/eyeblink-seed.xml $dir/shared_prefs/eyeblink.xml && chown -R $uid:$uid $dir/shared_prefs && (chcon -R $label $dir/shared_prefs || restorecon -R $dir/shared_prefs)"
+    ashell ls -lZ "$dir/shared_prefs"
+  else
+    adb shell "run-as $PKG sh -c 'rm -f shared_prefs/eyeblink.xml.bak; mkdir -p shared_prefs; cat > shared_prefs/eyeblink.xml'" < "$1"
+  fi
+}
+
 # What the app, CameraX and the camera service said, for when the camera does not deliver what it should.
 camera_report() {
   echo "--- the app's own log ---"
   adb logcat -d -s EyeBlink:V 2>/dev/null | tr -d '\r' | tail -25
   echo "--- CameraX and the camera service ---"
   adb logcat -d -v threadtime 2>/dev/null | tr -d '\r' | grep -iE "camera" | grep -v "EyeBlink" | tail -50
-  echo "--- the camera service's clients and events ---"
-  adb shell dumpsys media.camera 2>/dev/null | tr -d '\r' | grep -iE "eyeblink|active|connect|evict|error|camera [0-9]+:" | head -40
+  echo "--- the emulator's camera settings ---"
+  grep -h "hw.camera" "$HOME"/.android/avd/*.avd/config.ini 2>/dev/null
+  echo "--- the camera service: which cameras, which way they face, who has them open ---"
+  adb shell dumpsys media.camera 2>/dev/null | tr -d '\r' | grep -iE "eyeblink|number of camera devices|static information|lens.facing|evict|error" | head -30
 }
 
 collect() {
@@ -104,7 +148,7 @@ collect() {
   ashell dumpsys accessibility > "$OUT/dumpsys-accessibility.txt" 2>&1
   ashell dumpsys window windows > "$OUT/dumpsys-windows.txt" 2>&1
   ashell "dumpsys notification --noredact" > "$OUT/dumpsys-notifications.txt" 2>&1
-  adb shell "run-as $PKG cat shared_prefs/eyeblink.xml" > "$OUT/final-prefs.xml" 2>&1
+  prefs_read > "$OUT/final-prefs.xml" 2>&1
 }
 
 # ── the device ──────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -131,6 +175,7 @@ adb shell pm grant "$PKG" android.permission.POST_NOTIFICATIONS
 adb shell pm grant "$PKG" android.permission.CAMERA
 adb shell appops set "$PKG" SYSTEM_ALERT_WINDOW allow
 adb shell appops set "$PKG" GET_USAGE_STATS allow
+use_root_when_needed
 
 # ── 1. first start, then a walk through the app ─────────────────────────────────────────────────────────────────────
 
@@ -213,9 +258,17 @@ if tools tap Calibration --timeout 15; then
     # Long enough for the page to show a verdict: the session gives up after 20 s without a single picture from the camera.
     sleep 26
     snap 15-calibration
-    # "Camera on" only says the camera was asked; the app logs the moment the first picture really arrives.
-    if adb logcat -d -s EyeBlink:I 2>/dev/null | tr -d '\r' | grep "calibration: the first camera picture"; then
+    shown_texts=$(tools texts "$OUT/15-calibration.xml")
+    if echo "$shown_texts" | grep -q "face model could not be loaded"; then
+      # The face model is what R8 once broke in the release build only; this must never come back.
+      fail "the face model could not be loaded"
+      echo "$shown_texts" | grep -iE "face model|caused by|Error|Exception" | head -8
+      camera_report
+    elif adb logcat -d -s EyeBlink:I 2>/dev/null | tr -d '\r' | grep "calibration: the first camera picture"; then
       echo "pictures are arriving from the camera"
+    elif echo "$shown_texts" | grep -q "no front camera"; then
+      warn "this emulator has no front camera, so the camera pipeline was not exercised"
+      camera_report
     else
       warn "no picture came from the camera during calibration"
       camera_report
@@ -224,7 +277,7 @@ if tools tap Calibration --timeout 15; then
       echo "calibration is running: the camera and the face model came up"
     else
       warn "calibration did not stay running"
-      tools texts "$OUT/15-calibration.xml" | head -20
+      echo "$shown_texts" | head -20
     fi
   else
     warn "could not press Begin on the calibration page"
@@ -352,7 +405,7 @@ fi
 
 # Preferences first, then the accessibility service, so the engine finds its settings when the service wakes it up.
 tools seed "${fg:-com.android.documentsui}" > "$OUT/seed-eyeblink.xml"
-adb shell "run-as $PKG sh -c 'rm -f shared_prefs/eyeblink.xml.bak; mkdir -p shared_prefs; cat > shared_prefs/eyeblink.xml'" < "$OUT/seed-eyeblink.xml"
+prefs_write "$OUT/seed-eyeblink.xml"
 adb shell settings put secure enabled_accessibility_services "$PKG/$A11Y"
 adb shell settings put secure accessibility_enabled 1
 adb logcat -c
@@ -374,9 +427,9 @@ deadline=$((SECONDS + 100))
 while [ "$SECONDS" -lt "$deadline" ]; do
   sleep 5
   alive || break
-  if adb shell "run-as $PKG cat shared_prefs/eyeblink.xml" 2>/dev/null | tr -d '\r' | tools ledger --quiet; then shown=yes; break; fi
+  if prefs_read | tools ledger --quiet; then shown=yes; break; fi
 done
-adb shell "run-as $PKG cat shared_prefs/eyeblink.xml" 2>/dev/null | tr -d '\r' | tools ledger || true
+prefs_read | tools ledger || true
 if [ "$shown" = yes ]; then
   echo "an automatic blink was shown"
 else
