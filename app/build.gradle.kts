@@ -1,3 +1,7 @@
+// NOTE: `java` alone resolves to Gradle's JavaPluginExtension, shadowing the
+// `java.util` package, so Properties must be imported rather than fully qualified.
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -7,7 +11,7 @@ plugins {
 // Signing credentials come from keystore.properties (local, git-ignored) or from
 // environment variables (CI). Never commit real values.
 val keystorePropsFile = rootProject.file("keystore.properties")
-val keystoreProps = java.util.Properties().apply {
+val keystoreProps = Properties().apply {
     if (keystorePropsFile.exists()) keystorePropsFile.inputStream().use { load(it) }
 }
 
@@ -61,7 +65,9 @@ android {
     }
 
     buildFeatures { compose = true }
-    composeOptions { kotlinCompilerExtensionVersion = "1.5.15" }
+    // No composeOptions.kotlinCompilerExtensionVersion here: the Kotlin 2.x
+    // Compose plugin derives a matching compiler itself, and pinning it
+    // manually causes a version-mismatch failure.
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
