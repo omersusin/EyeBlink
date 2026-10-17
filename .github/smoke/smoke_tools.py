@@ -36,7 +36,8 @@ def adb(*args, timeout=60):
 
 
 def dump(path, tries=8, pause=1.5):
-    """uiautomator refuses while the screen is still changing, so ask again a few times."""
+    """uiautomator refuses while the screen is still changing, so ask again a few times. A system box that has
+    covered the app (see below) is pressed away and the screen read again."""
     for _ in range(tries):
         try:
             adb("shell", "rm", "-f", DUMP_ON_DEVICE)
@@ -46,8 +47,27 @@ def dump(path, tries=8, pause=1.5):
             out = None
         if out is not None and out.returncode == 0 and b"<hierarchy" in out.stdout:
             Path(path).write_bytes(out.stdout)
+            if dismiss_system_dialog(out.stdout.decode(errors="replace")):
+                time.sleep(1.5)
+                continue
             return True
         time.sleep(pause)
+    return False
+
+
+def dismiss_system_dialog(xml_text):
+    """A slow emulator makes the launcher miss its deadline, and Android then covers whatever is running with
+    "Pixel Launcher isn't responding" until somebody presses Wait. Does that, and says whether it had to."""
+    said = [n[0] for n in nodes(xml_text)]
+    if not any("isn't responding" in s or "keeps stopping" in s for s in said):
+        return False
+    for label in ("Wait", "OK", "Close app"):
+        box = find(xml_text, label)
+        if box:
+            x, y = centre(box)
+            adb("shell", "input", "tap", str(x), str(y))
+            print(f"a system dialog was in the way; pressed '{label}'")
+            return True
     return False
 
 

@@ -101,6 +101,11 @@ step "Device"
 echo "Android $(ashell getprop ro.build.version.release) (API $(ashell getprop ro.build.version.sdk)), $(ashell getprop ro.product.cpu.abi)"
 adb shell input keyevent KEYCODE_WAKEUP
 adb shell wm dismiss-keyguard
+# A slow emulator makes the launcher miss its deadline, and an "isn't responding" box then covers the app for the rest of
+# the run. Hide such boxes, give the launcher a moment to settle, and let the UI helper press Wait on any that slip through.
+adb shell settings put global hide_error_dialogs 1
+adb shell input keyevent KEYCODE_HOME
+sleep 15
 
 step "Install"
 apk=""
