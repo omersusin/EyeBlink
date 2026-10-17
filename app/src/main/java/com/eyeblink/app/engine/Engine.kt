@@ -108,6 +108,17 @@ class Engine(val app: Application, ports: EnginePorts) {
     // ── components ───────────────────────────────────────────────
 
     private val stores = Stores(app)
+
+    // What was saved, loaded before any component is built. Properties are initialised in the order they are
+    // declared, and some components read these while they are still being constructed (the tracker takes its
+    // first thresholds from the profile). Declared any further down they are still null at that moment, which
+    // made the engine throw - and the app die - the first time it started.
+    @Volatile var settings: EyeBlinkSettings = stores.loadSettings()
+        private set
+    private var personal: PersonalProfile = stores.loadProfile()
+    private var ledger: UsageLedger = stores.loadLedger()
+    private var batteryLedger = stores.loadBattery()
+
     private val device = DeviceState(app)
     private val light = AmbientLight(app)
     private val sessions = MediaSessions(app)
@@ -160,13 +171,7 @@ class Engine(val app: Application, ports: EnginePorts) {
     }
     private val director = BreakDirector(overlay, coordinator, env)
 
-    // ── state (engine thread only unless marked) ─────────────────
-
-    @Volatile var settings: EyeBlinkSettings = stores.loadSettings()
-        private set
-    private var personal: PersonalProfile = stores.loadProfile()
-    private var ledger: UsageLedger = stores.loadLedger()
-    private var batteryLedger = stores.loadBattery()
+    // ── state (engine thread only unless marked; the saved values are declared with `stores`, above) ──
 
     @Volatile private var running = false
     @Volatile private var suspended = false
