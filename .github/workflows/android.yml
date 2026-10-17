@@ -82,19 +82,21 @@ jobs:
       - name: Assemble release APK
         run: ./gradlew assembleRelease --stacktrace
 
-      - name: Report release signing state
+      # apksigner is the source of truth. Do NOT look for META-INF/*.RSA:
+      # at minSdk 26 AGP emits v2/v3 signatures only, which write an APK
+      # Signing Block and no META-INF signature entries at all.
+      - name: Verify release APK
         run: |
           APK=app/build/outputs/apk/release/app-release.apk
-          if [ -f "$APK" ]; then
-            echo "release APK: $(du -h "$APK" | cut -f1)"
-            if unzip -l "$APK" | grep -q "META-INF/.*\.\(RSA\|SF\|MF\)"; then
-              echo "signature: PRESENT"
-              "$ANDROID_HOME"/build-tools/35.0.0/apksigner verify --verbose "$APK" || true
-            else
-              echo "signature: ABSENT (no signing secrets configured)"
-            fi
+          echo "release APK: $(du -h "$APK" | cut -f1)"
+          if "$ANDROID_HOME"/build-tools/35.0.0/apksigner verify --verbose --print-certs "$APK"; then
+            echo "result: SIGNED and verified"
           else
-            echo "release APK missing"; exit 1
+            echo "result: unsigned or unverifiable"
+            if [ -n "$KEYSTORE_PASSWORD" ]; then
+              echo "secrets were configured, so a signing failure is a real error"
+              exit 1
+            fi
           fi
 
       - name: Upload APKs
