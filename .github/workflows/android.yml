@@ -21,6 +21,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
+    # Job-level so every Gradle step sees them. The signing block in
+    # app/build.gradle.kts reads these env vars; blank values mean "unsigned".
+    env:
+      KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+      KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+      KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -46,9 +53,10 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       # Materialise the signing key from secrets. Nothing is committed to the
-      # repo, and the file is removed at the end of the job.
+      # repo, and the file is removed at the end of the job. Skipped entirely
+      # when no key is configured, which leaves the release APK unsigned.
       - name: Decode signing keystore
-        if: ${{ env.KEYSTORE_BASE64 != '' }}
+        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
