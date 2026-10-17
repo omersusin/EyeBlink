@@ -4,8 +4,22 @@ Everything below the unit tests has been built and linted by CI but never run on
 things in, with what you should see. Each step is small; stop at the first thing that surprises you and send the
 **Copy report** text from *More → Diagnostics* (versions, permissions and counters only - nothing personal) with a note of which step.
 
-Get the build: GitHub → **Actions** → the latest green **Android CI** run → artifact `eyeblink-apk` → install the
-`arm64-v8a` release APK (or the debug one, whose package is `com.eyeblink.app.debug`).
+Get the build: GitHub → **Actions** → the latest green **Android CI** run → artifact `eyeblink-release-arm64` (the ordinary
+install) or `eyeblink-debug-arm64` (package `com.eyeblink.app.debug`; install it as well while testing, because its crash logs are readable).
+
+## If it crashes
+
+On a rooted phone, from Termux:
+
+```
+su -c "logcat -b all -c"                                       # clear the old logs
+# open EyeBlink and let it crash, then:
+su -c "logcat -b crash -d -v threadtime" > ~/eyeblink-crash.txt
+cat ~/eyeblink-crash.txt
+```
+
+Without root, `adb logcat -b crash -d` from a computer shows the same thing. What helps most is the block that starts at
+`FATAL EXCEPTION`, with every `Caused by:` line, and whether it happened at launch or after a particular tap.
 
 ## Rootless basics
 

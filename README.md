@@ -109,8 +109,14 @@ The reasoning behind each of these is in [docs/FEASIBILITY.md](docs/FEASIBILITY.
 
 ## Try it
 
-Every push is built by GitHub Actions. Open the latest run of **Android CI** and download the artifact `eyeblink-apk`: debug and release APKs split per ABI
-(release: about 15 MB for `arm64-v8a`, which is nearly every phone; 12 MB for `armeabi-v7a`; 18 MB for `x86_64` emulators), a 27 MB App Bundle, and the optional LSPosed module.
+Every push is built by GitHub Actions. Open the latest run of **Android CI** and download one of its artifacts:
+
+- **`eyeblink-release-arm64`** - the release APK for `arm64-v8a`, which is nearly every phone (about 15 MB).
+- **`eyeblink-debug-arm64`** - the debug build. It installs next to the release as `com.eyeblink.app.debug`, is not minified, and its crash logs read like the source.
+- **`eyeblink-apk`** - everything: debug and release APKs per ABI (12 MB `armeabi-v7a`, 18 MB `x86_64` for emulators), a 27 MB App Bundle and the optional LSPosed module.
+
+A second job, **Start it on an emulator**, installs the debug build on an Android 15 emulator, walks through onboarding, a rest, a blink, the tabs and the language list, then lets the engine run with the accessibility service on.
+It fails the run if the app dies or an engine task throws, and keeps screenshots and logs in `eyeblink-smoke`.
 Release builds are signed (v2 and v3) when the repository has keystore secrets, and CI verifies the signature.
 On first start, onboarding explains each permission; only *Accessibility* (or *Display over other apps*) is required.
 

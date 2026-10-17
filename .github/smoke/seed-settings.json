@@ -1,0 +1,13 @@
+{
+  "onboardingDone": true,
+  "startOnBoot": true,
+  "apps": [{ "packageName": "PACKAGE", "label": "PACKAGE" }],
+  "rhythm": {
+    "microIntervalSec": 5,
+    "adaptive": false,
+    "jitterPercent": 0,
+    "cooldownSec": 3,
+    "postRestGraceMin": 0,
+    "restEnabled": false
+  }
+}
