@@ -275,6 +275,18 @@ if tools tap Calibration --timeout 15; then
     fi
     if tools has "$OUT/15-calibration.xml" "Camera on"; then
       echo "calibration is running: the camera and the face model came up"
+      # Skip the three steps, so that the page a person reaches after three minutes is drawn at least once on a real runtime.
+      for _ in 1 2 3; do
+        tools tap "Skip this step" --timeout 8 && sleep 2
+      done
+      sleep 3
+      snap 16-calibration-result
+      if tools has "$OUT/16-calibration-result.xml" "Not enough to learn from yet" ||
+        tools has "$OUT/16-calibration-result.xml" "Here is what I learned"; then
+        echo "the calibration result page is drawn"
+      else
+        warn "no result page after skipping through the calibration"
+      fi
     else
       warn "calibration did not stay running"
       echo "$shown_texts" | head -20

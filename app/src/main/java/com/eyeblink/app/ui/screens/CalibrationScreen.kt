@@ -59,7 +59,10 @@ fun CalibrationScreen(state: UiState, actions: UiActions, onBack: () -> Unit) {
     val s = S
     val c = state.calibration
     PageColumn(s.t("Calibration", "Kalibrasyon"), s.t("Meet your blink", "Kırpmanla tanış"), onBack = {
-        if (c.stage == CalibrationStage.RUNNING) actions.cancelCalibration()
+        // A session in progress is dropped on the way out, and so is a result with nothing in it to keep; a result that can
+        // still be saved stays until it is.
+        val nothingToKeep = c.stage == CalibrationStage.RESULT && c.result?.hasEnoughSpontaneous != true
+        if (c.stage == CalibrationStage.RUNNING || nothingToKeep) actions.cancelCalibration()
         onBack()
     }) {
         when (c.stage) {
