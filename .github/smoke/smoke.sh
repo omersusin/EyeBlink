@@ -25,6 +25,17 @@ warn() { echo "::warning::$*"; }
 tools() { python3 "$HERE/smoke_tools.py" "$@"; }
 ashell() { adb shell "$@" | tr -d '\r'; }
 shot() { adb exec-out screencap -p > "$OUT/$1.png" 2>/dev/null || warn "no screenshot for $1"; }
+
+# A screenshot, plus what the log needs to say about it: which colours it is made of and which words are on screen.
+snap() {
+  shot "$1"
+  echo "[$1] $(tools palette "$OUT/$1.png")"
+  if tools dump "$OUT/$1.xml"; then
+    tools texts "$OUT/$1.xml" | head -30
+  else
+    echo "[$1] (the UI tree could not be read)"
+  fi
+}
 alive() { ashell pidof "$PKG" | grep -Eq '^[0-9]+'; }
 crash_log() { adb logcat -d -b crash -v threadtime 2>/dev/null | tr -d '\r'; }
 engine_errors() { adb logcat -d -s EyeBlink:E 2>/dev/null | tr -d '\r'; }
@@ -49,7 +60,7 @@ press() {
   shift 2
   if tools tap "$label" "$@"; then
     sleep 2
-    shot "$shot_name"
+    snap "$shot_name"
   else
     warn "could not tap '$label' (step $shot_name)"
     return 1
@@ -91,10 +102,9 @@ step "First start, as a new user"
 adb logcat -c
 timeout 120 adb shell am start -W -n "$PKG/$ACTIVITY" | tail -6
 sleep 8
-shot 01-welcome
 health "first start"
-if tools dump "$OUT/01-welcome.xml"; then
-  tools texts "$OUT/01-welcome.xml" | head -40
+snap 01-welcome
+if [ -f "$OUT/01-welcome.xml" ]; then
   tools has "$OUT/01-welcome.xml" Welcome Begin || warn "the welcome page is not what was expected"
 else
   warn "could not read the UI tree"
@@ -119,6 +129,7 @@ step "A rest on demand"
 if tools tap Rest --topmost --timeout 15; then
   sleep 4
   shot 07-rest
+  echo "[07-rest] $(tools palette "$OUT/07-rest.png")"
   ashell dumpsys window windows | grep -E "EyeBlink" | head -5
   black=$(tools black "$OUT/07-rest.png")
   echo "black share of the screen during the rest: $black"
@@ -142,23 +153,21 @@ for tab in Rhythm Apps More; do
 done
 if tools tap English --timeout 10; then
   sleep 2
-  shot 10-language-list
+  snap 10-language-list
   if tools tap "Türkçe" --timeout 8; then
     sleep 3
-    shot 11-turkish
-    if tools dump "$OUT/11-turkish.xml"; then
-      tools has "$OUT/11-turkish.xml" "Bugün" || warn "the app did not switch to Turkish"
-    fi
+    snap 11-turkish
+    tools has "$OUT/11-turkish.xml" "Bugün" || warn "the app did not switch to Turkish"
     tools tap "Türkçe" --timeout 8 && sleep 2
     tools tap English --timeout 8 && sleep 2
-    shot 12-english-again
+    snap 12-english-again
   fi
 else
   warn "could not open the language list"
 fi
 if tools tap Dark --timeout 8; then
   sleep 2
-  shot 13-dark
+  snap 13-dark
 fi
 health "after tabs, language and theme"
 
@@ -192,14 +201,14 @@ adb shell settings put secure accessibility_enabled 1
 adb logcat -c
 timeout 120 adb shell am start -W -n "$PKG/$ACTIVITY" | tail -3
 sleep 8
-shot 20-running
+snap 20-running
 health "start with saved settings"
 ashell dumpsys accessibility | grep -i "eyeblink" | head -5 || true
 
 if [ -n "$component" ]; then
   adb shell am start -n "$component"
   sleep 4
-  shot 21-selected-app
+  snap 21-selected-app
 fi
 
 echo "waiting for an automatic blink..."
@@ -216,7 +225,7 @@ if [ "$shown" = yes ]; then
 else
   warn "no automatic blink was recorded in 100 s (selected app: ${fg:-none})"
 fi
-shot 22-after-blinks
+snap 22-after-blinks
 health "after automatic breaks"
 
 # ── report ──────────────────────────────────────────────────────────────────────────────────────────────────────────

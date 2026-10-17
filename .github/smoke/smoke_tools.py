@@ -11,6 +11,8 @@
     smoke_tools.py ledger [--quiet]              read EyeBlink's SharedPreferences XML from stdin and print what its
                                                  usage ledger recorded; exit 0 when at least one blink was shown
     smoke_tools.py black IMAGE.png               print the share of (nearly) black pixels in a screenshot
+    smoke_tools.py palette IMAGE.png             print how much of a screenshot is pure black, Daylight page, Moonlit page
+                                                 or white, so a log can say whether the right screen was drawn
 """
 import json
 import re
@@ -139,14 +141,40 @@ def ledger(prefs_xml):
     return None
 
 
-def black_share(path):
+def thumbnail_pixels(path):
+    """The screenshot as a list of (r, g, b), shrunk first: the shares below do not need every pixel."""
     try:
         from PIL import Image
     except ImportError:
-        return None
+        return None, None
     image = Image.open(path).convert("RGB")
-    pixels = image.getdata()
+    size = image.size
+    small = image.resize((max(1, size[0] // 8), max(1, size[1] // 8)), Image.NEAREST)
+    raw = small.tobytes()
+    return size, list(zip(raw[0::3], raw[1::3], raw[2::3]))
+
+
+def black_share(path):
+    _, pixels = thumbnail_pixels(path)
+    if pixels is None:
+        return None
     return sum(1 for r, g, b in pixels if max(r, g, b) <= 8) / max(1, len(pixels))
+
+
+def palette(path):
+    """Shares of the colours that identify EyeBlink's screens, as a one-line summary."""
+    size, pixels = thumbnail_pixels(path)
+    if pixels is None:
+        return "no Pillow, no palette"
+    total = max(1, len(pixels))
+
+    def near(colour, tolerance=10):
+        return sum(1 for px in pixels if all(abs(px[i] - colour[i]) <= tolerance for i in range(3))) / total
+
+    return (
+        f"{size[0]}x{size[1]}  black {near((0, 0, 0), 8):.2f}  daylight page {near((0xF3, 0xF8, 0xFF)):.2f}"
+        f"  moonlit page {near((0x11, 0x14, 0x3B)):.2f}  white {near((255, 255, 255), 4):.2f}"
+    )
 
 
 # ── command line ──────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -198,6 +226,10 @@ def main(argv):
         if "--quiet" not in rest:
             print(json.dumps(totals, sort_keys=True))
         return 0 if totals.get("microShown", 0) >= 1 else 1
+
+    if command == "palette" and len(rest) == 1:
+        print(palette(rest[0]))
+        return 0
 
     if command == "black" and len(rest) == 1:
         share = black_share(rest[0])
