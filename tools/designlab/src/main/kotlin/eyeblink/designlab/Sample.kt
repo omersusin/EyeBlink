@@ -66,14 +66,18 @@ object Sample {
 
     private val week = listOf(day(38, 3, 82), day(52, 4, 104, skipped = 1), day(21, 1, 40), day(66, 5, 131), day(71, 6, 149, skipped = 2), day(44, 3, 96), day(29, 2, 61))
 
-    fun calibration(stage: CalibrationStage, phase: com.eyeblink.core.calibration.CalibrationSession.Phase = com.eyeblink.core.calibration.CalibrationSession.Phase.VIDEO): UiState {
+    fun calibration(
+        stage: CalibrationStage,
+        phase: com.eyeblink.core.calibration.CalibrationSession.Phase = com.eyeblink.core.calibration.CalibrationSession.Phase.VIDEO,
+        hint: com.eyeblink.core.calibration.CalibrationSession.Hint = com.eyeblink.core.calibration.CalibrationSession.Hint.NONE,
+    ): UiState {
         val base = state()
         val video = BlinkBaseline(9_800, 138, 0.9f, 7)
         val reading = BlinkBaseline(13_400, 145, 0.86f, 6)
         val general = BlinkBaseline(11_300, 141, 0.88f, 13)
         val profile = PersonalProfile(
             general = general, byContext = mapOf(ContextProfile.VIDEO to video, ContextProfile.READING to reading),
-            thresholds = com.eyeblink.core.calibration.BlinkThresholds(0.34f, 0.58f, 0.14f, true),
+            thresholds = com.eyeblink.core.calibration.BlinkThresholds(0.30f, 0.14f, 0.55f, true, 0.60f),
         )
         val result = com.eyeblink.core.calibration.CalibrationResult(
             baseline = general, spontaneousCount = 13, instructedCount = 5, complete = true, completeRatio = 0.88f,
@@ -82,7 +86,9 @@ object Sample {
         return base.copy(
             calibration = CalibrationUi(
                 stage = stage, phase = phase, phaseProgress = 0.42f, remainingSec = 34, deliberateTotal = 5, deliberateLeft = 2,
-                liveOpenness = 0.82f, blinksSeen = 4, result = if (stage == CalibrationStage.RESULT) result else null, hasCameraPermission = true,
+                liveOpenness = if (phase == com.eyeblink.core.calibration.CalibrationSession.Phase.DELIBERATE) 0.58f else 0.82f,
+                countsAt = 0.38f, hint = hint,
+                blinksSeen = 4, result = if (stage == CalibrationStage.RESULT) result else null, hasCameraPermission = true,
                 quality = com.eyeblink.core.calibration.QualityReport(0.55f, setOf(com.eyeblink.core.calibration.QualityIssue.TOO_DARK)),
             ),
             personal = if (stage == CalibrationStage.RESULT) profile else base.personal,

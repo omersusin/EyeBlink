@@ -353,6 +353,7 @@ class Engine(val app: Application, ports: EnginePorts) {
             if (next.camera.tracking == com.eyeblink.core.model.TrackingMode.OFF) tracking.stopCamera()
             service?.get()?.refresh()
         }
+        if (old.camera.sensitivity != next.camera.sensitivity) tracking.applyThresholds(personal.thresholds)
         syncService()
         notifyState()
         publish()

@@ -43,6 +43,7 @@ import com.eyeblink.core.model.NoPauseFallback
 import com.eyeblink.core.model.RestStyle
 import com.eyeblink.core.model.RhythmPreset
 import com.eyeblink.core.model.RhythmSettings
+import com.eyeblink.core.model.EyeSensitivity
 import com.eyeblink.core.model.TrackingMode
 import kotlin.math.ln
 import kotlin.math.pow
@@ -197,6 +198,20 @@ fun RhythmScreen(state: UiState, actions: UiActions, onPage: (Page) -> Unit, mod
                     { onPage(Page.CALIBRATION) }, kind = ButtonKind.Soft, icon = Icon.Eye, compact = true,
                 )
             }
+            Spacer(Modifier.height(16.dp))
+            EbText(s.t("Eye sensitivity", "Göz hassasiyeti"), Ink.Eyebrow, caps = false)
+            Spacer(Modifier.height(8.dp))
+            Tide(listOf(s.t("Auto", "Otomatik"), s.t("Higher", "Yüksek"), s.t("Lower", "Düşük")), st.camera.sensitivity.ordinal, { i ->
+                setS { it.copy(camera = it.camera.copy(sensitivity = EyeSensitivity.entries[i])) }
+            })
+            Spacer(Modifier.height(6.dp))
+            EbText(
+                s.t(
+                    "EyeBlink measures every eye against its own open level, so Auto suits almost everyone. Choose Higher if your eyelids only move a little (narrow eyes, heavy lids) and blinks are missed; Lower if it sees blinks that did not happen.",
+                    "EyeBlink her gözü kendi açık hâline göre ölçer; bu yüzden Otomatik hemen herkese uyar. Göz kapakların az hareket ediyorsa (dar gözler, ağır kapaklar) ve kırpmalar kaçıyorsa Yüksek'i, olmayan kırpmaları görüyorsa Düşük'ü seç.",
+                ),
+                Ink.Caption, color = P.inkFaint,
+            )
             Spacer(Modifier.height(10.dp))
             EbText(s.t("Frames are analysed on this phone and thrown away. No video is saved and nothing is uploaded. A visible indicator shows whenever the camera is on.", "Kareler bu telefonda analiz edilip atılır. Video kaydedilmez, hiçbir şey yüklenmez. Kamera açıkken görünür bir gösterge belirir."), Ink.Caption, color = P.inkFaint)
         }

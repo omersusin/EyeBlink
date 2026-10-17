@@ -32,6 +32,7 @@ import com.google.mediapipe.tasks.components.containers.NormalizedLandmark
 import com.google.mediapipe.tasks.core.BaseOptions
 import com.google.mediapipe.tasks.vision.core.RunningMode
 import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarker
+import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarkerResult
 import java.util.concurrent.Executors
 import kotlin.math.abs
 
@@ -209,6 +210,8 @@ class CameraFaceSource(private val app: Application) : FaceSource {
                 .setBaseOptions(BaseOptions.builder().setModelAssetPath(MODEL).build())
                 .setRunningMode(RunningMode.VIDEO)
                 .setNumFaces(1)
+                // The model's own "eyes are shut" score: a second opinion that does not depend on the shape of the eye.
+                .setOutputFaceBlendshapes(true)
                 .build()
             FaceLandmarker.createFromOptions(app, options).also { landmarker = it }
         } catch (e: Throwable) {
@@ -270,8 +273,8 @@ class CameraFaceSource(private val app: Application) : FaceSource {
     }
 
     private fun detect(bitmap: Bitmap, ts: Long): FaceFrame {
-        val luma = meanLuma(bitmap)
-        val none = FaceFrame(ts, null, QualityReport(0f, setOf(QualityIssue.NO_FACE)), luma)
+        val frameLuma = meanLuma(bitmap, 0f, 0f, 1f, 1f)
+        val none = FaceFrame(ts, null, QualityReport(0f, setOf(QualityIssue.NO_FACE)), frameLuma)
         val result = synchronized(lock) {
             val lm = landmarker ?: return none
             val image = BitmapImageBuilder(bitmap).build()
@@ -283,31 +286,72 @@ class CameraFaceSource(private val app: Application) : FaceSource {
         val faceHeight = EyeGeometry.faceHeight(p[FOREHEAD].y(), p[CHIN].y())
         if (faceHeight <= 0f) return none
 
+        // How bright the *face* is, not the room: in a dark room the screen lights the face, and a mean over the whole
+        // picture would call that frame too dark to trust.
+        val luma = meanLuma(
+            bitmap,
+            minOf(p[LEFT_CONTOUR].x(), p[RIGHT_CONTOUR].x()), minOf(p[FOREHEAD].y(), p[CHIN].y()),
+            maxOf(p[LEFT_CONTOUR].x(), p[RIGHT_CONTOUR].x()), maxOf(p[FOREHEAD].y(), p[CHIN].y()),
+        )
+
         val yaw = HeadPose.yaw(abs(p[NOSE].x() - p[LEFT_CONTOUR].x()), abs(p[RIGHT_CONTOUR].x() - p[NOSE].x()))
         val eyeLine = (p[LEFT_EYE_OUTER].y() + p[RIGHT_EYE_OUTER].y()) / 2f
         val pitch = HeadPose.pitch(p[NOSE].y() - eyeLine, p[CHIN].y() - eyeLine)
         val quality = TrackingQuality.score(true, faceHeight, yaw, pitch, luma)
 
-        val left = openness(p, LEFT_UPPER, LEFT_LOWER, faceHeight)
-        val right = openness(p, RIGHT_UPPER, RIGHT_LOWER, faceHeight)
-        val sample = EyeOpennessSample(ts, left, right, confidence = quality.score, illuminance = luma)
+        // Landmarks are normalised to the picture, so a step in x is not the same length as a step in y unless told so.
+        val aspect = bitmap.width.toFloat() / bitmap.height.coerceAtLeast(1)
+        val left = eyeOpenness(p, RIGHT_EYE_CORNERS, RIGHT_EYE_UPPER, RIGHT_EYE_LOWER, aspect)
+        val right = eyeOpenness(p, LEFT_EYE_CORNERS, LEFT_EYE_UPPER, LEFT_EYE_LOWER, aspect)
+        val sample = EyeOpennessSample(ts, left, right, confidence = quality.score, illuminance = luma, blinkScore = blinkScore(result))
         return FaceFrame(ts, sample, quality, luma)
     }
 
-    private fun openness(p: List<NormalizedLandmark>, upper: IntArray, lower: IntArray, faceHeight: Float): Float =
-        EyeGeometry.openness(
-            EyeGeometry.normalisedAperture(upper.map { p[it].y() }, lower.map { p[it].y() }, faceHeight),
-        )
+    // One set of buffers: detect() only ever runs on the camera thread.
+    private val cornerPoints = FloatArray(4)
+    private val upperPoints = FloatArray(6)
+    private val lowerPoints = FloatArray(6)
 
-    private fun meanLuma(b: Bitmap): Float {
-        val stepX = (b.width / 16).coerceAtLeast(1)
-        val stepY = (b.height / 16).coerceAtLeast(1)
+    /** The eye aspect ratio (mean lid gap over eye width) of one eye, on the 0..1 scale the engine works with. */
+    private fun eyeOpenness(p: List<NormalizedLandmark>, corners: IntArray, upper: IntArray, lower: IntArray, aspect: Float): Float {
+        cornerPoints[0] = p[corners[0]].x(); cornerPoints[1] = p[corners[0]].y()
+        cornerPoints[2] = p[corners[1]].x(); cornerPoints[3] = p[corners[1]].y()
+        for (i in upper.indices) {
+            upperPoints[2 * i] = p[upper[i]].x(); upperPoints[2 * i + 1] = p[upper[i]].y()
+            lowerPoints[2 * i] = p[lower[i]].x(); lowerPoints[2 * i + 1] = p[lower[i]].y()
+        }
+        return EyeGeometry.openness(EyeGeometry.aspectRatio(cornerPoints, upperPoints, lowerPoints, aspect))
+    }
+
+    /** The mean of the model's blink scores for the two eyes (0 = open, 1 = shut), or null if it gave none. */
+    private fun blinkScore(result: FaceLandmarkerResult): Float? {
+        val categories = result.faceBlendshapes().orElse(null)?.firstOrNull() ?: return null
+        var left = -1f
+        var right = -1f
+        for (c in categories) {
+            when (c.categoryName()) {
+                "eyeBlinkLeft" -> left = c.score()
+                "eyeBlinkRight" -> right = c.score()
+            }
+        }
+        return if (left >= 0f && right >= 0f) (left + right) / 2f else null
+    }
+
+    /** Mean brightness (0..255) of the part of the picture between the given normalised corners; the whole of it if that is too small to say anything. */
+    private fun meanLuma(b: Bitmap, left: Float, top: Float, right: Float, bottom: Float): Float {
+        var x0 = (left.coerceIn(0f, 1f) * b.width).toInt()
+        var y0 = (top.coerceIn(0f, 1f) * b.height).toInt()
+        var x1 = (right.coerceIn(0f, 1f) * b.width).toInt().coerceAtMost(b.width)
+        var y1 = (bottom.coerceIn(0f, 1f) * b.height).toInt().coerceAtMost(b.height)
+        if (x1 - x0 < MIN_LUMA_REGION || y1 - y0 < MIN_LUMA_REGION) { x0 = 0; y0 = 0; x1 = b.width; y1 = b.height }
+        val stepX = ((x1 - x0) / 16).coerceAtLeast(1)
+        val stepY = ((y1 - y0) / 16).coerceAtLeast(1)
         var sum = 0L
         var n = 0
-        var y = 0
-        while (y < b.height) {
-            var x = 0
-            while (x < b.width) {
+        var y = y0
+        while (y < y1) {
+            var x = x0
+            while (x < x1) {
                 val c = b.getPixel(x, y)
                 sum += (299 * Color.red(c) + 587 * Color.green(c) + 114 * Color.blue(c)) / 1000
                 n++
@@ -334,6 +378,9 @@ class CameraFaceSource(private val app: Application) : FaceSource {
         const val HEIGHT = 480
         const val MODEL_IDLE_MS = 120_000L
 
+        /** A face region narrower than this many pixels is no better a sample of the face than the whole picture. */
+        const val MIN_LUMA_REGION = 16
+
         // Indices into MediaPipe's 478-point face mesh.
         const val FOREHEAD = 10
         const val CHIN = 152
@@ -343,9 +390,14 @@ class CameraFaceSource(private val app: Application) : FaceSource {
         const val LEFT_EYE_OUTER = 33
         const val RIGHT_EYE_OUTER = 263
         const val MAX_INDEX = 454
-        val LEFT_UPPER = intArrayOf(159, 158)
-        val LEFT_LOWER = intArrayOf(145, 144)
-        val RIGHT_UPPER = intArrayOf(386, 385)
-        val RIGHT_LOWER = intArrayOf(374, 373)
+
+        // Each eye: its two corners, and three upper-lid points with the lower-lid point facing each. (MediaPipe calls the
+        // eye on the left of the picture the "right" one; which is which does not matter here, both are measured alike.)
+        val RIGHT_EYE_CORNERS = intArrayOf(33, 133)
+        val RIGHT_EYE_UPPER = intArrayOf(160, 159, 158)
+        val RIGHT_EYE_LOWER = intArrayOf(144, 145, 153)
+        val LEFT_EYE_CORNERS = intArrayOf(263, 362)
+        val LEFT_EYE_UPPER = intArrayOf(387, 386, 385)
+        val LEFT_EYE_LOWER = intArrayOf(373, 374, 380)
     }
 }

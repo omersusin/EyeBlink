@@ -139,7 +139,7 @@ Signing secrets, if you have them, are read from `keystore.properties` (git-igno
 
 - **No network.** The app does not hold the `INTERNET` permission - it is removed in the manifest, and CI fails the build if any APK declares it. There is no account, analytics, ad or server.
 - **No screen reading.** The accessibility service does not request window content. It sees which app is in front, whether a field is a password field, and event *types* - never text.
-- **The camera is analysed in memory.** Frames become a few numbers (eye openness, quality) and are discarded. A visible indicator shows whenever the camera is on, and the Quick Settings tile suspends everything - camera included - from anywhere.
+- **The camera is analysed in memory.** Frames become a few numbers (how far each eyelid is open against its own usual level, quality) and are discarded. A visible indicator shows whenever the camera is on, and the Quick Settings tile suspends everything - camera included - from anywhere.
 - **Everything is local and deletable.** Settings, calibration numbers, daily counters and per-app test results live in one private file; each can be cleared in the app.
 - **Fails closed.** If the service dies, whatever it drew disappears. It never covers calls, the lock screen, payments, sign-in or system settings.
 

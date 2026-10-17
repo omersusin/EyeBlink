@@ -29,9 +29,13 @@ data class FrameEvents(
  * produces no evidence rather than a blink rate of zero, which is what keeps a camera that
  * cannot see from ever being mistaken for one that saw you stare.
  */
-class TrackingPipeline(thresholds: BlinkThresholds = BlinkThresholds()) {
+class TrackingPipeline(thresholds: BlinkThresholds = BlinkThresholds(), sensitivity: Float = 1f) {
 
-    private var detector: BlinkDetector = thresholds.newDetector()
+    private var detector: BlinkDetector = thresholds.newDetector(sensitivity)
+    private var sensitivity: Float = sensitivity
+
+    /** How closed the eyes were on the last frame, as a share of their own open level; for diagnostics. */
+    val closure: Float get() = detector.closure
 
     val rate = BlinkRateTracker()
 
@@ -44,9 +48,13 @@ class TrackingPipeline(thresholds: BlinkThresholds = BlinkThresholds()) {
     private var windowConfidence = 0.0
     private var windowLuma = 0.0
 
-    /** Switches to freshly calibrated thresholds; an eye that is mid-blink is forgotten. */
-    fun setThresholds(t: BlinkThresholds) {
-        detector = t.newDetector()
+    /**
+     * Switches to freshly calibrated thresholds (and, if given, a new sensitivity); an eye that is mid-blink is
+     * forgotten, and what "open" looks like is learned again from the next frames.
+     */
+    fun setThresholds(t: BlinkThresholds, sensitivity: Float = this.sensitivity) {
+        this.sensitivity = sensitivity
+        detector = t.newDetector(sensitivity)
     }
 
     fun onFrame(frame: FaceFrame): FrameEvents {

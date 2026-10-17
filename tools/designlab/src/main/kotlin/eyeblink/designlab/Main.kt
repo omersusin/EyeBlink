@@ -64,11 +64,17 @@ fun main(args: Array<String>) {
     shot("home-tr") { EyeBlinkApp(Sample.state(Language.TR), NoActions, Strings.TR) }
     both("home-off") { d -> EyeBlinkApp(Sample.state(running = false, notReady = true), NoActions, en, systemDark = d) }
     both("rhythm") { d -> EyeBlinkApp(Sample.state(), NoActions, en, initialTab = Tab.RHYTHM, systemDark = d) }
-    shot("rhythm-tall", h = 3400) { EyeBlinkApp(Sample.state().let { it.copy(settings = it.settings.copy(advanced = true)) }, NoActions, en, initialTab = Tab.RHYTHM) }
+    shot("rhythm-tall", h = 4000) { EyeBlinkApp(Sample.state().let { it.copy(settings = it.settings.copy(advanced = true)) }, NoActions, en, initialTab = Tab.RHYTHM) }
     both("calib-intro", h = 2000) { d -> EyeBlinkApp(Sample.calibration(CalibrationStage.INTRO), NoActions, en, initialPage = Page.CALIBRATION, systemDark = d) }
     shot("calib-video", h = 1700) { EyeBlinkApp(Sample.calibration(CalibrationStage.RUNNING, Phase.VIDEO), NoActions, en, initialPage = Page.CALIBRATION) }
     shot("calib-read", h = 1700) { EyeBlinkApp(Sample.calibration(CalibrationStage.RUNNING, Phase.READING), NoActions, en, initialPage = Page.CALIBRATION) }
-    shot("calib-blink", h = 1700) { EyeBlinkApp(Sample.calibration(CalibrationStage.RUNNING, Phase.DELIBERATE), NoActions, en, initialPage = Page.CALIBRATION) }
+    shot("calib-blink", h = 1900) { EyeBlinkApp(Sample.calibration(CalibrationStage.RUNNING, Phase.DELIBERATE), NoActions, en, initialPage = Page.CALIBRATION) }
+    shot("calib-blink-close-more", h = 1900) {
+        EyeBlinkApp(Sample.calibration(CalibrationStage.RUNNING, Phase.DELIBERATE, com.eyeblink.core.calibration.CalibrationSession.Hint.CLOSE_MORE), NoActions, en, initialPage = Page.CALIBRATION)
+    }
+    shot("calib-blink-eased-tr", h = 1900) {
+        EyeBlinkApp(Sample.calibration(CalibrationStage.RUNNING, Phase.DELIBERATE, com.eyeblink.core.calibration.CalibrationSession.Hint.EASED), NoActions, Strings.TR, initialPage = Page.CALIBRATION)
+    }
     shot("calib-result", h = 2300) { EyeBlinkApp(Sample.calibration(CalibrationStage.RESULT), NoActions, en, initialPage = Page.CALIBRATION) }
     shot("calib-error", h = 2300) {
         val broken = Sample.calibration(CalibrationStage.INTRO)

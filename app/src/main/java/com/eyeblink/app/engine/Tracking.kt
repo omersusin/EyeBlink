@@ -57,7 +57,7 @@ class TrackingController(
     private val onBlink: (BlinkObservation) -> Unit,
     private val onUsage: (trackedMs: Long, cameraMs: Long, blinks: Int) -> Unit,
 ) {
-    private val pipeline = TrackingPipeline(profile().thresholds)
+    private val pipeline = TrackingPipeline(profile().thresholds, settings().camera.sensitivity.factor)
     private val duty = DutyCycle { settings().camera }
     private val latency = LatencyTracker()
 
@@ -79,7 +79,8 @@ class TrackingController(
     val frameP50: Long get() = latency.p50
     val frameP95: Long get() = latency.p95
 
-    fun applyThresholds(t: BlinkThresholds) = pipeline.setThresholds(t)
+    /** Fresh thresholds, or the same ones with a new sensitivity: what "open" looks like is learned again within a second. */
+    fun applyThresholds(t: BlinkThresholds) = pipeline.setThresholds(t, settings().camera.sensitivity.factor)
 
     /** Evaluated on the engine tick. [eligible]: the user is in a selected app with the screen on. */
     fun tick(now: Long, eligible: Boolean) {
@@ -224,7 +225,6 @@ class Calibrator(
         private set
 
     private var session: CalibrationSession? = null
-    private var detector = BlinkThresholds().newDetector()
     private var result: CalibrationResult? = null
     private var tick: Job? = null
     private var blinks = 0
@@ -251,14 +251,13 @@ class Calibrator(
         }
         source.stop()
         val c = settings().calibration.validated()
-        val s = CalibrationSession(c.videoSec * 1_000L, c.readingSec * 1_000L, c.deliberateBlinks)
+        val s = CalibrationSession(c.videoSec * 1_000L, c.readingSec * 1_000L, c.deliberateBlinks, settings().camera.sensitivity.factor)
         s.start(nowMs())
         session = s
         result = null
         blinks = 0
         framesSeen = 0
         lastFrameAtMs = nowMs()
-        detector = BlinkThresholds().newDetector()
         val started = source.start(CALIBRATION_FPS, { frame, _ -> post { onFrame(frame) } }, { message -> post { abort(message) } })
         if (!started) {
             session = null
@@ -287,11 +286,13 @@ class Calibrator(
         lastFrameAtMs = nowMs()
         if (++framesSeen == 1) Log.i(TAG, "calibration: the first camera picture arrived, face seen: ${frame.sample != null}")
         val sample = frame.sample
-        if (sample != null) {
-            s.onSample(sample)
-            detector.onSample(sample)?.let { if (s.onBlink(it)) blinks++ }
-        }
-        ui = ui.copy(liveOpenness = sample?.openness, quality = frame.quality, blinksSeen = blinks)
+        // The session decides what counts as a blink in each phase (see CalibrationSession.process).
+        if (sample != null && s.process(sample) != null) blinks++
+        ui = ui.copy(
+            // How open the eyes are *for this person*: 1 is their own open eye, whatever it looks like.
+            liveOpenness = if (sample != null && sample.isTrackable) 1f - s.closure else null,
+            quality = frame.quality, blinksSeen = blinks, hint = s.hint, countsAt = s.startDepth,
+        )
     }
 
     private fun step() {
@@ -368,7 +369,8 @@ class Calibrator(
 
     private companion object {
         const val TAG = "EyeBlink"
-        const val CALIBRATION_FPS = 15
+        /** A blink is over in a few frames; at 15 fps a quick one is two. Calibration is short, so it can afford to look closely. */
+        const val CALIBRATION_FPS = 30
         const val NO_FRAMES_MS = 20_000L
     }
 }

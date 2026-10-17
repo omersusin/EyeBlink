@@ -65,6 +65,19 @@ enum class TrackingMode {
     CONTINUOUS,
 }
 
+/**
+ * How readily the camera engine calls a movement of the eyelids a blink. The engine measures every eye against
+ * that person's own open eye, so [AUTO] suits nearly everybody; the other two are for the rest: eyes that close
+ * only a little (narrow, heavy lids) want [HIGHER], and a tracker that sees blinks that did not happen (jittery
+ * light, glasses) wants [LOWER].
+ */
+@Serializable
+enum class EyeSensitivity(val factor: Float) {
+    AUTO(1f),
+    HIGHER(0.70f),
+    LOWER(1.35f),
+}
+
 @Serializable
 data class QuietHours(
     val enabled: Boolean = false,
@@ -156,7 +169,8 @@ data class CameraSettings(
     val tracking: TrackingMode = TrackingMode.OFF,
     val burstSec: Int = 8,
     val periodSec: Int = 45,
-    val targetFps: Int = 15,
+    val targetFps: Int = 20,
+    val sensitivity: EyeSensitivity = EyeSensitivity.AUTO,
 ) {
     fun validated(): CameraSettings = copy(
         burstSec = burstSec.coerceIn(4, 60),

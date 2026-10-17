@@ -58,7 +58,7 @@ flowchart LR
 | `engine` | `IntervalPlanner` (the adaptive interval and the factors behind it), `TriggerPolicy` (camera-assisted vs camera-free), `InterruptionGate` (touch, typing, calls, transitions, cool-downs), `BreakScheduler` (a pure `step(input) -> step`), `BreakDirector` (runs one break end to end against an `OverlayPort`). |
 | `playback` | `PlaybackCoordinator` - the safety protocol - plus `CompatTester` and the per-app, per-version `Compat` policy. |
 | `rest` | `RestSession`, the Smart Rest state machine (resting, awaiting confirmation, done; skippable at any moment). |
-| `calibration` | `TrackingPipeline` (face frames to blinks, observed rate, learning windows), `BlinkDetector`, `BlinkStatistics`, `CalibrationSession`, `AdaptiveLearner`, `ContextProfile`, `DutyCycle`. |
+| `calibration` | `TrackingPipeline` (face frames to blinks, observed rate, learning windows), `EyeGeometry` (eye aspect ratio), `OpenBaseline` (what open looks like for this eye right now), `BlinkDetector` (relative closure, hysteresis), `BlinkThresholds` (fitted to the person), `BlinkStatistics`, `CalibrationSession` (owns detection, eases the deliberate test), `AdaptiveLearner`, `ContextProfile`, `DutyCycle`. |
 | `night` | `NightPlanner` - what warmth and brightness to ask for, and when, with ramps and manual-override back-off. |
 | `privileged` | `PrivilegedCommands`, `ShellSession`, `MediaSessionDump` (parser for `dumpsys media_session`), `PrivilegedSetup`. |
 | `perf`, `stats` | frame-time percentiles, a battery ledger, a content-change detector, daily usage counters. |
@@ -93,7 +93,19 @@ there is no shared mutable state to lock. It publishes an immutable `UiState` as
 * **Accessibility service** - `canRetrieveWindowContent` is `false`. It reads only the package name, the class name, whether
   the source is a password field, and which of three event *types* happened: a window changed, something scrolled, a field took focus. It is not subscribed to text changes and never reads text.
 * **Notification listener** - used for media sessions and to know that a navigation notification is active.
-* **Camera** - frames are analysed in memory by MediaPipe and reduced to a `FaceFrame` (eye openness, quality, luma). Pixels never leave `camera/`.
+* **Camera** - frames are analysed in memory by MediaPipe and reduced to a `FaceFrame` (eye aspect ratios, the model's blink score, quality, brightness of the face). Pixels never leave `camera/`.
+
+### How a blink is recognised
+
+Eyes differ by a factor of two - a wide eye reads about 0.35 when open, a narrow or heavy-lidded one 0.15 - so nothing in the engine compares an eye with a fixed number.
+
+1. `CameraFaceSource` turns the landmarks of each eye into an **eye aspect ratio**: the mean gap between three upper and three lower lid points, over the width of the eye (corner to corner). It does not depend on how far away the face is, how tall it is, or how the head is rolled. The model's own `eyeBlinkLeft/Right` score rides along as a second opinion.
+2. `OpenBaseline` keeps the last eight seconds of each eye's readings and takes a high percentile: **the open level of this eye, now**. Blinks are brief dips below it and barely move it; looking down at a phone or tired lids carry it along within a few seconds.
+3. `BlinkDetector` measures each sample as a **closure**: how far below its own open level the eye is (0 = as open as usual, 1 = shut), averaged over the two eyes. A blink starts at `start` and ends below `end` (hysteresis); a closure of a single frame must be deep, one longer than 900 ms is not a blink (and the open level is learned again).
+4. `BlinkThresholds` are shares of that closure, fitted per person from the deliberate blinks of the calibration (`start` is half of how deep their full blinks go), and stored with the typical open level so the next session needs no warm-up. The Rhythm page has an *Eye sensitivity* choice (Auto / Higher / Lower) that scales them.
+5. `CalibrationSession.process()` owns detection during calibration. In the deliberate step it accepts closures of up to three seconds and shallow ones, listens to the model's blink score as well, and **eases** in three steps (the threshold falls to a fifth of the open level) when the person has tried for eight seconds without a blink counting, while the page says what to try. The thresholds are then fitted to what the person actually did.
+
+`EyeShapesTest` runs this whole path on simulated wide, typical, narrow, monolid, heavy-lidded and asymmetric eyes at 15 and 30 frames per second, with tracker noise, glitch frames, dropped frames and a slow change of gaze.
 
 ### Overlay
 

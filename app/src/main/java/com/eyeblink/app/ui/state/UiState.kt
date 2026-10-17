@@ -80,8 +80,12 @@ data class CalibrationUi(
     val remainingSec: Int = 0,
     val deliberateTotal: Int = 5,
     val deliberateLeft: Int = 5,
-    /** Live eye openness from the camera, 0..1, or null when no face is tracked. */
+    /** How open the eyes are, 0..1 where 1 is this person's own open eye, or null when no face is tracked. */
     val liveOpenness: Float? = null,
+    /** What the person could do so that the deliberate blinks count, or NONE. */
+    val hint: CalibrationSession.Hint = CalibrationSession.Hint.NONE,
+    /** How far the eyes must close (0..1, shut = 1) for a deliberate blink to count right now. */
+    val countsAt: Float = 0f,
     val quality: QualityReport? = null,
     val blinksSeen: Int = 0,
     val result: CalibrationResult? = null,

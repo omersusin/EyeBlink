@@ -107,14 +107,44 @@ class TrackingPipelineTest {
     @Test
     fun `new thresholds apply to the next blink`() {
         val p = TrackingPipeline()
-        // A shallow dip to 0.4 is not a blink with the defaults (close threshold 0.30)...
-        p.openFrames(0, 1_000)
-        p.onFrame(frame(1_000, 0.4f)); p.onFrame(frame(1_066, 0.4f)); p.onFrame(frame(1_132, 0.4f))
-        assertNull(p.onFrame(frame(1_198, 0.9f)).blink)
+        // A shallow dip, to 0.75 of an open 0.9 (a closure of about 0.17), is not a blink with the defaults...
+        p.openFrames(0, 1_500)
+        p.onFrame(frame(1_500, 0.75f)); p.onFrame(frame(1_566, 0.75f)); p.onFrame(frame(1_632, 0.75f))
+        assertNull(p.onFrame(frame(1_698, 0.9f)).blink)
         // ...but is one for a person whose eyes simply do not close as far.
-        p.setThresholds(BlinkThresholds(close = 0.5f, reopen = 0.7f, complete = 0.3f, personalised = true))
-        p.onFrame(frame(2_000, 0.4f)); p.onFrame(frame(2_066, 0.4f)); p.onFrame(frame(2_132, 0.4f))
-        assertNotNull(p.onFrame(frame(2_198, 0.9f)).blink)
+        p.setThresholds(BlinkThresholds(start = 0.12f, end = 0.05f, full = 0.30f, fitted = true, openLevel = 0.9f))
+        p.onFrame(frame(2_500, 0.75f)); p.onFrame(frame(2_566, 0.75f)); p.onFrame(frame(2_632, 0.75f))
+        assertNotNull(p.onFrame(frame(2_698, 0.9f)).blink)
+    }
+
+    @Test
+    fun `a narrow open eye is as good as a wide one`() {
+        val p = TrackingPipeline()
+        var t = 0L
+        while (t < 1_500) { p.onFrame(frame(t, 0.32f)); t += 66 }
+        p.onFrame(frame(1_500, 0.10f)); p.onFrame(frame(1_566, 0.10f)); p.onFrame(frame(1_632, 0.10f))
+        assertNotNull(p.onFrame(frame(1_698, 0.32f)).blink)
+    }
+
+    @Test
+    fun `sensitivity changes what the pipeline calls a blink`() {
+        val dip = { pipeline: TrackingPipeline ->
+            var t = 0L
+            while (t < 1_500) { pipeline.onFrame(frame(t, 0.9f)); t += 66 }
+            pipeline.onFrame(frame(1_500, 0.70f)); pipeline.onFrame(frame(1_566, 0.70f)); pipeline.onFrame(frame(1_632, 0.70f))
+            pipeline.onFrame(frame(1_698, 0.9f)).blink
+        }
+        assertNull(dip(TrackingPipeline()))
+        assertNotNull(dip(TrackingPipeline(sensitivity = 0.6f)))
+    }
+
+    @Test
+    fun `the live closure follows the eyes`() {
+        val p = TrackingPipeline()
+        p.openFrames(0, 1_500)
+        assertEquals(0f, p.closure, 0.03f)
+        p.onFrame(frame(1_500, 0.45f))
+        assertEquals(0.5f, p.closure, 0.05f)
     }
 
     @Test

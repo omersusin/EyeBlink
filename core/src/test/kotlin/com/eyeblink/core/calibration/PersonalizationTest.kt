@@ -68,42 +68,87 @@ class ContextProfileTest {
 class BlinkThresholdsTest {
 
     @Test
-    fun `defaults are used when the open and closed levels barely differ`() {
-        val t = BlinkThresholds.fromCalibration(openLevel = 0.5f, closedLevel = 0.4f)
-        assertFalse(t.personalised)
-        assertEquals(BlinkDetector.DEFAULT_CLOSE_THRESHOLD, t.close, 0f)
+    fun `defaults are used when the deliberate blinks barely closed the eyes`() {
+        val t = BlinkThresholds.fromCalibration(openLevel = 0.5f, fullDepth = 0.10f)
+        assertFalse(t.fitted)
+        assertEquals(BlinkDetector.DEFAULT_START, t.start, 0f)
+        assertEquals("the open level is still worth keeping", 0.5f, t.openLevel, 0f)
     }
 
     @Test
-    fun `a clear gap personalises the thresholds in a sane order`() {
-        val t = BlinkThresholds.fromCalibration(openLevel = 0.9f, closedLevel = 0.05f)
-        assertTrue(t.personalised)
-        assertTrue("complete < close", t.complete < t.close)
-        assertTrue("close < reopen", t.close < t.reopen)
-        assertTrue(t.reopen <= 0.85f)
+    fun `defaults are used when nothing was measured`() {
+        assertFalse(BlinkThresholds.fromCalibration(null, null).fitted)
+        assertEquals(0f, BlinkThresholds.fromCalibration(null, null).openLevel, 0f)
     }
 
     @Test
-    fun `narrow eyes get a lower close threshold than wide eyes`() {
-        val narrow = BlinkThresholds.fromCalibration(openLevel = 0.62f, closedLevel = 0.05f)
-        val wide = BlinkThresholds.fromCalibration(openLevel = 0.95f, closedLevel = 0.05f)
-        assertTrue(narrow.close < wide.close)
+    fun `a clear closure fits the thresholds in a sane order`() {
+        val t = BlinkThresholds.fromCalibration(openLevel = 0.7f, fullDepth = 0.75f)
+        assertTrue(t.fitted)
+        assertTrue("end < start", t.end < t.start)
+        assertTrue("start < full", t.start < t.full)
+        assertTrue(t.full <= BlinkThresholds.MAX_FULL)
+        assertEquals(0.7f, t.openLevel, 0f)
+    }
+
+    @Test
+    fun `eyes that close less get a lower start than eyes that close completely`() {
+        val narrow = BlinkThresholds.fromCalibration(openLevel = 0.4f, fullDepth = 0.50f)
+        val wide = BlinkThresholds.fromCalibration(openLevel = 0.8f, fullDepth = 0.80f)
+        assertTrue("${narrow.start} vs ${wide.start}", narrow.start < wide.start)
+        assertTrue(narrow.full < wide.full)
     }
 
     @Test
     fun `nan input is not trusted`() {
-        assertFalse(BlinkThresholds.fromCalibration(Float.NaN, 0.1f).personalised)
+        assertFalse(BlinkThresholds.fromCalibration(0.5f, Float.NaN).fitted)
+        assertEquals(0f, BlinkThresholds.fromCalibration(Float.NaN, 0.6f).openLevel, 0f)
     }
 
     @Test
-    fun `a personalised detector actually uses its thresholds`() {
-        val t = BlinkThresholds.fromCalibration(0.6f, 0.05f)
+    fun `nonsense thresholds fall back to the defaults`() {
+        assertEquals(BlinkThresholds(), BlinkThresholds(start = 0.9f, end = 0.1f, full = 0.5f, fitted = true).sanitised())
+        assertEquals(BlinkThresholds(), BlinkThresholds(start = 0.3f, end = 0.5f, full = 0.8f, fitted = true).sanitised())
+        val fine = BlinkThresholds(0.3f, 0.12f, 0.55f, true, 0.6f)
+        assertEquals(fine, fine.sanitised())
+    }
+
+    @Test
+    fun `a file written by an older build decodes to the defaults, not to numbers that now mean something else`() {
+        val old = """{"close":0.30,"reopen":0.55,"complete":0.12,"personalised":true}"""
+        val decoded = com.eyeblink.core.model.CoreJson.instance.decodeFromString<BlinkThresholds>(old)
+        assertEquals(BlinkThresholds(), decoded)
+        assertFalse(decoded.fitted)
+    }
+
+    @Test
+    fun `thresholds survive a round trip`() {
+        val t = BlinkThresholds(0.27f, 0.12f, 0.50f, true, 0.41f)
+        val json = com.eyeblink.core.model.CoreJson.instance.encodeToString(BlinkThresholds.serializer(), t)
+        assertEquals(t, com.eyeblink.core.model.CoreJson.instance.decodeFromString<BlinkThresholds>(json))
+    }
+
+    @Test
+    fun `a fitted detector actually uses its thresholds`() {
+        // A person whose eyes close by only a quarter of their open level: the defaults would never see this.
+        val t = BlinkThresholds(start = 0.15f, end = 0.07f, full = 0.25f, fitted = true, openLevel = 0.6f)
         val d = t.newDetector()
         fun s(ts: Long, o: Float) = EyeOpennessSample(ts, o, o, 0.9f, 200f)
-        assertNull(d.onSample(s(0, 0.6f)))
-        d.onSample(s(100, 0.05f))
-        val b = d.onSample(s(260, 0.6f))
+        d.onSample(s(0, 0.6f))
+        d.onSample(s(100, 0.44f))
+        d.onSample(s(200, 0.44f))
+        val b = d.onSample(s(300, 0.6f))
         assertTrue(b != null && b.complete)
+        assertNull(BlinkThresholds().newDetector().also { it.seed(0.6f) }.let { dd ->
+            dd.onSample(s(0, 0.6f)); dd.onSample(s(100, 0.44f)); dd.onSample(s(200, 0.44f)); dd.onSample(s(300, 0.6f))
+        })
+    }
+
+    @Test
+    fun `sensitivity makes the same thresholds quicker or slower to see a blink`() {
+        val base = BlinkThresholds().settings()
+        assertTrue(BlinkThresholds().settings(0.7f).start < base.start)
+        assertTrue(BlinkThresholds().settings(1.35f).start > base.start)
     }
 }
 

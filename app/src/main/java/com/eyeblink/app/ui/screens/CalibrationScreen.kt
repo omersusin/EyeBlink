@@ -48,6 +48,7 @@ import com.eyeblink.app.ui.state.CalibrationUi
 import com.eyeblink.app.ui.state.PermissionKind
 import com.eyeblink.app.ui.state.UiActions
 import com.eyeblink.app.ui.state.UiState
+import com.eyeblink.core.calibration.CalibrationSession.Hint
 import com.eyeblink.core.calibration.CalibrationSession.Phase
 import com.eyeblink.core.calibration.ContextProfile
 import com.eyeblink.core.calibration.Provenance
@@ -193,6 +194,12 @@ private fun Running(c: CalibrationUi, actions: UiActions) {
                 Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                     LiveEye(c.liveOpenness)
                     Spacer(Modifier.height(10.dp))
+                    // How far the eyelids have moved, against how far they must for a blink to count right now.
+                    val closure = 1f - (c.liveOpenness ?: 1f)
+                    EbText(s.t("Eyelid movement", "Göz kapağı hareketi"), Ink.Eyebrow, color = P.inkSoft)
+                    Spacer(Modifier.height(6.dp))
+                    Meter(closure, tone = if (closure >= c.countsAt && c.countsAt > 0f) P.sun else P.sky)
+                    Spacer(Modifier.height(12.dp))
                     val p = P
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         repeat(c.deliberateTotal) { i ->
@@ -212,6 +219,17 @@ private fun Running(c: CalibrationUi, actions: UiActions) {
                 else s.t("That's all I need.", "İhtiyacım olan bu kadar."),
                 Ink.Title, align = TextAlign.Center, modifier = Modifier.reveal(4).fillMaxWidth(),
             )
+            when (c.hint) {
+                Hint.CLOSE_MORE -> EbText(
+                    s.t("Close your eyes a little more firmly. It only has to look clearly different from your open eyes.", "Gözlerini biraz daha sıkı kapat. Açık hâlinden belirgin biçimde farklı görünmesi yeterli."),
+                    Ink.Caption, color = P.inkSoft, align = TextAlign.Center, modifier = Modifier.fillMaxWidth(),
+                )
+                Hint.EASED -> EbText(
+                    s.t("I made this a little more forgiving for your eyes. Keep going.", "Bunu gözlerin için biraz daha esnek yaptım. Devam et."),
+                    Ink.Caption, color = P.inkSoft, align = TextAlign.Center, modifier = Modifier.fillMaxWidth(),
+                )
+                Hint.NONE -> Unit
+            }
         }
     }
 
@@ -306,7 +324,7 @@ private fun Result(state: UiState, actions: UiActions) {
         Hairline()
         DetailRow(s.t("Camera confidence", "Kamera güveni"), "${(r.meanConfidence * 100).roundToInt()}%")
         Hairline()
-        DetailRow(s.t("Detector fitted to you", "Sana göre ayarlanan algılayıcı"), if (r.profile.thresholds.personalised) s.t("yes", "evet") else s.t("defaults", "varsayılan"))
+        DetailRow(s.t("Detector fitted to you", "Sana göre ayarlanan algılayıcı"), if (r.profile.thresholds.fitted) s.t("yes", "evet") else s.t("defaults", "varsayılan"))
     }
 
     Card(Modifier.reveal(4).fillMaxWidth()) {

@@ -14,14 +14,26 @@ package com.eyeblink.core.calibration
  * seen open versus closed - so the result can personalise the detector thresholds and
  * seed separate video and reading baselines.
  *
+ * The session also owns blink detection ([process]), so that what counts as a blink in each phase is
+ * decided here, in one place that can be tested end to end. In the two timed phases that is the ordinary
+ * detector. In the deliberate phase it is a more forgiving one - closures of up to three seconds, shallower
+ * ones allowed - and it keeps easing while the person is trying and nothing counts: a person whose lids
+ * close only a little (narrow eyes, heavy lids) must still be able to finish the test, and the depth they
+ * reach is exactly what their own thresholds are then fitted to.
+ *
  * Contains no Android types, so the phase logic is unit testable.
  */
 class CalibrationSession(
     private val videoMs: Long = DEFAULT_VIDEO_MS,
     private val readingMs: Long = DEFAULT_READING_MS,
     private val deliberateBlinksRequired: Int = DEFAULT_DELIBERATE_BLINKS,
+    /** How willing the timed phases are to call a closure a blink; the person's own setting. */
+    private val sensitivity: Float = 1f,
 ) {
     enum class Phase { VIDEO, READING, DELIBERATE, COMPLETE }
+
+    /** What the person could do to make the deliberate test count, when it has not been counting. */
+    enum class Hint { NONE, CLOSE_MORE, EASED }
 
     var phase: Phase = Phase.VIDEO
         private set
@@ -47,6 +59,29 @@ class CalibrationSession(
 
     private val tallies = Phase.entries.associateWith { Tally() }
     private val openLevels = ArrayList<Float>()
+
+    private val detector = BlinkDetector(naturalSettings())
+    private var easeStep = 0
+    private var trackedSinceCountMs = 0L
+    private var peakSinceCount = 0f
+    private var easedAtMs: Long? = null
+    private var lastSampleAtMs = 0L
+
+    /** How closed the eyes are right now as a share of their own open level (0 = open, 1 = shut); for a live display. */
+    val closure: Float get() = detector.closure
+
+    /** The depth at which the detector currently starts counting a closure, in the same terms as [closure]. */
+    val startDepth: Float get() = detector.settings.start
+
+    /** A suggestion for the person, or [Hint.NONE]. Only the deliberate phase has any. */
+    val hint: Hint
+        get() {
+            if (phase != Phase.DELIBERATE) return Hint.NONE
+            val eased = easedAtMs
+            if (eased != null && lastSampleAtMs - eased < HINT_HOLD_MS) return Hint.EASED
+            if (trackedSinceCountMs >= CLOSE_MORE_AFTER_MS && peakSinceCount < detector.settings.start) return Hint.CLOSE_MORE
+            return Hint.NONE
+        }
 
     /** Blinks still needed in Phase C. */
     val deliberateRemaining: Int get() = (deliberateBlinksRequired - deliberateSeen).coerceAtLeast(0)
@@ -79,6 +114,13 @@ class CalibrationSession(
         tallies.values.forEach {
             it.trackedMs = 0; it.confidenceWeighted = 0.0; it.lumaWeighted = 0.0; it.lastSampleMs = null
         }
+        detector.forget()
+        detector.configure(naturalSettings())
+        easeStep = 0
+        trackedSinceCountMs = 0L
+        peakSinceCount = 0f
+        easedAtMs = null
+        lastSampleAtMs = nowMs
     }
 
     /**
@@ -136,6 +178,20 @@ class CalibrationSession(
     }
 
     /**
+     * The whole path from a camera sample to a counted blink: tallies the sample ([onSample]), runs it through
+     * the detector for the current phase, and records what that finds ([onBlink]).
+     * @return the blink that was counted on this sample, or null
+     */
+    fun process(sample: EyeOpennessSample): BlinkObservation? {
+        onSample(sample)
+        if (!sample.isTrackable) return null
+        val blink = detector.onSample(sample)
+        if (phase == Phase.DELIBERATE) trackDeliberate(sample, blink)
+        lastSampleAtMs = sample.timestampMs
+        return if (blink != null && onBlink(blink)) blink else null
+    }
+
+    /**
      * Records a blink into the current phase.
      * @return true if the blink was accepted for learning.
      */
@@ -147,6 +203,8 @@ class CalibrationSession(
             }
             instructed += blink.copy(instructed = true)
             deliberateSeen++
+            trackedSinceCountMs = 0L
+            peakSinceCount = 0f
             if (deliberateSeen >= deliberateBlinksRequired) {
                 phase = Phase.COMPLETE
             }
@@ -174,11 +232,7 @@ class CalibrationSession(
 
         val open = openLevel()
         val closed = closedLevel()
-        val thresholds = if (open != null && closed != null) {
-            BlinkThresholds.fromCalibration(open, closed)
-        } else {
-            BlinkThresholds()
-        }
+        val thresholds = BlinkThresholds.fromCalibration(open, fullDepth(open))
 
         val phaseStats = Phase.entries.filter { it == Phase.VIDEO || it == Phase.READING }.associateWith { p ->
             val list = if (p == Phase.VIDEO) videoBlinks else readingBlinks
@@ -217,6 +271,14 @@ class CalibrationSession(
     private fun advance(next: Phase, nowMs: Long): Boolean {
         phase = next
         phaseStartedMs = nowMs
+        if (next == Phase.DELIBERATE) {
+            easeStep = 0
+            trackedSinceCountMs = 0L
+            peakSinceCount = 0f
+            easedAtMs = null
+            detector.reset()
+            detector.configure(deliberateSettings(0))
+        }
         return true
     }
 
@@ -232,6 +294,58 @@ class CalibrationSession(
         val good = instructed.filter { it.confidence >= EyeOpennessSample.MIN_CONFIDENCE }
         if (good.size < MIN_CLOSED_BLINKS) return null
         return good.map { it.minOpenness }.average().toFloat()
+    }
+
+    /**
+     * How far this person's deliberate blinks closed their eyes, as a share of their open level: the middle one
+     * of them, so a single odd blink (a flinch, a half-hearted one) does not decide. Blinks that were not measured
+     * as a depth fall back to what their lowest openness says against the open level.
+     */
+    private fun fullDepth(open: Float?): Float? {
+        val good = instructed.filter { it.confidence >= EyeOpennessSample.MIN_CONFIDENCE }
+        if (good.size < MIN_CLOSED_BLINKS) return null
+        val depths = good.mapNotNull { b ->
+            when {
+                b.depth > 0f -> b.depth
+                open != null && open > 0f -> (1f - b.minOpenness / open).coerceIn(0f, 1f)
+                else -> null
+            }
+        }.sorted()
+        if (depths.size < MIN_CLOSED_BLINKS) return null
+        return depths[depths.size / 2]
+    }
+
+    /** Eases the deliberate detector, one step at a time, while the person is trying and nothing is counting. */
+    private fun trackDeliberate(sample: EyeOpennessSample, blink: BlinkObservation?) {
+        val gap = sample.timestampMs - lastSampleAtMs
+        if (gap in 1..MAX_SAMPLE_GAP_MS) trackedSinceCountMs += gap
+        peakSinceCount = maxOf(peakSinceCount, detector.closure)
+        if (blink != null) return
+        if (trackedSinceCountMs >= EASE_AFTER_MS && easeStep < MAX_EASE_STEPS) {
+            easeStep++
+            trackedSinceCountMs = 0L
+            peakSinceCount = 0f
+            easedAtMs = sample.timestampMs
+            detector.configure(deliberateSettings(easeStep))
+        }
+    }
+
+    private fun naturalSettings(): DetectorSettings = DetectorSettings().scaled(sensitivity)
+
+    /**
+     * What counts as a deliberate blink at ease step [step]: the closure may be shallower each time the person has
+     * been trying without result, down to about a fifth of their open level, and may be held for up to three seconds.
+     */
+    private fun deliberateSettings(step: Int): DetectorSettings {
+        val start = DELIBERATE_START[step.coerceIn(0, DELIBERATE_START.lastIndex)]
+        return DetectorSettings(
+            start = start,
+            end = start * 0.5f,
+            full = BlinkDetector.DEFAULT_FULL,
+            maxDurationMs = DELIBERATE_MAX_DURATION_MS,
+            singleFrameDepth = start + 0.12f,
+            useBlinkScore = true,
+        ).scaled(sensitivity)
     }
 
     private fun weightedMean(stats: Collection<PhaseStats>, pick: (PhaseStats) -> Float): Float {
@@ -257,6 +371,22 @@ class CalibrationSession(
         const val MIN_OPEN_SAMPLES = 30
         const val MIN_CLOSED_BLINKS = 3
         const val OPEN_PERCENTILE = 0.8f
+
+        /** The depths (shares of the open level) at which a deliberate blink starts to count, easing one step at a time. */
+        private val DELIBERATE_START = floatArrayOf(0.38f, 0.30f, 0.24f, 0.19f)
+        const val MAX_EASE_STEPS = 3
+
+        /** Closing the eyes on purpose can be slow and held; a closure is a deliberate blink for up to this long. */
+        const val DELIBERATE_MAX_DURATION_MS = 3_000L
+
+        /** Tracked time without a counted deliberate blink after which the test eases by one step. */
+        const val EASE_AFTER_MS = 8_000L
+
+        /** After this long without a counted blink and without ever reaching the threshold, suggest closing more firmly. */
+        const val CLOSE_MORE_AFTER_MS = 4_000L
+
+        /** How long "the test was eased" stays on the screen. */
+        const val HINT_HOLD_MS = 6_000L
     }
 }
 
