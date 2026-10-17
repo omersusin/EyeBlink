@@ -23,6 +23,10 @@
 # where nobody looks. CI starts a minified build on an emulator to keep this honest.
 -keep class com.google.mediapipe.** { *; }
 -keep class com.google.protobuf.** { *; }
+# Keeping every method also keeps two in MediaPipe's framework that mention generated proto classes the library does not
+# ship (the graph profiler and graph templates, which a face landmarker never touches). R8 rejects a keep that points at a
+# missing class unless told it is expected.
+-dontwarn com.google.mediapipe.proto.**
 
 # Keep source file + line numbers for readable production stack traces, but
 # hide the original source file name from the class file.
