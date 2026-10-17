@@ -14,7 +14,7 @@ class BlinkController(
     private val animator: BlinkAnimator,
     private val playback: PlaybackController,
     private val contextEngine: ContextEngine,
-    private val intervalMs: () -> Long = { DEFAULT_INTERVAL_MS },
+    private val intervalMs: () -> Long = { DEFAULT_BLINK_INTERVAL_MS },
     private val onBlink: suspend () -> Unit = {},
 ) {
     private var job: Job? = null
@@ -23,22 +23,23 @@ class BlinkController(
         if (job != null) return
         job = scope.launch {
             while (true) {
-                delay(nextInterval())
+                delay(clampBlinkInterval(intervalMs()))
                 if (!configProvider().enabled) continue
                 if (!contextEngine.isInteractive()) continue
 
-                // Pause only if we can positively confirm something is playing.
+                // pauseIfPlaying() returns true only when it issued a pause AND
+                // verified playback is now paused. Anything else means we do not
+                // know what is playing, so we must not toggle it.
                 val pausedByUs = playback.pauseIfPlaying()
-                if (pausedByUs && !playback.isPlaying()) {
-                    // Verified paused: no content is lost during the interruption.
-                    animator.blink()
-                    onBlink()
+
+                animator.blink()
+                onBlink()
+
+                if (pausedByUs) {
                     delay(POST_PAUSE_SETTLE_MS)
-                    if (playback.isStillPaused()) playback.resumeIfPausedByUs()
-                } else {
-                    // Nothing verifiable to pause/resume -> blink without touching playback.
-                    animator.blink()
-                    onBlink()
+                    if (shouldResumePlayback(pausedByUs = true, stillPaused = playback.isStillPaused())) {
+                        playback.resumeIfPausedByUs()
+                    }
                 }
             }
         }
@@ -47,14 +48,5 @@ class BlinkController(
     fun stop() {
         job?.cancel()
         job = null
-    }
-
-    private fun nextInterval(): Long = intervalMs().coerceIn(MIN_INTERVAL_MS, MAX_INTERVAL_MS)
-
-    private companion object {
-        const val DEFAULT_INTERVAL_MS = 20_000L
-        const val MIN_INTERVAL_MS = 5_000L
-        const val MAX_INTERVAL_MS = 600_000L
-        const val POST_PAUSE_SETTLE_MS = 120L
     }
 }
