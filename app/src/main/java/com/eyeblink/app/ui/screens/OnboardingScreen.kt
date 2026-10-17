@@ -313,7 +313,7 @@ private fun ColumnScope.Ready(state: UiState) {
                 EbText(s.t("Make it yours", "Sana göre ayarla"), Ink.BodyStrong)
                 Spacer(Modifier.height(3.dp))
                 EbText(
-                    s.t("Calibrate once in More, then Calibration. It takes about two minutes and teaches EyeBlink how often you really blink.", "Daha, ardından Kalibrasyon'dan bir kez kalibre et. Yaklaşık iki dakika sürer ve EyeBlink'e gerçekte ne sıklıkla kırptığını öğretir."),
+                    s.t("Calibrate once in More, then Calibration. It takes about two minutes and teaches EyeBlink how often you really blink.", "Diğer sekmesinden Kalibrasyon'a gir ve bir kez kalibre et. Yaklaşık iki dakika sürer ve EyeBlink'e gerçekte ne sıklıkla kırptığını öğretir."),
                     Ink.Caption,
                 )
             }

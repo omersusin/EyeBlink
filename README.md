@@ -1,208 +1,158 @@
-# EyeBlink — Smart Eye Comfort & Adaptive Blink System for Android
+<p align="center">
+  <img src="docs/brand/banner.png" alt="EyeBlink - give your eyes the pause back" width="100%">
+</p>
 
-An intelligent Android eye-comfort app that introduces brief, natural visual breaks during prolonged smartphone use (Reels, Shorts, scrolling). Combines a realistic screen-closing "blink" animation with personalized blink observation (camera-assisted) and adaptive timer scheduling (camera-free), plus safe pause/resume of media playback.
+# EyeBlink
 
-> **Not medical.** Does not physically replace blinking or treat dry-eye disease. Provides brief visual breaks, interrupts continuous stimulation, encourages natural blinking, improves subjective comfort.
+**Give your eyes the pause back.** EyeBlink is an Android app for the hours you spend staring at a feed.
+Every so often it draws a soft, half-second eyelid over your screen - it closes, holds pure black, and opens - and now and then it asks
+for a proper 20-20-20 rest. When it can *prove* it paused your video, it gives it back to you exactly where you left it.
+When it can't, it says so instead of guessing.
 
-## Core features
+> **Not a medical device.** EyeBlink does not replace blinking and does not treat dry eye. It gives you short, regular visual breaks.
 
-- **Hybrid blink animation** — curved eyelid-shaped gradients close from top/bottom, subtle darkening, fully black `#000000` hold, smooth reopen. Default 140/150/165 ms (≈455 ms). All timings/curves/easing customizable. Live preview in settings; respects reduced-motion.
-- **Hybrid trigger system** — camera-assisted blink detection with personal baseline, or adaptive timer from calibration data + usage + preferences. Never claims real-blink detection while camera inactive.
-- **Guided calibration** — Phase A video viewing, Phase B reading, Phase C deliberate blinks. Spontaneous vs instructed blinks kept separate. Local only, no raw video.
-- **Continuous personalization** — gradual model updates from reliable observations; context profiles (video/reading/social/low-light); observed vs estimated clearly distinguished.
-- **Smart pause/resume** — layered playback control: MediaSession/MediaController → AccessibilityService → optional LSPosed hooks. Never toggles blindly; verifies pause and resumes only when safe. Fallback when unsupported.
-- **Adaptive rest** — Micro Blink (auto-resume) and Smart Rest (longer, configurable; camera-confirmed blink or tap). Optional Blackout Rest / Distance Focus Rest (20-20-20). Skippable/cancellable.
-- **Interruption scheduling** — avoids triggers during touch/swipe, text entry, calls, notifications, camera capture, navigation, video transitions, recent rests; cooldowns.
-- **Smart Night Mode** — optional Night Light/brightness integration, gradual, user-controlled.
-- **Rootless + LSPosed modes** — shared core; rootless uses standard Android APIs; LSPosed adapter is modular/optional.
-- **Optional MediaProjection** — research feature, explicit consent, not default.
-- **Per-app compatibility calibration** — detect player, pause/resume test, record working strategy; per-app/version settings.
+<p align="center">
+  <img src="docs/brand/tour.gif" alt="A tour of the app" width="260">
+</p>
 
-## Privacy & safety
+<table align="center">
+  <tr>
+    <td><img src="docs/screens/home.png" width="170" alt="Today"></td>
+    <td><img src="docs/screens/rhythm.png" width="170" alt="Rhythm"></td>
+    <td><img src="docs/screens/studio.png" width="170" alt="Blink Studio"></td>
+    <td><img src="docs/screens/apps.png" width="170" alt="Apps"></td>
+    <td><img src="docs/screens/more.png" width="170" alt="More"></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screens/home-dark.png" width="170" alt="Today, Moonlit theme"></td>
+    <td><img src="docs/screens/rhythm-dark.png" width="170" alt="Rhythm, Moonlit theme"></td>
+    <td><img src="docs/screens/studio-dark.png" width="170" alt="Blink Studio, Moonlit theme"></td>
+    <td><img src="docs/screens/apps-dark.png" width="170" alt="Apps, Moonlit theme"></td>
+    <td><img src="docs/screens/more-dark.png" width="170" alt="More, Moonlit theme"></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screens/onboard-0.png" width="170" alt="Welcome"></td>
+    <td><img src="docs/screens/calib-video.png" width="170" alt="Calibration"></td>
+    <td><img src="docs/screens/night.png" width="170" alt="Night"></td>
+    <td><img src="docs/screens/power.png" width="170" alt="Power modes"></td>
+    <td><img src="docs/screens/rest-focus.png" width="170" alt="Smart Rest"></td>
+  </tr>
+</table>
 
-- Camera frames processed locally; no facial/eye data uploaded; no raw camera video saved in normal tracking.
-- All sensitive permissions optional and explained; visible camera-active indicator; instant suspend via app or Quick Settings.
-- Overlays disappear on service failure; avoids critical screens (emergency/payment/auth).
-- Handles rotation, app changes, service restarts, low memory.
-- Never resumes media the user intentionally paused.
+*Every screenshot above is the app's real Compose UI, rendered headlessly on a laptop by the [design lab](tools/designlab) - not a mock-up.*
 
-## Architecture
+## What it does
 
-Kotlin + Jetpack Compose settings. Components: Core, Blink Animation Engine, Eye Tracking Engine (MediaPipe on-device), Calibration Engine, Context Engine, Playback Controller, Accessibility Adapter, LSPosed Adapter, Night Display Controller, Privacy & Safety Manager.
+- **A blink you can shape.** Curved eyelids close from the top and bottom, the screen darkens slightly, holds a pure `#000000` for a beat (on an OLED
+  screen those pixels emit nothing), then reopens. 140 / 150 / 165 ms by default; every timing and curve is yours to change in Blink Studio, with a live
+  preview on a stand-in feed. Reduced-motion mode fades instead of sweeping.
+- **Camera-assisted or camera-free.** With the camera, EyeBlink watches how *you* blink (on-device, nothing stored) and paces itself accordingly.
+  Without it, it runs on a smart timer - and never claims to have seen you blink.
+- **It learns you.** A short guided calibration (watch, read, blink on purpose) gives it your baseline, with spontaneous and instructed blinks kept apart.
+  It then keeps refining slowly from reliable moments only, per context (video, reading, scrolling, low light), and always labels what was *measured* and what is only *estimated*.
+- **Two kinds of break.** *Micro Blink* is the half-second lid. *Smart Rest* is a longer, skippable pause - a pure-black Blackout or a Distance Focus
+  countdown (look 6 m away for 20 s) - ended by a tap, or one real blink when the camera is on.
+- **Videos wait for you - when it is safe.** EyeBlink pauses only after reading that something is playing, *verifies* the pause, and resumes only if nothing
+  changed meanwhile. It never resumes what you paused yourself, never touches a video it cannot read, and tests each app on your phone (again after each app update) before relying on it.
+- **Polite.** It waits out swipes, typing, calls, navigation and video transitions, keeps cool-downs and an hourly cap, and stays away from calls, payments, sign-in and system screens.
+- **Smart night mode.** Optional, gradual warmth and brightness, driven by the clock and the room's light, which steps back the moment you change something yourself.
+- **Simple or advanced.** Sensible automatic behaviour by default; one switch exposes every knob.
+- **Two themes, two languages.** Bright *Daylight* and deep-indigo *Moonlit* (Auto / Light / Dark). English and Turkish, chosen from a chip that opens a list.
 
-## Milestones
+## Pick how deep it reaches
 
-1. Functional prototype — animation, black overlay, scheduling, app detection, safe activation.
-2. Playback integration — MediaSession, accessibility control, verification, compatibility tests.
-3. Personal calibration — guided video/text calibration, blink detection, personalized thresholds, local profiles.
-4. Adaptive intelligence — hybrid triggering, context-aware scheduling, safe long rest, gradual personalization.
-5. Advanced integration — optional LSPosed modules, night mode, performance optimization, optional screen analysis, wider compatibility.
+Nothing below the first row is required.
+
+| | Rootless | Shizuku | Root | + LSPosed |
+|---|:-:|:-:|:-:|:-:|
+| Draw the blink, know the app in front | yes | yes | yes | |
+| Pause and resume through media sessions | yes¹ | yes | yes | |
+| Verify the pause by reading player state | yes | yes | yes | yes |
+| One-tap permission setup | | yes | yes | |
+| Control Night Light | | yes | yes | |
+| Hook an app's own player | | | | yes² |
+
+¹ needs the one-time notification-access permission. ² an optional second APK; experimental, and only used for an app after its own test passes.
 
 ## Status
 
-**Implemented and compiling-ready (not yet built on a device):**
+This is an honest list. "Tested" means unit tests that run in CI; "built" means CI compiles and lints it; "on a phone" is something nobody has done yet.
 
-| Component | State |
+| Part | State |
 |---|---|
-| Hybrid blink animation (gradient eyelids, darken, black hold, reopen) | done |
-| Reduced-motion path (snap closed, no sweep) | done |
-| Adaptive timer scheduling with clamped intervals | done |
-| Full-screen overlay via foreground service (`TYPE_APPLICATION_OVERLAY`) | done |
-| Configurable timing + appearance persisted to DataStore | done |
-| Settings UI with live preview, start/stop, master toggle | done |
-| Quick Settings tile for one-tap suspend/resume | done |
-| Context engine: screen-on, unlocked, foreground-app blocking | done |
-| Accessibility adapter (bounded play/pause node search) | done |
-| R8 + resource shrinking on release | done |
-| Per-ABI release splits + App Bundle (50.8 MB → 14.4 MB) | done |
-| Signed release APK (v2/v3, plus detached v4 `.idsig`) | done |
-| Blink detection from MediaPipe face landmarks (on device) | code complete, unrun |
-| Eyelid geometry → normalised openness | done |
-| Guided calibration phase machine (A video / B reading / C deliberate) | done |
-| Personal baseline statistics + gradual merge | done |
-| Hybrid trigger policy (camera-assisted vs camera-free) | done |
-| Local-only baseline storage | done |
+| Animation timeline, eyelid geometry, scheduling, interruption gates, rest state machine | **Tested** (450 JVM tests in `:core`) |
+| Playback safety protocol (pause, verify, remember, decide, resume, retry) and per-app compatibility policy | **Tested** |
+| Calibration maths, tracking pipeline, adaptive learning, night planner, usage and battery ledgers | **Tested** |
+| Shell command building, quoting and `dumpsys media_session` parsing; settings codec | **Tested** |
+| The whole UI - every screen in both themes | **Rendered** by the design lab on every CI run |
+| Android layer: engine, overlay, accessibility, notification listener, foreground service, tile, camera, Shizuku/root bridge | **Built and linted** by CI |
+| LSPosed module | **Built and linted** by CI |
+| Anything that needs a real device: the overlay on top of real apps, MediaPipe on real faces, media sessions of real video apps, Shizuku/root commands and `dumpsys` on real output, the LSPosed hooks, foreground-service rules on Android 14+, battery numbers | **Not run on a phone yet** |
+| MediaProjection screen analysis | **Not wired** - the change detector is implemented and tested; the capture is not |
 
-**Playback pause/resume is coded but inert.** Cross-app `MediaSession`
-control needs a permission a normal app cannot hold (see *Known platform
-limits*), so `PlaybackController` always reports *unknown* and blinks proceed
-without touching media. The logic is in place and its safety rules are unit
-tested for when that path becomes reachable.
+Known limits you should know about before trusting it:
 
-**Camera mode has never run.** MediaPipe, the bundled
-`face_landmarker.task` model and CameraX all compile and package, and every
-MediaPipe API used was verified with `javap` against the resolved AAR — but
-no frame has ever been processed on a device. Landmark indices, openness
-thresholds and the phase timings are all *unvalidated against real faces*.
+- **Many short-video apps publish no usable media session.** For those, no rootless strategy can be verified, so EyeBlink follows your chosen fallback (blink anyway, wait for the next swipe, or skip the app).
+- **It cannot see your finger lift.** Android only lets it see the *start* of a touch outside its own window, so it waits out a debounce window instead.
+- **The camera runs in short bursts.** Since Android 14 a camera foreground service cannot be started from the background.
+- **On an LCD screen the backlight stays on** during the black hold. EyeBlink says so rather than implying the OLED effect.
+- **The pacing is a product heuristic, not medicine.** People who blink less often than average are given *shorter* gaps between breaks, within a bounded range (see `personalIntervalScale` in `BlinkStatistics`).
 
-**Not implemented yet:** the calibration screens (UI; the phase logic behind
-them is done and tested), the camera tracking service that feeds the
-detector, Smart Rest / Blackout Rest / Distance Focus Rest, per-app
-compatibility testing, LSPosed adapter, MediaProjection.
+The reasoning behind each of these is in [docs/FEASIBILITY.md](docs/FEASIBILITY.md).
 
-The feature list above is the *design target*, not the current state.
+## Try it
 
-### Tests
+Every push is built by GitHub Actions. Open the latest run of **Android CI** and download the artifact `eyeblink-apk`: debug and release APKs split per ABI
+(release: about 15 MB for `arm64-v8a`, which is nearly every phone; 12 MB for `armeabi-v7a`; 18 MB for `x86_64` emulators), a 27 MB App Bundle, and the optional LSPosed module.
+Release builds are signed (v2 and v3) when the repository has keystore secrets, and CI verifies the signature.
+On first start, onboarding explains each permission; only *Accessibility* (or *Display over other apps*) is required.
 
-116 JVM unit tests, run in CI on every push. They cover the parts that can be
-verified without a device:
+## Build it
 
-- `BlinkConfigTest` — pins the documented 140 + 150 + 165 = **455 ms** contract.
-- `InterruptionPolicyTest` — interruptions stay within 5 s – 10 min, and
-  playback resumes **only** when EyeBlink paused it *and* it is still paused.
-- `TriggerPolicyTest` — camera-off/unready/low-confidence/screen-off all fall
-  back to camera-free and never claim real blink detection.
-- `BlinkDetectorTest` — hysteresis, completeness, outlier rejection,
-  dark-frame immunity.
-- `EyeGeometryTest` — scale-invariant aperture mapping, clamping, monotonicity.
-- `BlinkStatisticsTest` — median intervals, tracking-loss rejection, gradual
-  merge, and the blink-rate → break-cadence mapping.
-- `CalibrationSessionTest` — A/B spontaneous vs C instructed separation, phase
-  progression, cancel/restart.
+```
+# the brain and the design lab - any machine with a JDK 17, no Android SDK
+./gradlew -p jvm-build :core:test
+./gradlew -p jvm-build :tools:designlab:run --args="build/shots"
 
-All calibration and policy logic is deliberately free of Android types so it
-runs as plain JVM tests. What remains untested is precisely the untestable
-part: CameraX plumbing, MediaPipe runtime behaviour, and anything the user
-sees.
-
-### Known gaps
-
-- Blink interval is a fixed constant (`BlinkController.DEFAULT_INTERVAL_MS = 20s`);
-  the adaptive interval formula was removed as dead logic.
-- `ContextEngine.foregroundPackage()` needs the user to grant Usage Access;
-  without it, blinks are suppressed entirely (fails safe).
-- Camera-based triggering from the design is absent — timing is timer-only.
-- Nothing here has been run on a device; behaviour is verified by inspection only.
-
-## Build
-
-Requires JDK 17+ and the Android SDK (compileSdk 35). No SDK is required to
-clone.
-
-```bash
-./gradlew :app:testDebugUnitTest   # 116 unit tests
-./gradlew :app:lintDebug
-./gradlew :app:assembleDebug
-./gradlew :app:assembleRelease    # per-ABI signed slices
-./gradlew :app:bundleRelease      # .aab for Play
+# the app - needs the Android SDK (platform 35)
+./gradlew :app:lintDebug :lsposed:lintDebug
+./gradlew :app:assembleDebug :app:assembleRelease :app:bundleRelease
 ```
 
-### Release sizes
+Signing secrets, if you have them, are read from `keystore.properties` (git-ignored) or the `KEYSTORE_*` environment variables.
 
-MediaPipe's `libmediapipe_tasks_jni.so` is ~11 MB *per ABI*, which made the
-universal APK 50.8 MB. It is now split per ABI:
+## Privacy
 
-| Artifact | Size |
+- **No network.** The app does not hold the `INTERNET` permission - it is removed in the manifest, and CI fails the build if any APK declares it. There is no account, analytics, ad or server.
+- **No screen reading.** The accessibility service does not request window content. It sees which app is in front, whether a field is a password field, and event *types* - never text.
+- **The camera is analysed in memory.** Frames become a few numbers (eye openness, quality) and are discarded. A visible indicator shows whenever the camera is on, and the Quick Settings tile suspends everything - camera included - from anywhere.
+- **Everything is local and deletable.** Settings, calibration numbers, daily counters and per-app test results live in one private file; each can be cleared in the app.
+- **Fails closed.** If the service dies, whatever it drew disappears. It never covers calls, the lock screen, payments, sign-in or system settings.
+
+## Where things are
+
+| | |
 |---|---|
-| `app-arm64-v8a-release.apk` | 14.4 MB |
-| `app-armeabi-v7a-release.apk` | 11.4 MB |
-| `app-x86_64-release.apk` | 16.8 MB |
-| `app-release.aab` (Play) | 24.9 MB |
+| [`core/`](core) | the brain: pure Kotlin, 450 tests |
+| [`app/`](app) | the Android app and its Compose UI |
+| [`lsposed/`](lsposed) | the optional LSPosed module |
+| [`tools/designlab/`](tools/designlab) | the desktop renderer behind the screenshots |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | how it fits together |
+| [`docs/FEASIBILITY.md`](docs/FEASIBILITY.md) | what Android allows, requirement by requirement |
+| [`docs/brand/`](docs/brand) | logo, banner and the script that draws the icons |
 
-x86_64 is kept so emulators still work.
+## The look
 
-### CI
+EyeBlink is deliberately not Material. The page is a pale sky (or deep indigo at night), cards and buttons are flat and stand on a darker *lip* that they sink
+onto when pressed - a lid coming down - and nothing glows or is translucent. Five hues (sun, sky, mint, coral, grape) carry all the colour; text on a bright fill is always navy.
+Headlines and numerals are set in Bricolage Grotesque, reading text in Figtree. The mascot eye on the home screen, the logo, the launcher icon and the status-bar glyph are one drawing:
+`python3 docs/brand/build_brand.py` writes them all.
 
-`.github/workflows/android.yml` runs on every push and PR to `main`, and on
-manual dispatch. It lints, runs the unit tests, assembles a debug APK and an
-R8-optimized release APK, verifies the release signature with `apksigner`, and
-uploads everything as the `eyeblink-apk` artifact (30-day retention).
+## Credits and licenses
 
-Release signing is enabled only when these secrets exist, otherwise Gradle
-emits an unsigned APK instead of failing (so forks and secretless runs still
-work):
+- Face model and runtime: [MediaPipe Face Landmarker](https://ai.google.dev/edge/mediapipe) (Apache 2.0; model license in `app/src/main/assets/MODEL_LICENSE.txt`)
+- [Shizuku API](https://github.com/RikkaApps/Shizuku-API) (Apache 2.0), CameraX, Jetpack Compose, Kotlin and kotlinx (Apache 2.0)
+- Typefaces: Bricolage Grotesque, Figtree and DM Mono, each under the SIL Open Font License 1.1 (`app/src/main/assets/FONT_LICENSES.txt`)
+- The LSPosed module compiles against stubs of the Xposed API; it does not bundle the framework.
 
-| Secret | Contents |
-|---|---|
-| `KEYSTORE_BASE64` | base64 of the release keystore |
-| `KEYSTORE_PASSWORD` | keystore password |
-| `KEY_ALIAS` | signing key alias |
-| `KEY_PASSWORD` | key password |
-
-The keystore is decoded into `RUNNER_TEMP` and deleted at the end of the job.
-Nothing is committed: `.gitignore` blocks `*.jks`, `*.p12`, `*.b64` and
-`keystore.properties`.
-
-The release APK is signed with **v2 + v3**, plus a detached **v4** `.idsig`.
-It is a Play-ready signing identity but the APK itself is not Play-ready until
-the listing exists. To rebuild locally:
-
-```bash
-# create keystore.properties (git-ignored) or export the same env vars
-./gradlew assembleRelease
-```
-
-Superseded runs on the same ref are cancelled automatically.
-
-### Permissions
-
-| Permission | Why | Required? |
-|---|---|---|
-| `SYSTEM_ALERT_WINDOW` | draw the blink overlay | yes |
-| `FOREGROUND_SERVICE` (+ `..._SPECIAL_USE`) | keep the overlay alive | yes |
-| `POST_NOTIFICATIONS` | show the ongoing-service notification | Android 13+ |
-| `PACKAGE_USAGE_STATS` | read foreground app to avoid interrupting calls | optional (grant in Settings) |
-| `CAMERA` | front-camera blink detection during calibration and camera-assisted mode | optional |
-
-### Known platform limits
-
-**Cross-app playback control is not available to a normal app.**
-`MEDIA_CONTENT_CONTROL` is `signature|privileged`, so `MediaSessionManager
-.getActiveSessions()` throws `SecurityException` and lint rejects the
-`uses-permission`. `PlaybackController` therefore reports playback state as
-*unknown* and blinks **without** touching media. The reachable alternatives are
-the notification-listener role, or the optional LSPosed hook. Do not remove the
-`SecurityException` catch — it is what keeps the app honest about this.
-
-### Camera and privacy
-
-Camera permission is optional and never mandatory. Without it EyeBlink blinks
-on a timer and stays quiet during calls; it never claims to detect real blinks.
-
-When granted, frames are processed **on device** by MediaPipe and discarded.
-EyeBlink stores no images, no landmark lists and no recordings, and the
-baseline it derives is kept in local DataStore with no upload path. The only
-persisted artefact is numeric: median blink interval, blink duration,
-complete-blink ratio and sample count.
-
-A visible foreground-service notification is shown while camera tracking runs.
+EyeBlink's own code has **no license file yet**, which means all rights are reserved by default. Choose one before inviting contributions.

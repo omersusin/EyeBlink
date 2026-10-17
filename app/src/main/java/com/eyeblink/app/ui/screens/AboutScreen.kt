@@ -42,7 +42,7 @@ fun AboutScreen(state: UiState, actions: UiActions, onBack: () -> Unit) {
         }
 
         Card(Modifier.reveal(2).fillMaxWidth()) {
-            EbText(s.t("What it believes", "İnandıkları"), Ink.Title)
+            EbText(s.t("What it believes", "İlkeleri"), Ink.Title)
             Spacer(Modifier.height(6.dp))
             Belief(
                 Icon.Check, P.mint, s.t("Honest", "Dürüst"),

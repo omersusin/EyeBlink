@@ -48,6 +48,9 @@ import com.eyeblink.app.ui.state.Tab
 import com.eyeblink.app.ui.state.UiActions
 import com.eyeblink.app.ui.state.UiState
 
+/** The bottom sheets, so the design lab can render them open. */
+enum class Sheet { LANGUAGE, APPS }
+
 /**
  * The whole app UI. Platform-free: it takes a state and an action sink, so the same code runs
  * inside the Android activity and in the desktop design lab.
@@ -66,20 +69,22 @@ fun EyeBlinkApp(
     initialTab: Tab = Tab.TODAY,
     initialPage: Page? = null,
     onboardingStep: Int = 0,
+    /** Open one of the sheets from the start - for the design lab; the app itself never sets these. */
+    initialSheet: Sheet? = null,
     systemDark: Boolean = false,
     backHandler: @Composable (enabled: Boolean, onBack: () -> Unit) -> Unit = { _, _ -> },
 ) {
     val dark = state.settings.appearance.isDark(systemDark)
     EbTheme(strings, reducedMotion, insets, dark) {
         Backdrop {
-            var languageSheet by remember { mutableStateOf(false) }
+            var languageSheet by remember { mutableStateOf(initialSheet == Sheet.LANGUAGE) }
             val openLanguage = { languageSheet = true }
 
             Box(Modifier.fillMaxSize()) {
                 if (!state.settings.onboardingDone) {
                     OnboardingScreen(state, actions, initialStep = onboardingStep, onLanguage = openLanguage)
                 } else {
-                    MainShell(state, actions, insets, initialTab, initialPage, openLanguage, backHandler)
+                    MainShell(state, actions, insets, initialTab, initialPage, initialSheet == Sheet.APPS, openLanguage, backHandler)
                 }
                 // Hosted here, above everything, so the same list serves onboarding and More.
                 BottomSheet(visible = languageSheet, onDismiss = { languageSheet = false }) { LanguageSheet(state, actions) { languageSheet = false } }
@@ -97,12 +102,13 @@ private fun MainShell(
     insets: Insets,
     initialTab: Tab,
     initialPage: Page?,
+    initialPicker: Boolean,
     onLanguage: () -> Unit,
     backHandler: @Composable (enabled: Boolean, onBack: () -> Unit) -> Unit,
 ) {
     var tabIndex by rememberSaveable { mutableStateOf(initialTab.ordinal) }
     var page by remember { mutableStateOf(initialPage) }
-    var picker by remember { mutableStateOf(false) }
+    var picker by remember { mutableStateOf(initialPicker) }
     val tab = Tab.entries[tabIndex]
 
     backHandler(page != null || picker) { if (picker) picker = false else page = null }
@@ -144,8 +150,8 @@ private fun MainShell(
                     DockItem(Icon.Eye, s.t("Today", "Bugün")),
                     DockItem(Icon.Sliders, s.t("Blink", "Kırpma")),
                     DockItem(Icon.Pulse, s.t("Rhythm", "Ritim")),
-                    DockItem(Icon.Grid, s.t("Apps", "Uygulamalar")),
-                    DockItem(Icon.Dots, s.t("More", "Daha")),
+                    DockItem(Icon.Grid, s.t("Apps", "Uygulama")),
+                    DockItem(Icon.Dots, s.t("More", "Diğer")),
                 ),
                 selected = tabIndex,
                 onSelect = { tabIndex = it },

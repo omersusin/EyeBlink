@@ -79,7 +79,7 @@ fun MoreScreen(state: UiState, actions: UiActions, onPage: (Page) -> Unit, onLan
             Spacer(Modifier.height(16.dp))
             EbText(s.t("Appearance", "Görünüm"), Ink.Title)
             Spacer(Modifier.height(2.dp))
-            EbText(s.t("Daylight is bright, Moonlit is easy on a dark room.", "Gündüz parlak, Ay ışığı karanlık odada gözü yormaz."), Ink.Caption)
+            EbText(s.t("Daylight is bright, Moonlit is easy on a dark room.", "Gündüz teması parlak, Ay ışığı teması karanlık odada gözü yormaz."), Ink.Caption)
             Spacer(Modifier.height(12.dp))
             val modes = listOf(Appearance.SYSTEM, Appearance.LIGHT, Appearance.DARK)
             Tide(

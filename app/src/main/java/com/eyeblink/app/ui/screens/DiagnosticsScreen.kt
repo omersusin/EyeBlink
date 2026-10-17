@@ -78,7 +78,7 @@ fun DiagnosticsScreen(state: UiState, actions: UiActions, onBack: () -> Unit) {
                 if (d.listenerConnected) s.t("connected", "bağlı") else s.t("not connected", "bağlı değil"),
             )
             Health(
-                if (d.overlayKind.isNotEmpty()) true else null, s.t("Overlay", "Katman"),
+                if (d.overlayKind.isNotEmpty()) true else null, s.t("Overlay", "Bindirme"),
                 d.overlayKind.ifEmpty { s.t("none yet", "henüz yok") },
             )
             Health(
@@ -86,7 +86,7 @@ fun DiagnosticsScreen(state: UiState, actions: UiActions, onBack: () -> Unit) {
                 when {
                     camera == TrackingMode.OFF -> s.t("off (camera-free)", "kapalı (kamerasız)")
                     rt.cameraActive -> s.t("tracking now", "şu an izliyor")
-                    else -> s.t("idle between bursts", "atımlar arasında boşta")
+                    else -> s.t("idle between bursts", "aralarda beklemede")
                 },
             )
             Health(

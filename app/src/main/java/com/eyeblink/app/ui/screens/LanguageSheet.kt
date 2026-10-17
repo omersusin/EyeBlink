@@ -43,7 +43,7 @@ fun LanguageSheet(state: UiState, actions: UiActions, onDone: () -> Unit) {
     EbText(s.t("Choose the language EyeBlink speaks. It changes at once.", "EyeBlink'in hangi dilde konuşacağını seç. Hemen değişir."), Ink.Caption)
     Spacer(Modifier.height(16.dp))
     val options = listOf(
-        Triple(Language.EN, "English", s.t("English", "İngilizce")),
+        Triple(Language.EN, "English", s.t("Main language", "Ana dil")),
         Triple(Language.TR, "Türkçe", s.t("Turkish", "Türkçe")),
         Triple(Language.SYSTEM, s.t("Same as my phone", "Telefonumla aynı"), s.t("Uses English unless your phone is set to Turkish", "Telefonun Türkçeyse Türkçe, değilse İngilizce kullanır")),
     )

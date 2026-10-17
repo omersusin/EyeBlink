@@ -81,7 +81,7 @@ fun PowerScreen(state: UiState, actions: UiActions, onBack: () -> Unit) {
             if (!p.shizukuGranted) {
                 Spacer(Modifier.height(10.dp))
                 PillButton(
-                    if (!p.shizukuInstalled) s.t("Get Shizuku", "Shizuku'yu edin") else s.t("Grant access", "Erişim ver"),
+                    if (!p.shizukuInstalled) s.t("Get Shizuku", "Shizuku'yu indir") else s.t("Grant access", "Erişim ver"),
                     { actions.requestShizuku() }, kind = ButtonKind.Soft, compact = true, icon = Icon.Link,
                 )
             }

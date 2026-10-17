@@ -160,7 +160,7 @@ private fun DistanceFocus(view: RestView) {
     ) {
         Spacer(Modifier.weight(0.7f))
         EbText(
-            if (resting) s.t("Look far away", "Uzağa bak") else s.t("Welcome back", "Hoş geldin"),
+            if (resting) s.t("Look far away", "Uzağa bak") else s.t("Welcome back", "Tekrar hoş geldin"),
             Ink.Lead, align = TextAlign.Center,
         )
         Spacer(Modifier.height(10.dp))

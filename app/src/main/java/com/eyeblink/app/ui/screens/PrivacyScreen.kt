@@ -84,8 +84,8 @@ fun PrivacyScreen(state: UiState, actions: UiActions, onBack: () -> Unit) {
             Hairline()
             Access(
                 Icon.Play, P.grape, s.t("Media sessions", "Medya oturumları"),
-                sees = s.t("Whether a player is playing, and a fingerprint of the current item, to tell if you changed videos.", "Bir oynatıcının çalıp çalmadığını ve videoyu değiştirip değiştirmediğini anlamak için geçerli öğenin parmak izini."),
-                never = s.t("Reads your notifications or keeps titles. The fingerprint lives in memory for as long as a break lasts.", "Bildirimlerini okumaz, başlıkları saklamaz. Parmak izi, bir mola sürdüğü kadar bellekte yaşar."),
+                sees = s.t("Whether a player is playing, and a fingerprint of the current item, to tell if you changed videos.", "Bir oynatıcının çalıp çalmadığını ve videoyu değiştirip değiştirmediğini anlamak için geçerli öğenin kısa bir özetini."),
+                never = s.t("Reads your notifications or keeps titles. The fingerprint lives in memory for as long as a break lasts.", "Bildirimlerini okumaz, başlıkları saklamaz. Bu özet yalnızca bir mola sürdüğü kadar bellekte kalır."),
             )
             Hairline()
             Access(
