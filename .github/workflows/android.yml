@@ -3,8 +3,11 @@ name: Android CI
 on:
   push:
     branches: ['**']
+    # Pictures and prose do not need a half-hour build.
+    paths-ignore: ['docs/**', '**.md']
   pull_request:
     branches: [main]
+    paths-ignore: ['docs/**', '**.md']
   workflow_dispatch:
 
 # Least privilege. No repository write is needed to build an APK.

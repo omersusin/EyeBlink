@@ -40,7 +40,7 @@ Without root, `adb logcat -b crash -d` from a computer shows the same thing. Wha
 ## Camera
 
 10. **Bursts.** *Rhythm → Camera → Bursts*, allow the camera. *Today* should say the trigger is *Camera-assisted*, and Android's camera indicator and EyeBlink's "Camera on" notification should appear in short bursts. No picture is ever shown.
-11. **Calibration.** *More → Calibration → Begin*. Watch, read, blink on purpose. Note whether it says it cannot see you (light, distance) and what the result page shows. Then look at *Diagnostics → Performance*: frame analysis p50/p95 and the camera's share of active time.
+11. **Calibration.** *More → Calibration → Begin*. Watch, read, blink on purpose. Note whether it says it cannot see you (light, distance) and what the result page shows. If **Begin** seems to do nothing, the page should now show a red card, *The camera could not start*, with the reason (the face model, the camera, a missing library): that sentence is the bug report. Then look at *Diagnostics → Performance*: frame analysis p50/p95, the camera's share of active time and the last camera problem, if any.
 12. **Android 14+.** Put the app in the background with Bursts on and wait a few minutes. The camera may stop; EyeBlink should fall back to its timer without crashing.
 
 ## Elevated access (optional)
