@@ -95,6 +95,23 @@ private fun Intro(state: UiState, actions: UiActions) {
     if (!c.hasCameraPermission) {
         EbText(s.t("EyeBlink will ask for camera access when you begin. It is the only thing it asks for here.", "Başlayınca EyeBlink kamera erişimi isteyecek. Burada istediği tek şey bu."), Ink.Caption, color = P.inkSoft, modifier = Modifier.reveal(4))
     }
+    c.error?.let { problem ->
+        Card(Modifier.reveal(4).fillMaxWidth(), tint = P.coral) {
+            Row(verticalAlignment = Alignment.Top) {
+                IconBadge(Icon.Warning, P.coral, size = 40.dp)
+                Column(Modifier.padding(start = 12.dp)) {
+                    EbText(s.t("The camera could not start", "Kamera başlatılamadı"), Ink.BodyStrong)
+                    Spacer(Modifier.height(4.dp))
+                    EbText(problem, Ink.Caption)
+                    Spacer(Modifier.height(6.dp))
+                    EbText(
+                        s.t("If this keeps happening, copy the report from More → Diagnostics and send it with this message.", "Bu sürerse Diğer → Tanılama'daki raporu kopyalayıp bu mesajla birlikte gönder."),
+                        Ink.Caption, color = P.inkSoft,
+                    )
+                }
+            }
+        }
+    }
     Column(Modifier.reveal(5), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         PillButton(s.t("Begin", "Başla"), { actions.startCalibration() }, icon = Icon.Eye, modifier = Modifier.fillMaxWidth())
         if (state.personal.isCalibrated) {

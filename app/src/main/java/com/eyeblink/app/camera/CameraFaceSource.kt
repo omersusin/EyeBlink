@@ -7,6 +7,7 @@ import android.graphics.Matrix
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.util.Log
 import android.util.Size
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
@@ -56,24 +57,53 @@ class CameraFaceSource(private val app: Application) : FaceSource {
     @Volatile private var active = false
     override val running: Boolean get() = active
 
-    private val modelPresent: Boolean by lazy { runCatching { app.assets.open(MODEL).close(); true }.getOrDefault(false) }
+    @Volatile override var lastError: String? = null
+        private set
+
+    private val modelPresent: Boolean by lazy {
+        try {
+            app.assets.open(MODEL).close()
+            true
+        } catch (e: Exception) {
+            remember(e, "the face model file is missing from the app")
+            false
+        }
+    }
     override val ready: Boolean get() = modelPresent
 
     override fun start(fps: Int, onFrame: (FaceFrame, Long) -> Unit, onError: (String) -> Unit): Boolean {
         if (active) return true
         if (!modelPresent) return false
+        lastError = null
         active = true
         main.post { release?.let { main.removeCallbacks(it) }; release = null }
         executor.execute {
             try {
-                if (ensureLandmarker() == null) { fail(onError, "the face model could not be loaded"); return@execute }
+                if (ensureLandmarker() == null) { fail(onError, lastError ?: "the face model could not be loaded"); return@execute }
                 val p = ProcessCameraProvider.getInstance(app).get()
                 main.post { bind(p, fps, onFrame, onError) }
-            } catch (e: Exception) {
-                fail(onError, e.message)
+            } catch (e: Throwable) {
+                fail(onError, remember(e, "the camera could not be started"))
             }
         }
         return true
+    }
+
+    /**
+     * Keeps the reason a camera or model step failed, in the log and for the screen. This code runs on threads of its
+     * own that nobody is waiting on, so a swallowed exception here used to mean a button that simply did nothing.
+     */
+    private fun remember(e: Throwable, what: String): String {
+        val message = "$what (${describe(e)})"
+        Log.e(TAG, message, e)
+        lastError = message
+        return message
+    }
+
+    private fun describe(e: Throwable): String {
+        val root = generateSequence(e) { it.cause }.last()
+        val text = "${e.javaClass.name}: ${e.message}"
+        return if (root === e) text else "$text, caused by ${root.javaClass.name}: ${root.message}"
     }
 
     override fun stop() {
@@ -108,8 +138,8 @@ class CameraFaceSource(private val app: Application) : FaceSource {
             p.bindToLifecycle(o, CameraSelector.DEFAULT_FRONT_CAMERA, analysis)
             owner = o
             provider = p
-        } catch (e: Exception) {
-            fail(onError, e.message)
+        } catch (e: Throwable) {
+            fail(onError, remember(e, "the camera could not be started"))
         }
     }
 
@@ -127,7 +157,8 @@ class CameraFaceSource(private val app: Application) : FaceSource {
                 .setNumFaces(1)
                 .build()
             FaceLandmarker.createFromOptions(app, options).also { landmarker = it }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
+            remember(e, "the face model could not be loaded")
             null
         }
     }
@@ -165,8 +196,8 @@ class CameraFaceSource(private val app: Application) : FaceSource {
                 val frame = detect(upright, lastTimestamp)
                 upright.recycle()
                 onFrame(frame, SystemClock.elapsedRealtime() - started)
-            } catch (e: Exception) {
-                onError(e.message ?: "analysis failed")
+            } catch (e: Throwable) {
+                onError(remember(e, "a camera frame could not be analysed"))
             } finally {
                 image.close()
             }
@@ -232,6 +263,7 @@ class CameraFaceSource(private val app: Application) : FaceSource {
     }
 
     private companion object {
+        const val TAG = "EyeBlink"
         const val MODEL = "face_landmarker.task"
         const val WIDTH = 640
         const val HEIGHT = 480

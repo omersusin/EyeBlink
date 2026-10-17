@@ -154,6 +154,11 @@ fun DiagnosticsScreen(state: UiState, actions: UiActions, onBack: () -> Unit) {
             }
             Spacer(Modifier.height(8.dp))
             Meter(d.cameraDutyPercent / 100f, tone = P.sky)
+            d.cameraError?.let { problem ->
+                Spacer(Modifier.height(12.dp))
+                EbText(s.t("Last camera problem", "Son kamera sorunu"), Ink.BodyStrong)
+                EbText(problem, Ink.Caption, color = P.coral.text)
+            }
 
             Hairline(Modifier.padding(vertical = 14.dp))
             EbText(s.t("Battery cost of the camera", "Kameranın pil maliyeti"), Ink.BodyStrong)

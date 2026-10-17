@@ -193,13 +193,25 @@ jobs:
         run: rm -f "$RUNNER_TEMP/eyeblink-release.jks"
 
   # CI used to compile the app and never start it, which is how a crash in Application.onCreate reached a phone.
-  # This job installs the debug build on an emulator, walks through the app, lets the engine run with the
-  # accessibility service on, and fails if the app dies or an engine task throws. Screenshots, UI dumps and logs
-  # are kept in the "eyeblink-smoke" artifact. It builds its own APK so it never sees the signing secrets.
+  # This job installs a build on an emulator, walks through the app (onboarding, a rest, a blink, the tabs, the
+  # calibration camera, the language list, the theme), lets the engine run with the accessibility service on, and fails
+  # if the app dies or an engine task throws. It runs twice: the debug build, and the minified build, which is the release
+  # build as R8 leaves it - the one that breaks when something is shrunk or renamed that native code or reflection needs.
+  # Screenshots, UI dumps and logs are kept in the "eyeblink-smoke-<variant>" artifacts. It builds its own APK, so it never
+  # sees the signing secrets.
   smoke:
-    name: Start it on an emulator
+    name: Start it on an emulator (${{ matrix.variant }})
     runs-on: ubuntu-latest
     timeout-minutes: 40
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: debug
+            task: assembleDebug
+          - variant: minified
+            task: assembleMinified
 
     steps:
       - name: Checkout
@@ -220,8 +232,8 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
 
-      - name: Build the debug APK
-        run: ./gradlew :app:assembleDebug --stacktrace
+      - name: Build the ${{ matrix.variant }} APK
+        run: ./gradlew :app:${{ matrix.task }} --stacktrace
 
       # The emulator needs hardware acceleration, which the runner only allows once /dev/kvm is open to everyone.
       - name: Enable KVM
@@ -230,14 +242,21 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
+      # Lets the log say what colours a screenshot is made of, which is all a reader of a log can see of one.
+      - name: Install Pillow
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq python3-pil
+
       # Animations stay on: the app has to survive its own motion, and it switches to a still version when the phone
-      # turns animations off.
+      # turns animations off. The screen is a Pixel 6's, so layouts are the size a person sees.
       - name: Walk through the app
         uses: reactivecircus/android-emulator-runner@v2
+        env:
+          SMOKE_VARIANT: ${{ matrix.variant }}
         with:
           api-level: 35
           target: google_apis
           arch: x86_64
+          profile: pixel_6
           ram-size: 3072M
           disable-animations: false
           script: bash .github/smoke/smoke.sh
@@ -246,7 +265,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: eyeblink-smoke
+          name: eyeblink-smoke-${{ matrix.variant }}
           path: build/smoke
           if-no-files-found: ignore
           retention-days: 14

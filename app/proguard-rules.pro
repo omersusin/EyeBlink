@@ -18,6 +18,12 @@
 }
 -keep class rikka.shizuku.ShizukuRemoteProcess { *; }
 
+# MediaPipe (the face model) calls back into Java by name from its native code, and its protobuf messages are read by
+# reflection. Shrinking or renaming either one makes the model fail to load - in a release build only, which is exactly
+# where nobody looks. CI starts a minified build on an emulator to keep this honest.
+-keep class com.google.mediapipe.** { *; }
+-keep class com.google.protobuf.** { *; }
+
 # Keep source file + line numbers for readable production stack traces, but
 # hide the original source file name from the class file.
 -keepattributes SourceFile,LineNumberTable

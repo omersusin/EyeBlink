@@ -4,8 +4,9 @@
     smoke_tools.py dump OUT.xml                  dump the screen's UI tree with uiautomator (retries)
     smoke_tools.py texts FILE.xml                list what is written on screen, with where
     smoke_tools.py has FILE.xml TEXT [TEXT...]   exit 0 when every TEXT is on screen
-    smoke_tools.py tap TEXT [--topmost|--bottommost] [--timeout SEC]
-                                                 find TEXT on screen and tap its centre
+    smoke_tools.py tap TEXT [--topmost|--bottommost] [--scroll] [--timeout SEC]
+                                                 find TEXT on screen and tap its centre; with --scroll, swipe up a page at
+                                                 a time while it is not there yet (the list may be longer than the screen)
     smoke_tools.py seed PACKAGE                  print a SharedPreferences file that makes EyeBlink start running
                                                  at once, with PACKAGE selected and a very short interval
     smoke_tools.py ledger [--quiet]              read EyeBlink's SharedPreferences XML from stdin and print what its
@@ -84,18 +85,37 @@ def centre(box):
     return (left + right) // 2, (top + bottom) // 2
 
 
-def tap(wanted, where, timeout):
+def screen_size():
+    """Width and height in pixels, as the phone reports them."""
+    text = adb("shell", "wm", "size").stdout.decode(errors="replace")
+    sizes = re.findall(r"(\d+)x(\d+)", text)
+    return (int(sizes[-1][0]), int(sizes[-1][1])) if sizes else (1080, 2400)
+
+
+def scroll_down():
+    """One page further down: a finger sliding up the middle of the screen."""
+    width, height = screen_size()
+    adb("shell", "input", "swipe", str(width // 2), str(int(height * 0.72)), str(width // 2), str(int(height * 0.32)), "350")
+
+
+def tap(wanted, where, timeout, scroll=False, max_scrolls=5):
     """Looks for [wanted] until [timeout] seconds have passed, and taps it."""
     deadline = time.time() + timeout
     scratch = "/tmp/eyeblink-smoke-tap.xml"
+    scrolled = 0
     while True:
         if dump(scratch, tries=2, pause=1.0):
             box = find(Path(scratch).read_text(encoding="utf-8", errors="replace"), wanted, where)
             if box:
                 x, y = centre(box)
                 adb("shell", "input", "tap", str(x), str(y))
-                print(f"tapped '{wanted}' at {x},{y}")
+                print(f"tapped '{wanted}' at {x},{y}" + (f" after scrolling {scrolled}x" if scrolled else ""))
                 return True
+            if scroll and scrolled < max_scrolls:
+                scroll_down()
+                scrolled += 1
+                time.sleep(0.8)
+                continue
         if time.time() >= deadline:
             print(f"'{wanted}' never appeared on screen")
             return False
@@ -201,17 +221,19 @@ def main(argv):
         return 1 if missing else 0
 
     if command == "tap" and rest:
-        where, timeout, wanted = "smallest", 15.0, rest[0]
+        where, timeout, wanted, scroll = "smallest", 15.0, rest[0], False
         flags = rest[1:]
         while flags:
             flag = flags.pop(0)
             if flag in ("--topmost", "--bottommost"):
                 where = flag[2:]
+            elif flag == "--scroll":
+                scroll = True
             elif flag == "--timeout" and flags:
                 timeout = float(flags.pop(0))
             else:
                 sys.exit(f"unknown option {flag}")
-        return 0 if tap(wanted, where, timeout) else 1
+        return 0 if tap(wanted, where, timeout, scroll) else 1
 
     if command == "seed" and len(rest) == 1:
         sys.stdout.write(seed(rest[0]))

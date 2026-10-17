@@ -94,6 +94,8 @@ import kotlin.random.Random
  */
 class Engine(val app: Application, ports: EnginePorts) {
 
+    private val faces: FaceSource? = ports.faces
+
     // ── threading ────────────────────────────────────────────────
 
     private val executor = Executors.newSingleThreadExecutor { r -> Thread(r, "eyeblink-engine").apply { isDaemon = true } }
@@ -768,6 +770,7 @@ class Engine(val app: Application, ports: EnginePorts) {
             charging = bat.charging,
             thermal = device.thermal().name.lowercase(),
             powerSave = device.powerSave(),
+            cameraError = faces?.lastError,
         )
     }
 
@@ -786,7 +789,7 @@ class Engine(val app: Application, ports: EnginePorts) {
             appendLine("week: micro=${week.microShown} rests=${week.restsCompleted} skipped=${week.restsSkipped} aborted=${week.aborted} failed=${week.failed}")
             appendLine("pauses: verified=${week.pausesVerified} unverified=${week.pausesUnverified} failed=${week.pausesFailed}")
             appendLine("resumes: ok=${week.resumesOk} refused=${week.resumesRefused} failed=${week.resumesFailed}")
-            appendLine("camera: p50=${d.frameP50Ms}ms p95=${d.frameP95Ms}ms duty=${d.cameraDutyPercent}%")
+            appendLine("camera: p50=${d.frameP50Ms}ms p95=${d.frameP95Ms}ms duty=${d.cameraDutyPercent}%  model=${faces?.ready}  lastError=${d.cameraError ?: "none"}")
             appendLine("battery=${d.batteryPercent}% charging=${d.charging} thermal=${d.thermal} powerSave=${d.powerSave}")
         }
     }

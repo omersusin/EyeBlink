@@ -235,7 +235,14 @@ class Calibrator(
         val source = faces
         val permitted = Access.camera(app)
         if (source == null || !source.ready || !permitted) {
-            ui = CalibrationUi(hasCameraPermission = permitted, modelReady = source?.ready == true)
+            // Without the permission the activity has asked already. Without camera support or the face model there is
+            // nothing left to ask for, so say what is wrong instead of showing the same page again.
+            val why = when {
+                source == null -> "this build has no camera support"
+                !source.ready -> source.lastError ?: "the face model file is missing from the app"
+                else -> null
+            }
+            ui = CalibrationUi(hasCameraPermission = permitted, modelReady = source?.ready == true, error = why)
             onChange()
             return
         }
@@ -247,10 +254,10 @@ class Calibrator(
         result = null
         blinks = 0
         detector = BlinkThresholds().newDetector()
-        val started = source.start(CALIBRATION_FPS, { frame, _ -> post { onFrame(frame) } }, { post { cancel() } })
+        val started = source.start(CALIBRATION_FPS, { frame, _ -> post { onFrame(frame) } }, { message -> post { abort(message) } })
         if (!started) {
             session = null
-            ui = CalibrationUi(hasCameraPermission = true, modelReady = true)
+            ui = CalibrationUi(hasCameraPermission = true, modelReady = true, error = source.lastError ?: "the camera could not be started")
             onChange()
             return
         }
@@ -309,6 +316,18 @@ class Calibrator(
         session = null
         result = null
         ui = CalibrationUi(hasCameraPermission = Access.camera(app), modelReady = faces?.ready == true)
+        onChange()
+    }
+
+    /** The camera or the model failed under a running session: stop everything and tell the user why. */
+    private fun abort(message: String) {
+        if (session == null) return
+        tick?.cancel()
+        faces?.stop()
+        session?.cancel()
+        session = null
+        result = null
+        ui = CalibrationUi(hasCameraPermission = Access.camera(app), modelReady = faces?.ready == true, error = message)
         onChange()
     }
 

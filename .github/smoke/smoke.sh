@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# Starts the debug build on an emulator and checks that it comes up, stays up and does its job.
+# Starts a build of the app on an emulator and checks that it comes up, stays up and does its job.
 #
 # Run by .github/workflows/android.yml inside reactivecircus/android-emulator-runner, adb already connected:
-#     bash .github/smoke/smoke.sh
+#     SMOKE_VARIANT=debug|minified bash .github/smoke/smoke.sh
+# "minified" is the release build as R8 leaves it (see app/build.gradle.kts): it is where reflection and native
+# callbacks break, so it is tried as well as the debug build.
 # Everything it learns is printed, and screenshots, UI dumps and logs are left in $OUT for the workflow to upload.
 #
 # A crash, a dead process or an engine task that threw fails the run. What depends on the emulator image or on how the
@@ -11,10 +13,16 @@
 
 set -u
 
-PKG=com.eyeblink.app.debug
+VARIANT=${SMOKE_VARIANT:-debug}
+case "$VARIANT" in
+  debug) PKG=com.eyeblink.app.debug ;;
+  minified) PKG=com.eyeblink.app.minified ;;
+  *) echo "::error::unknown SMOKE_VARIANT '$VARIANT'"; exit 2 ;;
+esac
 ACTIVITY=com.eyeblink.app.host.MainActivity
 A11Y=com.eyeblink.app.access.EyeBlinkAccessibilityService
-OUT=${OUT:-build/smoke}
+OUT=${OUT:-build/smoke/$VARIANT}
+MAPPING=app/build/outputs/mapping/$VARIANT/mapping.txt
 HERE=$(cd "$(dirname "$0")" && pwd)
 FAILED=0
 mkdir -p "$OUT"
@@ -38,6 +46,15 @@ snap() {
 }
 alive() { ashell pidof "$PKG" | grep -Eq '^[0-9]+'; }
 crash_log() { adb logcat -d -b crash -v threadtime 2>/dev/null | tr -d '\r'; }
+
+# Stack traces from the minified build use R8's short names; give them back their own when the SDK can.
+retrace() {
+  local tool=""
+  for candidate in "${ANDROID_HOME:-/nonexistent}"/cmdline-tools/*/bin/retrace; do
+    if [ -x "$candidate" ]; then tool=$candidate; break; fi
+  done
+  if [ -n "$tool" ] && [ -f "$MAPPING" ]; then "$tool" "$MAPPING" 2>/dev/null || cat; else cat; fi
+}
 engine_errors() { adb logcat -d -s EyeBlink:E 2>/dev/null | tr -d '\r'; }
 
 # Fails when the app is gone, has recorded a crash, or its engine thread threw.
@@ -46,7 +63,7 @@ health() {
   if ! alive; then fail "$label: the app is not running"; fi
   if crash_log | grep -q "FATAL EXCEPTION"; then
     fail "$label: the app crashed"
-    crash_log | head -60
+    crash_log | retrace | head -80
   fi
   if engine_errors | grep -q "engine task failed"; then
     fail "$label: an engine task threw"
@@ -69,7 +86,8 @@ press() {
 
 collect() {
   adb logcat -d -v threadtime > "$OUT/logcat.txt" 2>&1
-  crash_log > "$OUT/crash.txt"
+  crash_log | retrace > "$OUT/crash.txt"
+  if [ -f "$MAPPING" ]; then cp "$MAPPING" "$OUT/mapping.txt"; fi
   ashell dumpsys activity services "$PKG" > "$OUT/dumpsys-services.txt" 2>&1
   ashell dumpsys accessibility > "$OUT/dumpsys-accessibility.txt" 2>&1
   ashell dumpsys window windows > "$OUT/dumpsys-windows.txt" 2>&1
@@ -86,13 +104,14 @@ adb shell wm dismiss-keyguard
 
 step "Install"
 apk=""
-for candidate in app/build/outputs/apk/debug/*x86_64*.apk; do
+for candidate in app/build/outputs/apk/"$VARIANT"/*x86_64*.apk; do
   if [ -e "$candidate" ]; then apk=$candidate; break; fi
 done
-if [ -z "$apk" ]; then fail "no x86_64 debug APK was built"; exit 1; fi
+if [ -z "$apk" ]; then fail "no x86_64 $VARIANT APK was built"; exit 1; fi
 echo "$apk"
 if ! adb install -r -t "$apk"; then fail "the APK would not install"; exit 1; fi
 adb shell pm grant "$PKG" android.permission.POST_NOTIFICATIONS
+adb shell pm grant "$PKG" android.permission.CAMERA
 adb shell appops set "$PKG" SYSTEM_ALERT_WINDOW allow
 adb shell appops set "$PKG" GET_USAGE_STATS allow
 
@@ -147,29 +166,58 @@ step "A blink on demand"
 tools tap Blink --topmost --timeout 15 && sleep 3
 health "after a blink"
 
-step "Tabs, language and theme"
+step "Tabs"
 for tab in Rhythm Apps More; do
   press "tab-$(echo "$tab" | tr '[:upper:]' '[:lower:]')" "$tab" --bottommost --timeout 10
 done
-if tools tap English --timeout 10; then
+health "after the tabs"
+
+# The camera and the face model start here. A phone once swallowed their failure and showed the same page again, so
+# the page now says what went wrong; the test reads it out.
+step "Calibration"
+if tools tap Calibration --timeout 15; then
+  sleep 2
+  snap 14-calibration-intro
+  if tools tap Begin --timeout 10; then
+    sleep 10
+    snap 15-calibration
+    if tools has "$OUT/15-calibration.xml" "Camera on"; then
+      echo "calibration started: the camera and the face model came up"
+    else
+      warn "calibration did not start"
+      tools texts "$OUT/15-calibration.xml" | head -20
+      adb logcat -d -s EyeBlink:V 2>/dev/null | tr -d '\r' | tail -20
+    fi
+  else
+    warn "could not press Begin on the calibration page"
+  fi
+  adb shell input keyevent KEYCODE_BACK
+  sleep 2
+else
+  warn "could not open the calibration page"
+fi
+health "after calibration"
+
+step "Language and theme"
+if tools tap English --scroll --timeout 20; then
   sleep 2
   snap 10-language-list
   if tools tap "Türkçe" --timeout 8; then
     sleep 3
     snap 11-turkish
     tools has "$OUT/11-turkish.xml" "Bugün" || warn "the app did not switch to Turkish"
-    tools tap "Türkçe" --timeout 8 && sleep 2
+    tools tap "Türkçe" --scroll --timeout 15 && sleep 2
     tools tap English --timeout 8 && sleep 2
     snap 12-english-again
   fi
 else
   warn "could not open the language list"
 fi
-if tools tap Dark --timeout 8; then
+if tools tap Dark --scroll --timeout 15; then
   sleep 2
   snap 13-dark
 fi
-health "after tabs, language and theme"
+health "after language and theme"
 
 adb logcat -d -v threadtime > "$OUT/logcat-1-walkthrough.txt" 2>&1
 

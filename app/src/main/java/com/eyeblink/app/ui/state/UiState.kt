@@ -87,6 +87,8 @@ data class CalibrationUi(
     val result: CalibrationResult? = null,
     val hasCameraPermission: Boolean = false,
     val modelReady: Boolean = true,
+    /** Why the camera or the face model could not start, when it could not; shown on the intro page. */
+    val error: String? = null,
 )
 
 data class PowerUi(
@@ -134,6 +136,8 @@ data class DiagnosticsUi(
     val charging: Boolean = false,
     val thermal: String = "none",
     val powerSave: Boolean = false,
+    /** The last reason the camera or the face model failed, or null. */
+    val cameraError: String? = null,
 )
 
 data class UiState(

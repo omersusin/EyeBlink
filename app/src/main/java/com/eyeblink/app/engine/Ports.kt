@@ -16,6 +16,9 @@ interface FaceSource {
 
     val running: Boolean
 
+    /** Why the camera or the face model last failed, as a sentence a person can read; null while all is well. */
+    val lastError: String?
+
     /**
      * Opens the front camera. [onFrame] is called on a background thread for each analysed frame
      * with how long the analysis took in milliseconds. Returns false if the camera could not start.

@@ -70,6 +70,17 @@ android {
             signingConfig = signingConfigs.findByName("release")
                 ?.takeIf { it.storeFile?.exists() == true }
         }
+        // The release build as R8 leaves it, but signed with the debug key and debuggable, so an emulator can install it
+        // and CI can look inside. Shrinking and renaming are where reflection and native callbacks break, and a debug
+        // build can never show that. Nothing is published from this one.
+        create("minified") {
+            initWith(getByName("release"))
+            signingConfig = signingConfigs.getByName("debug")
+            isDebuggable = true
+            applicationIdSuffix = ".minified"
+            versionNameSuffix = "-minified"
+            matchingFallbacks += "release"
+        }
     }
 
     buildFeatures { compose = true }
