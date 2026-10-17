@@ -42,6 +42,7 @@ fun main(args: Array<String>) {
     loadFonts()
     val out = File(args.firstOrNull() ?: "build/shots").apply { mkdirs() }
     val only = args.getOrNull(1)
+    if (only == "tour") { renderTour(out); return }
 
     fun shot(name: String, timeMs: Long = 1_800, w: Int = 720, h: Int = 1560, content: @Composable () -> Unit) {
         if (only != null && only != name) return

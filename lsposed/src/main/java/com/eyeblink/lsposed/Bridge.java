@@ -73,8 +73,8 @@ final class Bridge {
         IntentFilter filter = new IntentFilter(ACTION_COMMAND);
         Handler main = new Handler(Looper.getMainLooper());
         if (Build.VERSION.SDK_INT >= 33) {
-            // 2 = RECEIVER_EXPORTED: the sender is another app. The permission is what keeps everyone else out.
-            app.registerReceiver(receiver, filter, PERMISSION, main, 2);
+            // Exported: the sender is another app. The permission is what keeps everyone else out.
+            app.registerReceiver(receiver, filter, PERMISSION, main, Context.RECEIVER_EXPORTED);
         } else {
             app.registerReceiver(receiver, filter, PERMISSION, main);
         }

@@ -72,7 +72,7 @@ jobs:
         run: ./gradlew :core:test --stacktrace
 
       - name: Lint
-        run: ./gradlew :app:lintDebug :lsposed:lintDebug --stacktrace
+        run: ./gradlew :app:lintDebug :lsposed:lintDebug --continue --stacktrace
 
       - name: Assemble debug APKs
         run: ./gradlew :app:assembleDebug :lsposed:assembleDebug --stacktrace
