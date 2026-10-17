@@ -37,6 +37,13 @@ When it can't, it says so instead of guessing.
     <td><img src="docs/screens/power.png" width="170" alt="Power modes"></td>
     <td><img src="docs/screens/rest-focus.png" width="170" alt="Smart Rest"></td>
   </tr>
+  <tr>
+    <td><img src="docs/screens/language.png" width="170" alt="The language list"></td>
+    <td><img src="docs/screens/language-dark.png" width="170" alt="The language list, Moonlit theme"></td>
+    <td><img src="docs/screens/home-tr.png" width="170" alt="Today, in Turkish"></td>
+    <td><img src="docs/screens/privacy.png" width="170" alt="Privacy"></td>
+    <td><img src="docs/screens/stats.png" width="170" alt="Statistics"></td>
+  </tr>
 </table>
 
 *Every screenshot above is the app's real Compose UI, rendered headlessly on a laptop by the [design lab](tools/designlab) - not a mock-up.*
