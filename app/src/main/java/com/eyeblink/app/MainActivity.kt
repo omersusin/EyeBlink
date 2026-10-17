@@ -105,10 +105,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun isServiceRunning(): Boolean {
-        val manager = getSystemService(ACTIVITY_SERVICE) as android.app.ActivityManager
-        @Suppress("DEPRECATION")
-        return manager.getRunningServices(Int.MAX_VALUE)
-            .any { it.service.className == BlinkOverlayService::class.java.name }
-    }
+    private fun isServiceRunning(): Boolean =
+        com.eyeblink.app.core.isServiceRunning(this, BlinkOverlayService::class.java)
 }

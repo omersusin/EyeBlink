@@ -46,20 +46,40 @@ Kotlin + Jetpack Compose settings. Components: Core, Blink Animation Engine, Eye
 |---|---|
 | Hybrid blink animation (gradient eyelids, darken, black hold, reopen) | done |
 | Reduced-motion path (snap closed, no sweep) | done |
-| Adaptive timer scheduling with clamps + cooldown bounds | done |
+| Adaptive timer scheduling with clamped intervals | done |
 | Full-screen overlay via foreground service (`TYPE_APPLICATION_OVERLAY`) | done |
 | Configurable timing + appearance persisted to DataStore | done |
 | Settings UI with live preview, start/stop, master toggle | done |
-| MediaSession pause/resume with state verification | done |
+| Quick Settings tile for one-tap suspend/resume | done |
 | Context engine: screen-on, unlocked, foreground-app blocking | done |
 | Accessibility adapter (bounded play/pause node search) | done |
+| R8 + resource shrinking on release (dex 14.2 MB → 1.45 MB) | done |
+| Signed release APK (v2/v3, plus detached v4 `.idsig`) | done |
+
+**Playback pause/resume is coded but inert.** Cross-app `MediaSession`
+control needs a permission a normal app cannot hold (see *Known platform
+limits*), so `PlaybackController` always reports *unknown* and blinks proceed
+without touching media. The logic is in place and its safety rules are unit
+tested for when that path becomes reachable.
 
 **Not implemented yet:** camera tracking and MediaPipe blink detection, guided
-calibration (Milestone 3), adaptive learning (Milestone 4), LSPosed adapter,
-MediaProjection, Smart Rest / Blackout Rest / Distance Focus Rest, per-app
-compatibility testing, Quick Settings tile.
+calibration (Milestone 3), adaptive learning (Milestone 4), Smart Rest /
+Blackout Rest / Distance Focus Rest, per-app compatibility testing, LSPosed
+adapter, MediaProjection.
 
 The feature list above is the *design target*, not the current state.
+
+### Tests
+
+15 JVM unit tests, run in CI on every push:
+
+- `BlinkConfigTest` — pins the documented 140 + 150 + 165 = **455 ms** contract.
+- `InterruptionPolicyTest` — pins the two user-facing safety rules:
+  interruptions stay within 5 s – 10 min, and playback resumes **only** when
+  EyeBlink paused it *and* it is still paused.
+
+These rules live in `core/InterruptionPolicy.kt`, which has no Android imports
+so it runs without a device or Robolectric.
 
 ### Known gaps
 
@@ -84,16 +104,32 @@ clone.
 ### CI
 
 `.github/workflows/android.yml` runs on every push and PR to `main`, and on
-manual dispatch. It lints, runs the unit tests, assembles both a debug and an
-unsigned release APK, and uploads them as the `eyeblink-apk` artifact
-(14-day retention).
+manual dispatch. It lints, runs the unit tests, assembles a debug APK and an
+R8-optimized release APK, verifies the release signature with `apksigner`, and
+uploads everything as the `eyeblink-apk` artifact (30-day retention).
 
-The release APK is **unsigned** — no keystore lives in the repo. Sign it
-locally before distributing:
+Release signing is enabled only when these secrets exist, otherwise Gradle
+emits an unsigned APK instead of failing (so forks and secretless runs still
+work):
+
+| Secret | Contents |
+|---|---|
+| `KEYSTORE_BASE64` | base64 of the release keystore |
+| `KEYSTORE_PASSWORD` | keystore password |
+| `KEY_ALIAS` | signing key alias |
+| `KEY_PASSWORD` | key password |
+
+The keystore is decoded into `RUNNER_TEMP` and deleted at the end of the job.
+Nothing is committed: `.gitignore` blocks `*.jks`, `*.p12`, `*.b64` and
+`keystore.properties`.
+
+The release APK is signed with **v2 + v3**, plus a detached **v4** `.idsig`.
+It is a Play-ready signing identity but the APK itself is not Play-ready until
+the listing exists. To rebuild locally:
 
 ```bash
-zipalign -p 4 in.apk out.apk
-apksigner sign --ks release.jks out.apk
+# create keystore.properties (git-ignored) or export the same env vars
+./gradlew assembleRelease
 ```
 
 Superseded runs on the same ref are cancelled automatically.
