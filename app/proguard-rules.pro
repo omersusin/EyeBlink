@@ -1,24 +1,22 @@
 # R8 rules for EyeBlink.
 #
-# AndroidX and Compose ship their own consumer rules, so almost nothing needs
-# keeping. These are the app-specific cases only.
+# AndroidX, Compose, kotlinx.serialization and MediaPipe ship their own consumer rules, so almost
+# nothing needs keeping. These are the app-specific cases only.
 
-# Manifest-declared components are kept automatically by AGP, but be explicit:
-# the services are only ever referenced from AndroidManifest.xml.
--keep class com.eyeblink.app.MainActivity { *; }
--keep class com.eyeblink.app.core.BlinkOverlayService { *; }
--keep class com.eyeblink.app.accessibility.EyeBlinkAccessibilityService { *; }
+# Manifest-declared components are kept automatically by AGP; they are only ever referenced from
+# AndroidManifest.xml, so be explicit about the services Android binds by name.
+-keep class com.eyeblink.app.host.MainActivity { *; }
+-keep class com.eyeblink.app.host.EyeBlinkApplication { *; }
+-keep class com.eyeblink.app.access.EyeBlinkAccessibilityService { *; }
+-keep class com.eyeblink.app.access.EyeBlinkListenerService { *; }
+-keep class com.eyeblink.app.system.** { *; }
 
-# Blinks are driven by a Config provider lambda and a BlinkAnimator whose
-# progress is read from Compose. Keep the animation surface intact.
--keep class com.eyeblink.app.animation.BlinkAnimator { *; }
--keepclassmembers class com.eyeblink.app.animation.BlinkAnimator {
-    public <init>(kotlin.jvm.functions.Function0);
+# Shizuku: its simple shell entry point is private since 13.1, and is reached by reflection in
+# ShizukuBridge. Without this R8 would strip or rename it and Shizuku mode would silently die.
+-keepclassmembers class rikka.shizuku.Shizuku {
+    private static *** newProcess(java.lang.String[], java.lang.String[], java.lang.String);
 }
-
-# DataStore preferences are read by key, not reflection, so no keep is needed.
-# BlinkConfig is a plain data class used across the overlay/UI boundary.
--keep class com.eyeblink.app.core.BlinkConfig { *; }
+-keep class rikka.shizuku.ShizukuRemoteProcess { *; }
 
 # Keep source file + line numbers for readable production stack traces, but
 # hide the original source file name from the class file.

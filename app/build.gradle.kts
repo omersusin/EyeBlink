@@ -25,10 +25,11 @@ android {
         applicationId = "com.eyeblink.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
 
-        resourceConfigurations += listOf("en")
+        // The two languages EyeBlink is written in; libraries ship dozens more that would only add weight.
+        resourceConfigurations += listOf("en", "tr")
     }
 
     signingConfigs {
@@ -115,6 +116,9 @@ android {
 }
 
 dependencies {
+    // Scheduling, the playback safety protocol, parsers and calibration math: pure Kotlin, tested on the JVM.
+    implementation(project(":core"))
+
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.activity:activity-compose:1.9.3")
     implementation("androidx.compose.ui:ui:1.7.5")
@@ -123,7 +127,6 @@ dependencies {
     implementation("androidx.compose.animation:animation:1.7.5")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     implementation("androidx.savedstate:savedstate-ktx:1.2.1")
-    implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 
     // Camera: pinned to 1.5.x deliberately. camera-core 1.6.x declares
@@ -132,13 +135,13 @@ dependencies {
     implementation("androidx.camera:camera-core:1.5.3")
     implementation("androidx.camera:camera-camera2:1.5.3")
     implementation("androidx.camera:camera-lifecycle:1.5.3")
-    implementation("androidx.camera:camera-view:1.5.3")
 
     // On-device face landmarks. Runs locally: no network, no Play Services.
     implementation("com.google.mediapipe:tasks-vision:0.10.35")
 
-    testImplementation("junit:junit:4.13.2")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+    // Optional Shizuku mode. Both are on Maven Central.
+    implementation("dev.rikka.shizuku:api:13.1.5")
+    implementation("dev.rikka.shizuku:provider:13.1.5")
 }
 
 // Reproducible-ish release builds: no debug info in the shipped APK.

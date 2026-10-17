@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="xposed_description">Lets EyeBlink pause and resume video players that apps create themselves, for apps that expose no media session. Experimental: EyeBlink only uses it for an app after its own test passes.</string>
+
+    <!-- Suggested scope. LSPosed only ever hooks the apps you tick; nothing is hooked by default. -->
+    <string-array name="xposed_scope">
+        <item>com.google.android.youtube</item>
+        <item>com.instagram.android</item>
+        <item>com.zhiliaoapp.musically</item>
+        <item>app.revanced.android.youtube</item>
+    </string-array>
+</resources>

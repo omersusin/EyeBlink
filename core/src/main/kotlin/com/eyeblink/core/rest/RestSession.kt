@@ -41,6 +41,9 @@ data class RestView(
  * Nothing ever asks the user to keep their eyes open or to blink repeatedly: confirmation
  * has a timeout, a tap is always accepted as an alternative to a blink, and skipping is
  * always possible.
+ *
+ * The scene (main thread), the camera's blink events and the engine all talk to one session, so
+ * every public entry point is synchronised.
  */
 class RestSession(val request: RestRequest, private val startedMs: Long) {
 
@@ -53,6 +56,7 @@ class RestSession(val request: RestRequest, private val startedMs: Long) {
 
     val isFinished: Boolean get() = outcome != null
 
+    @Synchronized
     fun view(nowMs: Long): RestView {
         resolve(nowMs)
         val done = outcome
@@ -67,16 +71,20 @@ class RestSession(val request: RestRequest, private val startedMs: Long) {
     }
 
     /** A tap on the confirm affordance. Returns true if it ended the rest. */
+    @Synchronized
     fun onTap(nowMs: Long): Boolean = confirm(nowMs, ConfirmedBy.TAP, accepts = { it != ConfirmMode.AUTO })
 
     /** A real blink seen by the camera. Counts only when blink confirmation was asked for. */
+    @Synchronized
     fun onBlink(nowMs: Long): Boolean = confirm(nowMs, ConfirmedBy.BLINK, accepts = { it == ConfirmMode.BLINK })
 
+    @Synchronized
     fun skip(nowMs: Long) {
         resolve(nowMs)
         finish(nowMs, RestOutcome.SKIPPED, null)
     }
 
+    @Synchronized
     fun cancel(nowMs: Long) {
         resolve(nowMs)
         finish(nowMs, RestOutcome.CANCELLED, null)

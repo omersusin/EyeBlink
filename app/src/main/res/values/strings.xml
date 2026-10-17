@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Only what Android itself shows outside the app lives here. Everything inside EyeBlink is written
+  once, in English and Turkish side by side, in app/src/main/java/com/eyeblink/app/ui/i18n.
+-->
+<resources>
+    <string name="app_name" translatable="false">EyeBlink</string>
+    <string name="channel_running">EyeBlink is running</string>
+    <string name="channel_test">Playback tests</string>
+    <string name="a11y_summary">Lets EyeBlink draw its blink over every app and see which app is in front.</string>
+    <string name="a11y_description">EyeBlink uses this to show a short blink over your screen and to know which app you are in. It does not read what is on your screen, what you type, or your notifications.</string>
+    <string name="listener_label">EyeBlink media control</string>
+</resources>

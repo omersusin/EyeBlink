@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The EyeBlink mark: an almond eye whose iris is lit from within, under a lid whose edge is a line
+  of warm light. The same geometry, redrawn, is the README logo (docs/brand/logo.svg) and the hero
+  eye inside the app.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+
+    <!-- the eye's glow, so the mark does not sit flat on the black -->
+    <path android:pathData="M54,54 m-34,0 a34,34 0 1,0 68,0 a34,34 0 1,0 -68,0 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="radial" android:centerX="54" android:centerY="54" android:gradientRadius="34">
+                <item android:offset="0" android:color="#2E52E6D2" />
+                <item android:offset="0.55" android:color="#1214A9BC" />
+                <item android:offset="1" android:color="#0014A9BC" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- the eye -->
+    <path android:fillColor="#FF05080C"
+        android:pathData="M24,54 C38,36 70,36 84,54 C70,72 38,72 24,54 Z" />
+
+    <group>
+        <clip-path android:pathData="M24,54 C38,36 70,36 84,54 C70,72 38,72 24,54 Z" />
+        <!-- iris -->
+        <path android:pathData="M40,54 a14,14 0 1,0 28,0 a14,14 0 1,0 -28,0 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient android:type="radial" android:centerX="54" android:centerY="54" android:gradientRadius="14">
+                    <item android:offset="0" android:color="#FF9DF7EB" />
+                    <item android:offset="0.5" android:color="#FF52E6D2" />
+                    <item android:offset="1" android:color="#FF0E7F95" />
+                </gradient>
+            </aapt:attr>
+        </path>
+        <!-- pupil and catch-light -->
+        <path android:fillColor="#FF000000" android:pathData="M47.8,54 a6.2,6.2 0 1,0 12.4,0 a6.2,6.2 0 1,0 -12.4,0 Z" />
+        <path android:fillColor="#E6FFFFFF" android:pathData="M47.3,49.6 a2.2,2.2 0 1,0 4.4,0 a2.2,2.2 0 1,0 -4.4,0 Z" />
+    </group>
+
+    <!-- lower lid, quiet -->
+    <path android:fillColor="#00000000" android:strokeWidth="1.6" android:strokeLineCap="round" android:strokeAlpha="0.55"
+        android:strokeColor="#FF3FB8C6" android:pathData="M24,54 C38,72 70,72 84,54" />
+
+    <!-- upper lid: the seam of warm light -->
+    <path android:fillColor="#00000000" android:strokeWidth="3.2" android:strokeLineCap="round"
+        android:pathData="M24,54 C38,36 70,36 84,54">
+        <aapt:attr name="android:strokeColor">
+            <gradient android:type="linear" android:startX="24" android:startY="54" android:endX="84" android:endY="54">
+                <item android:offset="0" android:color="#FFFFBC70" />
+                <item android:offset="0.5" android:color="#FFFF6B8E" />
+                <item android:offset="1" android:color="#FFFFBC70" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- lashes -->
+    <path android:fillColor="#00000000" android:strokeWidth="1.8" android:strokeLineCap="round" android:strokeColor="#CCFFBC70"
+        android:pathData="M34.3,45.4 L31.2,39.7 M43.8,41.7 L42,34.4 M54,40.5 L54,33 M64.2,41.7 L66,34.4 M73.7,45.4 L76.8,39.7" />
+</vector>

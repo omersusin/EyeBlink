@@ -2,30 +2,76 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <!--
+      ── What EyeBlink asks Android for, and why ─────────────────────────────────────────────
+      Every line is listed on the in-app Privacy page; keep the two in step.
+    -->
+
+    <!-- The ongoing "EyeBlink is on" notification, and the service that keeps it. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!-- Camera-assisted mode only, and calibration. Frames are never stored. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <!-- The fallback way to draw the blink, if the accessibility service is not used. -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
+    <!-- The fallback way to know which app is in front. Granted by the user in Settings. -->
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
+
+    <!-- Smart night mode, only if the user turns it on and grants it: brightness (Settings screen)... -->
+    <uses-permission android:name="android.permission.WRITE_SETTINGS" tools:ignore="ProtectedPermissions" />
+    <!-- ...and Night Light, which Android lets only an adb/Shizuku/root grant reach. -->
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" tools:ignore="ProtectedPermissions" />
+
+    <!-- Optional Shizuku mode. -->
+    <uses-permission android:name="moe.shizuku.manager.permission.API_V23" />
+
+    <!-- Optional LSPosed module: only an app signed with the same key can talk to it. -->
+    <uses-permission android:name="com.eyeblink.lsposed.permission.BRIDGE" />
+
     <!--
-      MEDIA_CONTENT_CONTROL is deliberately absent: it is signature|privileged, so
-      a normal app can never hold it (lint: ProtectedPermissions). Cross-app
-      MediaSession control therefore only works via the notification-listener role
-      or the optional LSPosed path. Without it PlaybackController hits
-      SecurityException and returns null, and blinks proceed without touching
-      playback. See PlaybackController for the fallback.
+      MEDIA_CONTENT_CONTROL is deliberately absent: it is signature|privileged, so a normal app can never hold
+      it. Cross-app media control comes from notification access (rootless), Shizuku or root instead.
+
+      INTERNET is deliberately removed, even if a library asks for it. The face model ships inside the app and
+      nothing is ever sent anywhere; the privacy page says so, and the build enforces it.
     -->
-    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
-        tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" tools:node="remove" />
+
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.front" android:required="false" />
+
+    <queries>
+        <!-- Launchable apps, for the app picker. -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <package android:name="moe.shizuku.privileged.api" />
+        <package android:name="com.eyeblink.lsposed" />
+        <package android:name="org.lsposed.manager" />
+    </queries>
 
     <application
-        android:allowBackup="true"
-        android:label="EyeBlink"
+        android:name=".host.EyeBlinkApplication"
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="@string/app_name"
+        android:localeConfig="@xml/locales_config"
         android:supportsRtl="true"
         android:theme="@style/Theme.EyeBlink">
 
         <activity
-            android:name=".MainActivity"
+            android:name=".host.MainActivity"
             android:exported="true"
+            android:launchMode="singleTask"
             android:theme="@style/Theme.EyeBlink">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -33,19 +79,22 @@
             </intent-filter>
         </activity>
 
+        <!-- Keeps the process alive and shows the ongoing notification. Camera type only while camera tracking is on. -->
         <service
-            android:name=".core.BlinkOverlayService"
+            android:name=".system.EyeBlinkService"
             android:exported="false"
-            android:foregroundServiceType="specialUse">
+            android:foregroundServiceType="specialUse|camera">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Periodic visual rest breaks; overlays the screen briefly on a user-configured timer." />
+                android:value="Periodic eye-comfort breaks: briefly draws over the screen on a user-configured schedule." />
         </service>
 
+        <!-- Which app is in front, and a window to draw over everything. It does not read screen content. -->
         <service
-            android:name=".accessibility.EyeBlinkAccessibilityService"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
-            android:exported="true">
+            android:name=".access.EyeBlinkAccessibilityService"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
             <intent-filter>
                 <action android:name="android.accessibilityservice.AccessibilityService" />
             </intent-filter>
@@ -54,16 +103,53 @@
                 android:resource="@xml/accessibility_service_config" />
         </service>
 
-        <!-- One-tap suspend/resume from the Quick Settings shade. -->
+        <!-- The rootless way to see and control other apps' media sessions. Reads no notification text. -->
+        <service
+            android:name=".access.EyeBlinkListenerService"
+            android:exported="true"
+            android:label="@string/listener_label"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <!-- The instant suspend, from the Quick Settings shade. -->
         <service
             android:name=".system.BlinkTileService"
             android:exported="true"
-            android:icon="@drawable/ic_eyeblink"
-            android:label="EyeBlink"
+            android:icon="@drawable/ic_stat_eye"
+            android:label="@string/app_name"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>
                 <action android:name="android.service.quicksettings.action.QS_TILE" />
             </intent-filter>
         </service>
+
+        <receiver android:name=".system.BootReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <receiver android:name=".system.NotificationActionReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="com.eyeblink.action.SNOOZE" />
+                <action android:name="com.eyeblink.action.SUSPEND" />
+                <action android:name="com.eyeblink.action.RESUME" />
+                <action android:name="com.eyeblink.action.STOP" />
+            </intent-filter>
+        </receiver>
+
+        <receiver android:name=".system.LsposedReplyReceiver" android:exported="false" />
+
+        <!-- How Shizuku hands this app its binder. -->
+        <provider
+            android:name="rikka.shizuku.ShizukuProvider"
+            android:authorities="${applicationId}.shizuku"
+            android:enabled="true"
+            android:exported="true"
+            android:multiprocess="false"
+            android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
     </application>
 </manifest>

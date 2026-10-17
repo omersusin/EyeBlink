@@ -1,5 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  What this service may do is the privacy contract of the app, so it is spelled out:
+
+  - Events: a window changing (which app is in front), a scroll (a swipe happened), and a view taking
+    focus (a text field opened). Nothing else is subscribed to - in particular not text changes.
+  - canRetrieveWindowContent is false: Android will not let the service read what is on screen.
+  - canPerformGestures is true, only so the optional, off-by-default "tap to pause" strategy can work.
+-->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
-    android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeViewScrolled|typeViewFocused"
     android:accessibilityFeedbackType="feedbackGeneric"
-    android:canRetrieveWindowContent="true"
-    android:notificationTimeout="100" />
+    android:accessibilityFlags="flagDefault"
+    android:canRetrieveWindowContent="false"
+    android:canPerformGestures="true"
+    android:isAccessibilityTool="false"
+    android:notificationTimeout="50"
+    android:summary="@string/a11y_summary"
+    android:description="@string/a11y_description" />
