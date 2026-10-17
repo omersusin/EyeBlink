@@ -106,6 +106,7 @@ jobs:
           path: |
             app/build/outputs/apk/debug/*.apk
             app/build/outputs/apk/release/*.apk
+            app/build/outputs/apk/release/*.idsig
           if-no-files-found: error
           retention-days: 30
 
