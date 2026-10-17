@@ -105,8 +105,17 @@ Superseded runs on the same ref are cancelled automatically.
 | `SYSTEM_ALERT_WINDOW` | draw the blink overlay | yes |
 | `FOREGROUND_SERVICE` (+ `..._SPECIAL_USE`) | keep the overlay alive | yes |
 | `POST_NOTIFICATIONS` | show the ongoing-service notification | Android 13+ |
-| `MEDIA_CONTENT_CONTROL` | pause/resume media sessions | optional |
-| `PACKAGE_USAGE_STATS` | read foreground app to avoid interrupting calls | optional (granted in Settings) |
+| `PACKAGE_USAGE_STATS` | read foreground app to avoid interrupting calls | optional (grant in Settings) |
+
+### Known platform limits
+
+**Cross-app playback control is not available to a normal app.**
+`MEDIA_CONTENT_CONTROL` is `signature|privileged`, so `MediaSessionManager
+.getActiveSessions()` throws `SecurityException` and lint rejects the
+`uses-permission`. `PlaybackController` therefore reports playback state as
+*unknown* and blinks **without** touching media. The reachable alternatives are
+the notification-listener role, or the optional LSPosed hook. Do not remove the
+`SecurityException` catch — it is what keeps the app honest about this.
 
 Camera and Usage Access are requested in-app and are never mandatory; without
 them EyeBlink still blinks on a timer and simply stays quiet during calls.

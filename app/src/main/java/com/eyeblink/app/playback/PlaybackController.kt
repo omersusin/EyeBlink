@@ -9,10 +9,14 @@ import android.util.Log
 /**
  * Best-effort external playback control.
  *
- * `getActiveSessions(null)` returns non-empty only for callers holding
- * MEDIA_CONTENT_CONTROL (or a notification-listener grant). When it returns
- * empty we report "unknown" rather than guessing, and callers must not send
- * blind toggles.
+ * There is NO public permission that lets a normal app control other apps'
+ * media sessions: MEDIA_CONTENT_CONTROL is signature|privileged, so
+ * `getActiveSessions()` throws SecurityException for us. The reachable routes
+ * are the notification-listener role or the optional LSPosed hook.
+ *
+ * So this always reports "unknown" rather than guessing, and callers must not
+ * send blind toggles. EyeBlink degrades to blinking without touching playback,
+ * which is the documented fallback.
  */
 class PlaybackController(private val context: Context) {
 
