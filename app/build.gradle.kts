@@ -114,6 +114,17 @@ dependencies {
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 
+    // Camera: pinned to 1.5.x deliberately. camera-core 1.6.x declares
+    // minCompileSdk=36 and minAndroidGradlePluginVersion=8.9.1, which this
+    // project does not satisfy; 1.5.3 declares minCompileSdk=35 / AGP 8.6.0.
+    implementation("androidx.camera:camera-core:1.5.3")
+    implementation("androidx.camera:camera-camera2:1.5.3")
+    implementation("androidx.camera:camera-lifecycle:1.5.3")
+    implementation("androidx.camera:camera-view:1.5.3")
+
+    // On-device face landmarks. Runs locally: no network, no Play Services.
+    implementation("com.google.mediapipe:tasks-vision:0.10.35")
+
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
 }
