@@ -200,10 +200,18 @@ if tools tap Calibration --timeout 15; then
   sleep 2
   snap 14-calibration-intro
   if tools tap Begin --timeout 10; then
-    sleep 10
+    # Long enough for the page to show a verdict: the session gives up after 12 s without a single picture from the camera.
+    sleep 16
     snap 15-calibration
     if tools has "$OUT/15-calibration.xml" "Camera on"; then
       echo "calibration started: the camera and the face model came up"
+      # "Camera on" only says the camera was asked; the app logs the moment the first picture really arrives.
+      if adb logcat -d -s EyeBlink:I 2>/dev/null | tr -d '\r' | grep "calibration: the first camera picture"; then
+        echo "pictures are arriving from the camera"
+      else
+        warn "calibration is running, but no picture has come from the camera"
+        adb logcat -d -s EyeBlink:V 2>/dev/null | tr -d '\r' | tail -10
+      fi
     else
       warn "calibration did not start"
       tools texts "$OUT/15-calibration.xml" | head -20

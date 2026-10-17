@@ -1,6 +1,7 @@
 package com.eyeblink.app.engine
 
 import android.app.Application
+import android.util.Log
 import com.eyeblink.app.platform.Access
 import com.eyeblink.app.platform.DeviceState
 import com.eyeblink.app.platform.nowMs
@@ -227,6 +228,8 @@ class Calibrator(
     private var result: CalibrationResult? = null
     private var tick: Job? = null
     private var blinks = 0
+    private var startedAtMs = 0L
+    private var framesSeen = 0
 
     /** Background tracking must not touch the camera while this is true. */
     val running: Boolean get() = session != null
@@ -253,6 +256,8 @@ class Calibrator(
         session = s
         result = null
         blinks = 0
+        framesSeen = 0
+        startedAtMs = nowMs()
         detector = BlinkThresholds().newDetector()
         val started = source.start(CALIBRATION_FPS, { frame, _ -> post { onFrame(frame) } }, { message -> post { abort(message) } })
         if (!started) {
@@ -279,6 +284,7 @@ class Calibrator(
 
     private fun onFrame(frame: FaceFrame) {
         val s = session ?: return
+        if (++framesSeen == 1) Log.i(TAG, "calibration: the first camera picture came ${nowMs() - startedAtMs} ms after Begin, face seen: ${frame.sample != null}")
         val sample = frame.sample
         if (sample != null) {
             s.onSample(sample)
@@ -290,6 +296,11 @@ class Calibrator(
     private fun step() {
         val s = session ?: return
         val now = nowMs()
+        // A camera that another app holds opens "successfully" and then never delivers a picture; say so instead of waiting.
+        if (framesSeen == 0 && now - startedAtMs > NO_FRAMES_MS) {
+            abort("no pictures arrived from the camera in ${NO_FRAMES_MS / 1_000} seconds - another app may be using it")
+            return
+        }
         s.onTick(now)
         if (s.phase == CalibrationSession.Phase.COMPLETE) {
             finish(s)
@@ -329,6 +340,7 @@ class Calibrator(
     /** The camera or the model failed under a running session: stop everything and tell the user why. */
     private fun abort(message: String) {
         if (session == null) return
+        Log.w(TAG, "calibration stopped: $message")
         tick?.cancel()
         faces?.stop()
         session?.cancel()
@@ -352,6 +364,8 @@ class Calibrator(
     }
 
     private companion object {
+        const val TAG = "EyeBlink"
         const val CALIBRATION_FPS = 15
+        const val NO_FRAMES_MS = 12_000L
     }
 }
