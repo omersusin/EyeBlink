@@ -12,6 +12,9 @@ import android.os.IBinder
 import android.view.Gravity
 import android.view.WindowManager
 import androidx.compose.ui.platform.ComposeView
+import androidx.lifecycle.lifecycleScope
+import com.eyeblink.app.context.ContextEngine
+import com.eyeblink.app.playback.PlaybackController
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
@@ -31,6 +34,16 @@ class BlinkOverlayService : Service(), LifecycleOwner, SavedStateRegistryOwner {
     private var overlayView: ComposeView? = null
     private val config = BlinkConfig()
     private val animator = BlinkAnimator(config)
+    private val controller by lazy {
+        BlinkController(
+            scope = lifecycleScope,
+            config = config,
+            animator = animator,
+            playback = PlaybackController(this),
+            contextEngine = ContextEngine(this),
+            onBlink = {}
+        )
+    }
 
     override val lifecycle: Lifecycle get() = lifecycleRegistry
     override val savedStateRegistry: SavedStateRegistry get() = savedStateController.savedStateRegistry
@@ -44,6 +57,7 @@ class BlinkOverlayService : Service(), LifecycleOwner, SavedStateRegistryOwner {
         showOverlay()
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_START)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
+        controller.start()
     }
 
     private fun showOverlay() {
@@ -80,6 +94,7 @@ class BlinkOverlayService : Service(), LifecycleOwner, SavedStateRegistryOwner {
     }
 
     override fun onDestroy() {
+        controller.stop()
         overlayView?.let { windowManager.removeView(it) }
         overlayView = null
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
