@@ -298,7 +298,8 @@ class Calibrator(
         val now = nowMs()
         // A camera that another app holds opens "successfully" and then never delivers a picture; say so instead of waiting.
         if (framesSeen == 0 && now - startedAtMs > NO_FRAMES_MS) {
-            abort("no pictures arrived from the camera in ${NO_FRAMES_MS / 1_000} seconds - another app may be using it")
+            val said = faces?.lastError?.let { " ($it)" }.orEmpty()
+            abort("no pictures arrived from the camera in ${NO_FRAMES_MS / 1_000} seconds$said")
             return
         }
         s.onTick(now)
@@ -366,6 +367,6 @@ class Calibrator(
     private companion object {
         const val TAG = "EyeBlink"
         const val CALIBRATION_FPS = 15
-        const val NO_FRAMES_MS = 12_000L
+        const val NO_FRAMES_MS = 20_000L
     }
 }

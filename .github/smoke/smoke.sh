@@ -86,6 +86,16 @@ press() {
   fi
 }
 
+# What the app, CameraX and the camera service said, for when the camera does not deliver what it should.
+camera_report() {
+  echo "--- the app's own log ---"
+  adb logcat -d -s EyeBlink:V 2>/dev/null | tr -d '\r' | tail -25
+  echo "--- CameraX and the camera service ---"
+  adb logcat -d -v threadtime 2>/dev/null | tr -d '\r' | grep -iE "camera" | grep -v "EyeBlink" | tail -50
+  echo "--- the camera service's clients and events ---"
+  adb shell dumpsys media.camera 2>/dev/null | tr -d '\r' | grep -iE "eyeblink|active|connect|evict|error|camera [0-9]+:" | head -40
+}
+
 collect() {
   adb logcat -d -v threadtime > "$OUT/logcat.txt" 2>&1
   crash_log | retrace > "$OUT/crash.txt"
@@ -200,22 +210,21 @@ if tools tap Calibration --timeout 15; then
   sleep 2
   snap 14-calibration-intro
   if tools tap Begin --timeout 10; then
-    # Long enough for the page to show a verdict: the session gives up after 12 s without a single picture from the camera.
-    sleep 16
+    # Long enough for the page to show a verdict: the session gives up after 20 s without a single picture from the camera.
+    sleep 26
     snap 15-calibration
-    if tools has "$OUT/15-calibration.xml" "Camera on"; then
-      echo "calibration started: the camera and the face model came up"
-      # "Camera on" only says the camera was asked; the app logs the moment the first picture really arrives.
-      if adb logcat -d -s EyeBlink:I 2>/dev/null | tr -d '\r' | grep "calibration: the first camera picture"; then
-        echo "pictures are arriving from the camera"
-      else
-        warn "calibration is running, but no picture has come from the camera"
-        adb logcat -d -s EyeBlink:V 2>/dev/null | tr -d '\r' | tail -10
-      fi
+    # "Camera on" only says the camera was asked; the app logs the moment the first picture really arrives.
+    if adb logcat -d -s EyeBlink:I 2>/dev/null | tr -d '\r' | grep "calibration: the first camera picture"; then
+      echo "pictures are arriving from the camera"
     else
-      warn "calibration did not start"
+      warn "no picture came from the camera during calibration"
+      camera_report
+    fi
+    if tools has "$OUT/15-calibration.xml" "Camera on"; then
+      echo "calibration is running: the camera and the face model came up"
+    else
+      warn "calibration did not stay running"
       tools texts "$OUT/15-calibration.xml" | head -20
-      adb logcat -d -s EyeBlink:V 2>/dev/null | tr -d '\r' | tail -20
     fi
   else
     warn "could not press Begin on the calibration page"

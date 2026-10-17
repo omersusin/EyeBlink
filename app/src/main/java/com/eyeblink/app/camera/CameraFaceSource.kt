@@ -10,6 +10,7 @@ import android.os.SystemClock
 import android.util.Log
 import android.util.Size
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.CameraState
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.resolutionselector.ResolutionSelector
@@ -109,15 +110,14 @@ class CameraFaceSource(private val app: Application) : FaceSource {
     override fun stop() {
         if (!active) return
         active = false
-        main.post {
-            runCatching { provider?.unbindAll() }
-            owner?.destroy()
-            owner = null
-            // Keep the model for a short while: bursts come back every minute or so.
-            val r = Runnable { closeModel() }
-            release = r
-            main.postDelayed(r, MODEL_IDLE_MS)
-        }
+        main.post { unbind(); keepModelAwhile() }
+    }
+
+    /** Keeps the model for a short while: bursts come back every minute or so. Must run on the main thread. */
+    private fun keepModelAwhile() {
+        val r = Runnable { closeModel() }
+        release = r
+        main.postDelayed(r, MODEL_IDLE_MS)
     }
 
     private fun bind(p: ProcessCameraProvider, fps: Int, onFrame: (FaceFrame, Long) -> Unit, onError: (String) -> Unit) {
@@ -135,16 +135,53 @@ class CameraFaceSource(private val app: Application) : FaceSource {
             analysis.setAnalyzer(executor, Analyzer(fps, onFrame, onError))
             val o = CameraOwner().also { it.resume() }
             p.unbindAll()
-            p.bindToLifecycle(o, CameraSelector.DEFAULT_FRONT_CAMERA, analysis)
+            val camera = p.bindToLifecycle(o, CameraSelector.DEFAULT_FRONT_CAMERA, analysis)
             owner = o
             provider = p
+            Log.i(TAG, "camera: the front camera is bound, sensor rotation ${camera.cameraInfo.sensorRotationDegrees} degrees")
+            // CameraX reports a camera that is in use, disabled or broken through this state and not through an exception.
+            camera.cameraInfo.cameraState.observe(o) { state -> onCameraState(state, onError) }
         } catch (e: Throwable) {
             fail(onError, remember(e, "the camera could not be started"))
         }
     }
 
+    /** Must run on the main thread. */
+    private fun unbind() {
+        runCatching { provider?.unbindAll() }
+        owner?.destroy()
+        owner = null
+    }
+
+    private fun onCameraState(state: CameraState, onError: (String) -> Unit) {
+        val error = state.error
+        val problem = error?.let { stateProblem(it.code) + (it.cause?.let { c -> " (${c.javaClass.simpleName}: ${c.message})" } ?: "") }
+        Log.i(TAG, "camera: ${state.type}" + (problem?.let { " - $it" } ?: ""))
+        if (error == null || problem == null) {
+            if (state.type == CameraState.Type.OPEN) lastError = null
+            return
+        }
+        lastError = "the camera reports: $problem"
+        // CameraX keeps retrying a camera that another app holds; the rest it gives up on.
+        val retried = error.code == CameraState.ERROR_CAMERA_IN_USE || error.code == CameraState.ERROR_MAX_CAMERAS_IN_USE ||
+            error.code == CameraState.ERROR_OTHER_RECOVERABLE_ERROR
+        if (!retried && active) fail(onError, lastError)
+    }
+
+    private fun stateProblem(code: Int) = when (code) {
+        CameraState.ERROR_MAX_CAMERAS_IN_USE -> "too many cameras are open"
+        CameraState.ERROR_CAMERA_IN_USE -> "another app is using the camera"
+        CameraState.ERROR_OTHER_RECOVERABLE_ERROR -> "a camera error it may recover from"
+        CameraState.ERROR_STREAM_CONFIG -> "the camera could not be set up"
+        CameraState.ERROR_CAMERA_DISABLED -> "the camera is disabled by a privacy switch, a policy or the phone's settings"
+        CameraState.ERROR_CAMERA_FATAL_ERROR -> "a fatal camera error"
+        CameraState.ERROR_DO_NOT_DISTURB_MODE_ENABLED -> "Do Not Disturb is blocking the camera"
+        else -> "camera error $code"
+    }
+
     private fun fail(onError: (String) -> Unit, message: String?) {
         active = false
+        main.post { unbind(); keepModelAwhile() }
         onError(message ?: "camera error")
     }
 
@@ -179,10 +216,16 @@ class CameraFaceSource(private val app: Application) : FaceSource {
         private val minGapMs = 1_000L / fps.coerceAtLeast(1)
         private var lastMs = 0L
         private val matrix = Matrix()
+        private var firstSeen = false
+        private var firstDone = false
 
         override fun analyze(image: ImageProxy) {
             try {
                 val started = SystemClock.elapsedRealtime()
+                if (!firstSeen) {
+                    firstSeen = true
+                    Log.i(TAG, "camera: the first picture, ${image.width}x${image.height}, turned ${image.imageInfo.rotationDegrees} degrees")
+                }
                 if (!active || started - lastMs < minGapMs) return
                 lastMs = started
 
@@ -195,7 +238,12 @@ class CameraFaceSource(private val app: Application) : FaceSource {
                 lastTimestamp = maxOf(lastTimestamp + 1, started)
                 val frame = detect(upright, lastTimestamp)
                 upright.recycle()
-                onFrame(frame, SystemClock.elapsedRealtime() - started)
+                val tookMs = SystemClock.elapsedRealtime() - started
+                if (!firstDone) {
+                    firstDone = true
+                    Log.i(TAG, "camera: the first picture was analysed in $tookMs ms, face seen: ${frame.sample != null}")
+                }
+                onFrame(frame, tookMs)
             } catch (e: Throwable) {
                 onError(remember(e, "a camera frame could not be analysed"))
             } finally {
