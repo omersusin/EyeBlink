@@ -4,6 +4,16 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+// Signing credentials come from keystore.properties (local, git-ignored) or from
+// environment variables (CI). Never commit real values.
+val keystorePropsFile = rootProject.file("keystore.properties")
+val keystoreProps = java.util.Properties().apply {
+    if (keystorePropsFile.exists()) keystorePropsFile.inputStream().use { load(it) }
+}
+
+fun secret(key: String, env: String): String? =
+    (keystoreProps.getProperty(key) ?: System.getenv(env))?.takeIf { it.isNotBlank() }
+
 android {
     namespace = "com.eyeblink.app"
     compileSdk = 35
@@ -13,16 +23,69 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"
+
+        resourceConfigurations += listOf("en")
     }
+
+    signingConfigs {
+        create("release") {
+            val store = secret("storeFile", "KEYSTORE_FILE")
+            store?.let {
+                storeFile = rootProject.file(it)
+                storePassword = secret("storePassword", "KEYSTORE_PASSWORD")
+                keyAlias = secret("keyAlias", "KEY_ALIAS")
+                keyPassword = secret("keyPassword", "KEY_PASSWORD")
+            }
+        }
+    }
+
+    buildTypes {
+        debug {
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+            isMinifyEnabled = false
+        }
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            isDefault = false
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+            // Only sign when credentials are actually present, so a fork or a
+            // secretless CI run still produces an unsigned release.
+            signingConfig = signingConfigs.findByName("release")
+                ?.takeIf { it.storeFile?.exists() == true }
+        }
+    }
+
     buildFeatures { compose = true }
+    composeOptions { kotlinCompilerExtensionVersion = "1.5.15" }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
 
+    packaging {
+        resources.excludes += setOf(
+            "/META-INF/{AL2.0,LGPL2.1}",
+            "/META-INF/*.version",
+            "DebugProbesKt.bin",
+            "kotlin-tooling-metadata.json",
+        )
+    }
+
     testOptions {
         unitTests.isReturnDefaultValues = true
+    }
+
+    lint {
+        // A signature-only permission must never be requested; keep it fatal.
+        abortOnError = true
+        warningsAsErrors = false
     }
 }
 
@@ -40,4 +103,11 @@ dependencies {
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+}
+
+// Reproducible-ish release builds: no debug info in the shipped APK.
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    compilerOptions {
+        freeCompilerArgs.add("-Xjvm-default=all")
+    }
 }

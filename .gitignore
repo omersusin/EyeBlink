@@ -11,6 +11,11 @@
 *.apk
 *.ap_
 *.dex
+*.jks
+*.keystore
+keystore.properties
+*.p12
+*.b64
 *.class
 bin/
 gen/
