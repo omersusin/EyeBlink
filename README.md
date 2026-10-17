@@ -81,6 +81,23 @@ clone.
 ./gradlew :app:lintDebug
 ```
 
+### CI
+
+`.github/workflows/android.yml` runs on every push and PR to `main`, and on
+manual dispatch. It lints, runs the unit tests, assembles both a debug and an
+unsigned release APK, and uploads them as the `eyeblink-apk` artifact
+(14-day retention).
+
+The release APK is **unsigned** — no keystore lives in the repo. Sign it
+locally before distributing:
+
+```bash
+zipalign -p 4 in.apk out.apk
+apksigner sign --ks release.jks out.apk
+```
+
+Superseded runs on the same ref are cancelled automatically.
+
 ### Permissions
 
 | Permission | Why | Required? |
