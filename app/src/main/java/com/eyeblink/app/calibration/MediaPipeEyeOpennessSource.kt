@@ -3,7 +3,7 @@ package com.eyeblink.app.calibration
 import android.content.Context
 import android.graphics.Bitmap
 import android.util.Log
-import com.google.mediapipe.framework.image.MPImage
+import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.google.mediapipe.tasks.components.containers.NormalizedLandmark
 import com.google.mediapipe.tasks.core.BaseOptions
 import com.google.mediapipe.tasks.vision.core.RunningMode
@@ -67,8 +67,7 @@ class MediaPipeEyeOpennessSource(
     fun onFrame(bitmap: Bitmap, timestampMs: Long, illuminance: Float): EyeOpennessSample? {
         val lm = landmarker ?: return null
         return try {
-            val image = MPImage.Builder(bitmap)
-                .build()
+            val image = BitmapImageBuilder(bitmap).build()
             val result = lm.detectForVideo(image, timestampMs)
             image.close()
 
@@ -111,7 +110,7 @@ class MediaPipeEyeOpennessSource(
         if (faceHeight <= 0f) return null
 
         fun ys(indices: IntArray): List<Float> =
-            indices.mapNotNull { i ->
+            indices.toList().mapNotNull { i ->
                 val lm = landmarks[i]
                 // Reject landmarks the model is not confident about: this is the
                 // outlier rejection that EyeGeometry deliberately does not do.
@@ -135,7 +134,7 @@ class MediaPipeEyeOpennessSource(
 
         // Mean landmark visibility stands in for overall tracking confidence.
         val allVisibility = (LEFT_UPPER + LEFT_LOWER + RIGHT_UPPER + RIGHT_LOWER)
-            .mapNotNull { landmarks[it].visibility().orElse(null) }
+            .toList().mapNotNull { landmarks[it].visibility().orElse(null) }
         val confidence = if (allVisibility.isEmpty()) 0f else allVisibility.average().toFloat()
 
         return EyeOpennessSample(
