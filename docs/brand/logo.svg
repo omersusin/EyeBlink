@@ -1,38 +1,19 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="EyeBlink">
   <title>EyeBlink</title>
-  <!--
-    The mark: an almond eye whose iris is lit from within, under a lid whose edge is a line of warm light.
-    The geometry is the one in app/src/main/res/drawable/ic_launcher_foreground.xml, scaled by 512/108.
-  -->
-  <defs>
-    <radialGradient id="glow" gradientUnits="userSpaceOnUse" cx="54" cy="54" r="34">
-      <stop offset="0" stop-color="#52E6D2" stop-opacity="0.18"/>
-      <stop offset="0.55" stop-color="#14A9BC" stop-opacity="0.07"/>
-      <stop offset="1" stop-color="#14A9BC" stop-opacity="0"/>
-    </radialGradient>
-    <radialGradient id="iris" gradientUnits="userSpaceOnUse" cx="54" cy="54" r="14">
-      <stop offset="0" stop-color="#9DF7EB"/>
-      <stop offset="0.5" stop-color="#52E6D2"/>
-      <stop offset="1" stop-color="#0E7F95"/>
-    </radialGradient>
-    <linearGradient id="seam" gradientUnits="userSpaceOnUse" x1="24" y1="54" x2="84" y2="54">
-      <stop offset="0" stop-color="#FFBC70"/>
-      <stop offset="0.5" stop-color="#FF6B8E"/>
-      <stop offset="1" stop-color="#FFBC70"/>
-    </linearGradient>
-    <clipPath id="eye"><path d="M24,54 C38,36 70,36 84,54 C70,72 38,72 24,54 Z"/></clipPath>
-  </defs>
-  <rect width="512" height="512" rx="116" fill="#000"/>
-  <g transform="scale(4.740741)">
-    <circle cx="54" cy="54" r="34" fill="url(#glow)"/>
-    <path d="M24,54 C38,36 70,36 84,54 C70,72 38,72 24,54 Z" fill="#05080C"/>
-    <g clip-path="url(#eye)">
-      <circle cx="54" cy="54" r="14" fill="url(#iris)"/>
-      <circle cx="54" cy="54" r="6.2" fill="#000"/>
-      <circle cx="49.5" cy="49.6" r="2.2" fill="#fff" fill-opacity="0.9"/>
-    </g>
-    <path d="M24,54 C38,72 70,72 84,54" fill="none" stroke="#3FB8C6" stroke-opacity="0.55" stroke-width="1.6" stroke-linecap="round"/>
-    <path d="M24,54 C38,36 70,36 84,54" fill="none" stroke="url(#seam)" stroke-width="3.2" stroke-linecap="round"/>
-    <path d="M34.3,45.4 L31.2,39.7 M43.8,41.7 L42,34.4 M54,40.5 L54,33 M64.2,41.7 L66,34.4 M73.7,45.4 L76.8,39.7" fill="none" stroke="#FFBC70" stroke-opacity="0.8" stroke-width="1.8" stroke-linecap="round"/>
+  <rect x="0" y="18" width="512" height="494" rx="150" fill="#1C83DE"/>
+  <rect x="0" y="0" width="512" height="494" rx="150" fill="#3AA4FF"/>
+  <path transform="translate(0 11.37)" d="M63.68,247 C105.99,88.21 406.01,88.21 448.32,247 C406.01,373.09 105.99,373.09 63.68,247 Z" fill="#1C83DE"/>
+  <path d="M63.68,247 C105.99,88.21 406.01,88.21 448.32,247 C406.01,373.09 105.99,373.09 63.68,247 Z" fill="#FFC62E"/>
+  <path d="M77.93,247 C117.1,124.85 394.9,124.85 434.07,247 C394.9,350.36 117.1,350.36 77.93,247 Z" fill="#FFFFFF"/>
+  <clipPath id="aperture"><path d="M77.93,247 C117.1,124.85 394.9,124.85 434.07,247 C394.9,350.36 117.1,350.36 77.93,247 Z"/></clipPath>
+  <g clip-path="url(#aperture)">
+    <rect x="77.93" y="124.85" width="356.15" height="56.8" fill="#B7DAF5" fill-opacity="0.55"/>
+    <circle cx="256" cy="247" r="70.47" fill="#3AA4FF"/>
+    <circle cx="256" cy="247" r="66.24" fill="none" stroke="#1C83DE" stroke-width="8.46"/>
+    <circle cx="256" cy="247" r="32.42" fill="#16254A"/>
+    <circle cx="234.86" cy="223.04" r="14.09" fill="#FFFFFF"/>
+    <circle cx="275.73" cy="268.14" r="5.99" fill="#FFFFFF" fill-opacity="0.8"/>
   </g>
+  <path d="M77.93,247 C117.1,124.85 394.9,124.85 434.07,247" fill="none" stroke="#E3A10C" stroke-width="5.3" stroke-linecap="round"/>
+  <g stroke="#16254A" stroke-width="6.44" stroke-linecap="round"><line x1="104.25" y1="205.56" x2="79.73" y2="180.28"/><line x1="171.06" y1="167.93" x2="158.73" y2="129.15"/><line x1="256" y1="155.39" x2="256" y2="112.65"/><line x1="340.94" y1="167.93" x2="353.27" y2="129.15"/><line x1="407.75" y1="205.56" x2="432.27" y2="180.28"/></g>
 </svg>

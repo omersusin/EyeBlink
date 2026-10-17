@@ -34,8 +34,9 @@ fun RevealScope(content: @Composable () -> Unit) {
     val reduced = LocalReducedMotion.current
     var running by remember { mutableStateOf(!reduced) }
     val clock = rememberClockMs(running = running)
+    val settled = remember { mutableStateOf(10_000f) }
     if (running && clock.value > REVEAL_TOTAL_MS) running = false
-    CompositionLocalProvider(LocalRevealClock provides (if (reduced) mutableStateOf(10_000f) else clock), content = content)
+    CompositionLocalProvider(LocalRevealClock provides (if (reduced) settled else clock), content = content)
 }
 
 /** The i-th element of a screen fades up into place, slightly after the one before it. */

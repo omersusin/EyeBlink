@@ -6,6 +6,10 @@ import kotlinx.serialization.Serializable
 @Serializable
 enum class Language { SYSTEM, EN, TR }
 
+/** Which of the two themes the app wears: bright Daylight, deep-indigo Moonlit, or whichever the phone is in. */
+@Serializable
+enum class Appearance { SYSTEM, LIGHT, DARK }
+
 /** What the user asked for. What is actually possible is negotiated at runtime (see PowerCapabilities). */
 @Serializable
 enum class OperatingMode { ROOTLESS, SHIZUKU, ROOT }
@@ -254,6 +258,7 @@ data class EyeBlinkSettings(
     val onboardingDone: Boolean = false,
     /** English is the app's main language; following the phone's language is a choice, not the default. */
     val language: Language = Language.EN,
+    val appearance: Appearance = Appearance.SYSTEM,
     val mode: OperatingMode = OperatingMode.ROOTLESS,
     /** Simple: sensible automatic behaviour. Advanced exposes every knob. */
     val advanced: Boolean = false,

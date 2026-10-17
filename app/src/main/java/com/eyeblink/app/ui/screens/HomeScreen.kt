@@ -1,56 +1,56 @@
 package com.eyeblink.app.ui.screens
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.eyeblink.app.ui.eye.EyeHero
+import com.eyeblink.app.ui.eye.EyeMark
 import com.eyeblink.app.ui.i18n.Strings
 import com.eyeblink.app.ui.i18n.fmtClock
 import com.eyeblink.app.ui.i18n.fmtSeconds
 import com.eyeblink.app.ui.i18n.label
 import com.eyeblink.app.ui.kit.Badge
 import com.eyeblink.app.ui.kit.ButtonKind
+import com.eyeblink.app.ui.kit.Card
 import com.eyeblink.app.ui.kit.Chip
-import com.eyeblink.app.ui.kit.Dusk
 import com.eyeblink.app.ui.kit.EbFonts
 import com.eyeblink.app.ui.kit.EbText
-import com.eyeblink.app.ui.kit.Glass
 import com.eyeblink.app.ui.kit.Hairline
-import com.eyeblink.app.ui.kit.Ico
+import com.eyeblink.app.ui.kit.Hue
 import com.eyeblink.app.ui.kit.Icon
+import com.eyeblink.app.ui.kit.IconBadge
 import com.eyeblink.app.ui.kit.Ink
-import com.eyeblink.app.ui.kit.Meter
 import com.eyeblink.app.ui.kit.MiniBars
+import com.eyeblink.app.ui.kit.P
 import com.eyeblink.app.ui.kit.PillButton
-import com.eyeblink.app.ui.kit.PulseDot
 import com.eyeblink.app.ui.kit.S
 import com.eyeblink.app.ui.kit.ScreenColumn
 import com.eyeblink.app.ui.kit.SectionHeader
 import com.eyeblink.app.ui.kit.Tone
+import com.eyeblink.app.ui.kit.androidxClickable
 import com.eyeblink.app.ui.kit.reveal
 import com.eyeblink.app.ui.state.Page
 import com.eyeblink.app.ui.state.PermissionKind
@@ -65,14 +65,18 @@ import com.eyeblink.core.engine.ResumeSummary
 import com.eyeblink.core.engine.TriggerMode
 import com.eyeblink.core.model.OperatingMode
 
-/** The wordmark: "Eye" upright, "Blink" in amber italic - one open, one mid-blink. */
+/** The wordmark: "Eye" in ink, "Blink" in sky - with the logo tile in front when [mark] is set. */
 @Composable
-fun Wordmark(modifier: Modifier = Modifier, size: Int = 28) {
+fun Wordmark(modifier: Modifier = Modifier, size: Int = 26, mark: Boolean = true) {
+    val p = P
     val text: AnnotatedString = buildAnnotatedString {
-        withStyle(SpanStyle(fontFamily = EbFonts.serif, fontSize = size.sp, color = Dusk.Text, letterSpacing = (-0.5).sp)) { append("Eye") }
-        withStyle(SpanStyle(fontFamily = EbFonts.serifItalic, fontStyle = FontStyle.Italic, fontSize = size.sp, color = Dusk.Amber, letterSpacing = (-0.5).sp)) { append("Blink") }
+        withStyle(SpanStyle(fontFamily = EbFonts.display, fontWeight = FontWeight.ExtraBold, fontSize = size.sp, color = p.ink, letterSpacing = (-0.8).sp)) { append("Eye") }
+        withStyle(SpanStyle(fontFamily = EbFonts.display, fontWeight = FontWeight.ExtraBold, fontSize = size.sp, color = p.sky.text, letterSpacing = (-0.8).sp)) { append("Blink") }
     }
-    EbText(text, modifier = modifier)
+    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        if (mark) EyeMark(size = (size + 12).dp)
+        EbText(text)
+    }
 }
 
 @Composable
@@ -84,6 +88,7 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
 ) {
     val s = S
+    val p = P
     val rt = state.runtime
     val snoozed = rt.snoozedUntilMs > state.nowMs
     val awake = rt.running && !snoozed
@@ -97,49 +102,49 @@ fun HomeScreen(
             ModeChip(state.settings.mode, state.power.status.available) { onPage(Page.POWER) }
         }
 
-        // ── hero ────────────────────────────────────────────────
+        // ── hero: the eye in its own little sky, with the countdown under it ──────
         Box(Modifier.reveal(1).fillMaxWidth()) {
             EyeHero(
                 awake = awake, orbit = orbit, echo = rt.echo, spec = state.settings.blink,
                 description = if (awake) s.t("EyeBlink is awake", "EyeBlink uyanık") else s.t("EyeBlink is resting", "EyeBlink dinleniyor"),
-            )
-        }
-
-        // ── countdown ───────────────────────────────────────────
-        Column(Modifier.reveal(2).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-            when {
-                !rt.running -> {
-                    EbText(s.t("Resting", "Dinleniyor"), Ink.DisplayItalic, color = Dusk.TextDim, align = TextAlign.Center)
-                    Spacer(Modifier.height(4.dp))
-                    EbText(
-                        if (ready) s.t("EyeBlink is asleep. Wake it when you're ready.", "EyeBlink uyuyor. Hazır olunca uyandır.")
-                        else s.t("One quick step first: let EyeBlink draw the blink.", "Önce tek bir adım: EyeBlink'in göz kırpmayı çizmesine izin ver."),
-                        Ink.Caption, align = TextAlign.Center,
-                    )
-                }
-                snoozed -> {
-                    EbText(s.t("Snoozed", "Ertelendi"), Ink.DisplayItalic, color = Dusk.Amber, align = TextAlign.Center)
-                    Spacer(Modifier.height(4.dp))
-                    EbText(s.t("Back in ${fmtClock(rt.snoozedUntilMs - state.nowMs)}", "${fmtClock(rt.snoozedUntilMs - state.nowMs)} sonra geri"), Ink.Caption, align = TextAlign.Center)
-                }
-                rt.idle != null -> {
-                    EbText(s.t("Standing by", "Hazırda"), Ink.DisplayItalic, color = Dusk.TextDim, align = TextAlign.Center)
-                    Spacer(Modifier.height(4.dp))
-                    EbText(rt.idle.label(s), Ink.Caption, align = TextAlign.Center)
-                }
-                else -> {
-                    EbText(s.t("Next blink in", "Sonraki göz kırpma"), Ink.Eyebrow, color = Dusk.Amber)
-                    EbText(rt.microInMs?.let { fmtClock(it) } ?: "—", Ink.Display, align = TextAlign.Center)
-                    if (rt.deferred != null) {
-                        Spacer(Modifier.height(2.dp))
-                        EbText(s.t("Due, waiting: ${rt.deferred.label(s).lowercase()}", "Zamanı geldi, bekliyor: ${rt.deferred.label(s).lowercase()}"), Ink.Caption, color = Dusk.Amber, align = TextAlign.Center)
+            ) {
+                Spacer(Modifier.height(4.dp))
+                Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                    when {
+                        !rt.running -> {
+                            EbText(s.t("Fast asleep", "Derin uykuda"), Ink.Lead, align = TextAlign.Center)
+                            Spacer(Modifier.height(4.dp))
+                            EbText(
+                                if (ready) s.t("Wake it when you're ready.", "Hazır olunca uyandır.")
+                                else s.t("One quick step first: let EyeBlink draw the blink.", "Önce tek bir adım: EyeBlink'in göz kırpmayı çizmesine izin ver."),
+                                Ink.Caption, color = p.inkSoft, align = TextAlign.Center,
+                            )
+                        }
+                        snoozed -> {
+                            EbText(s.t("Snoozed", "Ertelendi"), Ink.Lead, align = TextAlign.Center)
+                            Spacer(Modifier.height(4.dp))
+                            EbText(s.t("Back in ${fmtClock(rt.snoozedUntilMs - state.nowMs)}", "${fmtClock(rt.snoozedUntilMs - state.nowMs)} sonra geri"), Ink.Caption, color = p.inkSoft, align = TextAlign.Center)
+                        }
+                        rt.idle != null -> {
+                            EbText(s.t("Standing by", "Hazırda"), Ink.Lead, align = TextAlign.Center)
+                            Spacer(Modifier.height(4.dp))
+                            EbText(rt.idle.label(s), Ink.Caption, color = p.inkSoft, align = TextAlign.Center)
+                        }
+                        else -> {
+                            EbText(s.t("Next blink in", "Sonraki göz kırpma"), Ink.Eyebrow, color = p.sky.text)
+                            EbText(rt.microInMs?.let { fmtClock(it) } ?: "—", Ink.Display, align = TextAlign.Center)
+                            if (rt.deferred != null) {
+                                Spacer(Modifier.height(2.dp))
+                                EbText(s.t("Due, waiting: ${rt.deferred.label(s).lowercase()}", "Zamanı geldi, bekliyor: ${rt.deferred.label(s).lowercase()}"), Ink.Caption, color = p.sun.text, align = TextAlign.Center)
+                            }
+                        }
                     }
                 }
             }
         }
 
         // ── controls ────────────────────────────────────────────
-        Column(Modifier.reveal(3).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.reveal(3).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             PillButton(
                 text = when {
                     !rt.running && !ready -> s.t("Finish setup", "Kurulumu tamamla")
@@ -149,12 +154,12 @@ fun HomeScreen(
                 onClick = {
                     if (!rt.running && !ready) actions.request(PermissionKind.ACCESSIBILITY) else actions.setRunning(!rt.running)
                 },
-                kind = if (rt.running) ButtonKind.Glass else ButtonKind.Primary,
+                kind = if (rt.running) ButtonKind.Soft else ButtonKind.Primary,
                 icon = if (rt.running) Icon.EyeClosed else Icon.Eye,
                 modifier = Modifier.fillMaxWidth(),
             )
             if (rt.running) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     QuickAction(s.t("Blink", "Kırp"), Icon.Eye, Modifier.weight(1f)) { actions.blinkNow() }
                     QuickAction(s.t("Rest", "Mola"), Icon.Moon, Modifier.weight(1f)) { actions.restNow() }
                     if (snoozed) QuickAction(s.t("Resume", "Sürdür"), Icon.Play, Modifier.weight(1f)) { actions.cancelSnooze() }
@@ -166,27 +171,27 @@ fun HomeScreen(
         // ── setup checklist ─────────────────────────────────────
         val missing = missingSetup(state)
         if (missing.isNotEmpty()) {
-            Glass(Modifier.reveal(4).fillMaxWidth(), glow = Dusk.Amber) {
-                SectionHeader(s.t("Setup", "Kurulum"), null)
-                Spacer(Modifier.height(10.dp))
+            Card(Modifier.reveal(4).fillMaxWidth(), tint = p.sun) {
+                SectionHeader(s.t("Almost there", "Neredeyse hazır"), null)
+                Spacer(Modifier.height(6.dp))
                 missing.forEachIndexed { i, item ->
                     if (i > 0) Hairline()
                     Row(Modifier.fillMaxWidth().clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { actions.request(item.kind) }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.size(34.dp).clip(CircleShape).then(Modifier), contentAlignment = Alignment.Center) { Ico(item.icon, size = 22.dp, color = Dusk.Amber) }
-                        Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
+                        IconBadge(item.icon, p.sky, size = 40.dp)
+                        Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
                             EbText(item.title, Ink.BodyStrong)
-                            EbText(item.why, Ink.Caption)
+                            EbText(item.why, Ink.Caption, color = p.inkSoft)
                         }
-                        Badge(if (item.required) s.t("needed", "gerekli") else s.t("optional", "isteğe bağlı"), if (item.required) Tone.Amber else Tone.Quiet, dot = false)
+                        Badge(if (item.required) s.t("needed", "gerekli") else s.t("optional", "isteğe bağlı"), if (item.required) Tone.Warn else Tone.Quiet, dot = false)
                     }
                 }
             }
         }
 
         // ── right now ───────────────────────────────────────────
-        Glass(Modifier.reveal(5).fillMaxWidth(), glow = Dusk.Iris) {
+        Card(Modifier.reveal(5).fillMaxWidth()) {
             SectionHeader(s.t("Right now", "Şu an"), null)
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(6.dp))
             FactRow(s.t("App", "Uygulama"), rt.foregroundLabel ?: "—")
             Hairline()
             FactRow(s.t("Context", "Bağlam"), rt.context?.let { contextName(it, s) } ?: "—")
@@ -201,20 +206,20 @@ fun HomeScreen(
             if (shown.isNotEmpty()) {
                 Spacer(Modifier.height(10.dp))
                 com.eyeblink.app.ui.kit.Flow(Modifier.fillMaxWidth()) {
-                    shown.take(4).forEach { f -> Badge("${factorName(f.code, s)} ×${"%.2f".format(f.multiplier)}", if (f.observed) Tone.Iris else Tone.Quiet, dot = f.observed) }
+                    shown.take(4).forEach { f -> Badge("${factorName(f.code, s)} ×${"%.2f".format(f.multiplier)}", if (f.observed) Tone.Sky else Tone.Quiet, dot = f.observed) }
                 }
             }
             Spacer(Modifier.height(12.dp))
             EbText(
                 if (rt.triggerMode == TriggerMode.CAMERA_ASSISTED) s.t("Blinks are being observed by the camera. Everything stays on this phone.", "Göz kırpmaların kamerayla gözlemleniyor. Her şey bu telefonda kalıyor.")
                 else s.t("EyeBlink is on a timer. It can't tell whether you actually blinked.", "EyeBlink bir zamanlayıcıyla çalışıyor. Gerçekten göz kırpıp kırpmadığını bilemez."),
-                Ink.Caption, color = Dusk.TextFaint,
+                Ink.Caption, color = p.inkFaint,
             )
         }
 
         // ── last break ──────────────────────────────────────────
         rt.lastBreak?.let { br ->
-            Glass(Modifier.reveal(6).fillMaxWidth()) {
+            Card(Modifier.reveal(6).fillMaxWidth(), tint = p.mint) {
                 SectionHeader(s.t("Last break", "Son mola"), null)
                 Spacer(Modifier.height(8.dp))
                 EbText(
@@ -223,7 +228,7 @@ fun HomeScreen(
                         br.kind == BreakKind.MICRO -> s.t("Micro Blink", "Mikro Göz Kırpma")
                         else -> s.t("Smart Rest", "Akıllı Mola")
                     },
-                    Ink.Title,
+                    Ink.Lead,
                 )
                 Spacer(Modifier.height(4.dp))
                 EbText(
@@ -235,25 +240,27 @@ fun HomeScreen(
                         br.pause == PauseSummary.NOT_ATTEMPTED && br.outcome != BreakOutcome.ABORTED -> s.t("The video kept playing underneath. No verified pause exists for this app yet.", "Video altta oynamaya devam etti. Bu uygulama için henüz doğrulanmış duraklatma yok.")
                         else -> ""
                     },
-                    Ink.Caption,
+                    Ink.Caption, color = p.ink,
                 )
             }
         }
 
         // ── today ───────────────────────────────────────────────
-        Glass(Modifier.reveal(7).fillMaxWidth()) {
+        Column(Modifier.reveal(7).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             SectionHeader(s.t("Today", "Bugün"), null, trailing = {
-                EbText(s.t("see all", "tümü"), Ink.Caption, color = Dusk.Iris, modifier = Modifier.clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { onPage(Page.STATS) })
+                EbText(s.t("see all", "tümü"), Ink.BodyStrong, color = p.sky.text, modifier = Modifier.androidxClickable { onPage(Page.STATS) }.padding(8.dp))
             })
-            Spacer(Modifier.height(14.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Stat(state.stats.today.microShown.toString(), s.t("blinks", "kırpma"), Modifier.weight(1f))
-                Stat(state.stats.today.restsCompleted.toString(), s.t("rests", "mola"), Modifier.weight(1f))
-                Stat((state.stats.today.activeMs / 60_000).toString(), s.t("min active", "dk aktif"), Modifier.weight(1f))
+            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Max), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Stat(state.stats.today.microShown.toString(), s.t("blinks", "kırpma"), p.sky, Modifier.weight(1f))
+                Stat(state.stats.today.restsCompleted.toString(), s.t("rests", "mola"), p.mint, Modifier.weight(1f))
+                Stat((state.stats.today.activeMs / 60_000).toString(), s.t("min active", "dk aktif"), p.sun, Modifier.weight(1f))
             }
             if (state.stats.series.isNotEmpty()) {
-                Spacer(Modifier.height(18.dp))
-                MiniBars(state.stats.series.map { (it.microShown + it.restsCompleted * 3).toFloat() }, state.stats.seriesLabels)
+                Card(Modifier.fillMaxWidth()) {
+                    EbText(s.t("This week", "Bu hafta"), Ink.Caption, color = p.inkSoft)
+                    Spacer(Modifier.height(12.dp))
+                    MiniBars(state.stats.series.map { (it.microShown + it.restsCompleted * 3).toFloat() }, state.stats.seriesLabels)
+                }
             }
         }
     }
@@ -273,22 +280,22 @@ private fun ModeChip(mode: OperatingMode, active: Boolean, onClick: () -> Unit) 
         OperatingMode.ROOT -> "Root"
     }
     val icon = when (mode) { OperatingMode.ROOTLESS -> Icon.Shield; OperatingMode.SHIZUKU -> Icon.Link; OperatingMode.ROOT -> Icon.Terminal }
-    Chip(label, selected = active && mode != OperatingMode.ROOTLESS, onClick = onClick, icon = icon)
+    Chip(label, selected = false, onClick = onClick, icon = icon, iconTint = if (active && mode != OperatingMode.ROOTLESS) P.mint.text else null)
 }
 
 @Composable
 private fun FactRow(label: String, value: String) {
     Row(Modifier.fillMaxWidth().padding(vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
-        EbText(label, Ink.Eyebrow, modifier = Modifier.width(96.dp))
+        EbText(label, Ink.Caption, color = P.inkSoft, modifier = Modifier.width(96.dp))
         EbText(value, Ink.BodyStrong, modifier = Modifier.weight(1f), align = TextAlign.End, maxLines = 1)
     }
 }
 
 @Composable
-private fun Stat(value: String, label: String, modifier: Modifier) {
-    Column(modifier) {
+private fun Stat(value: String, label: String, hue: Hue, modifier: Modifier) {
+    Card(modifier.fillMaxHeight(), tint = hue, padding = PaddingValues(horizontal = 16.dp, vertical = 14.dp)) {
         EbText(value, Ink.Headline)
-        EbText(label, Ink.Eyebrow, caps = false)
+        EbText(label, Ink.Caption, color = hue.text, maxLines = 1)
     }
 }
 

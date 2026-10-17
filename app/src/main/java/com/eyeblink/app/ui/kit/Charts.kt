@@ -5,16 +5,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.drag
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -27,7 +24,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -43,14 +39,17 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.eyeblink.core.anim.BlinkSpec
 import com.eyeblink.core.anim.EaseKind
 import kotlin.math.roundToInt
 
-/** Seven short bars with a label under each; the last one is lit. */
+/** Seven short bars with a label under each; the last one - today - is sun-yellow. */
 @Composable
-fun MiniBars(values: List<Float>, labels: List<String>, modifier: Modifier = Modifier, height: androidx.compose.ui.unit.Dp = 84.dp, accent: Color = Dusk.Iris) {
+fun MiniBars(values: List<Float>, labels: List<String>, modifier: Modifier = Modifier, height: Dp = 92.dp, accent: Hue? = null) {
+    val p = P
+    val hue = accent ?: p.sky
     val max = (values.maxOrNull() ?: 1f).coerceAtLeast(1f)
     Column(modifier.fillMaxWidth()) {
         Canvas(Modifier.fillMaxWidth().height(height)) {
@@ -58,21 +57,19 @@ fun MiniBars(values: List<Float>, labels: List<String>, modifier: Modifier = Mod
             val gap = 10.dp.toPx()
             val bw = (size.width - gap * (n - 1)) / n
             values.forEachIndexed { i, v ->
-                val bh = (size.height * (v / max)).coerceAtLeast(4.dp.toPx())
+                val bh = (size.height * (v / max)).coerceAtLeast(8.dp.toPx())
                 val x = i * (bw + gap)
                 val last = i == values.lastIndex
-                drawRoundRect(Color.White.copy(alpha = 0.05f), Offset(x, 0f), Size(bw, size.height), CornerRadius(bw / 2f))
-                drawRoundRect(
-                    brush = Brush.verticalGradient(
-                        if (last) listOf(Dusk.IrisGlow, accent, Dusk.IrisDeep) else listOf(accent.copy(alpha = 0.55f), accent.copy(alpha = 0.22f)),
-                        startY = size.height - bh, endY = size.height,
-                    ),
-                    topLeft = Offset(x, size.height - bh), size = Size(bw, bh), cornerRadius = CornerRadius(bw / 2f),
-                )
+                drawRoundRect(p.track, Offset(x, 0f), Size(bw, size.height), CornerRadius(bw / 2.6f))
+                // a bar with its own lip, like every raised thing
+                val face = if (last) p.sun.fill else hue.fill
+                val lip = if (last) p.sun.lip else hue.lip
+                drawRoundRect(lip, Offset(x, size.height - bh + 2.dp.toPx()), Size(bw, bh - 2.dp.toPx()), CornerRadius(bw / 2.6f))
+                drawRoundRect(face, Offset(x, size.height - bh), Size(bw, bh - 3.dp.toPx()), CornerRadius(bw / 2.6f))
             }
         }
         Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-            labels.forEachIndexed { i, l -> EbText(l, Ink.Eyebrow, color = if (i == labels.lastIndex) Dusk.Text else Dusk.TextFaint, caps = false, maxLines = 1) }
+            labels.forEachIndexed { i, l -> EbText(l, Ink.NumSmall, color = if (i == labels.lastIndex) p.ink else p.inkFaint, maxLines = 1) }
         }
     }
 }
@@ -80,10 +77,12 @@ fun MiniBars(values: List<Float>, labels: List<String>, modifier: Modifier = Mod
 /** An easing curve drawn as a little graph, selectable. */
 @Composable
 fun CurveThumb(kind: EaseKind, label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val p = P
     val (source, press) = rememberPress()
+    val shape = RoundedCornerShape(18.dp)
     Column(
-        modifier.pressScale(press.value, 0.05f)
-            .glass(RoundedCornerShape(18.dp), glow = if (selected) Dusk.Iris else null, strength = if (selected) 1.2f else 0.7f)
+        modifier
+            .let { if (selected) it.raised(shape, p.sun.soft, p.sun.lip, depth = 3.dp, sink = { press.value }) else it.raised(shape, p.card, p.cardLip, depth = 3.dp, border = p.line, sink = { press.value }) }
             .semantics { role = Role.Button; this.selected = selected; contentDescription = label }
             .clickable(interactionSource = source, indication = null, onClick = onClick)
             .padding(10.dp),
@@ -93,27 +92,28 @@ fun CurveThumb(kind: EaseKind, label: String, selected: Boolean, onClick: () -> 
             val pad = 4.dp.toPx()
             val w = size.width - pad * 2
             val h = size.height - pad * 2
-            val p = Path()
+            val path = Path()
             for (i in 0..40) {
                 val x = i / 40f
                 val y = kind.at(x).coerceIn(-0.25f, 1.25f)
                 val px = pad + x * w
                 val py = pad + (1f - y) * h
-                if (i == 0) p.moveTo(px, py) else p.lineTo(px, py)
+                if (i == 0) path.moveTo(px, py) else path.lineTo(px, py)
             }
-            drawLine(Color.White.copy(alpha = 0.10f), Offset(pad, pad + h), Offset(pad + w, pad + h), strokeWidth = 1.dp.toPx())
+            drawLine(p.line, Offset(pad, pad + h), Offset(pad + w, pad + h), strokeWidth = 1.5.dp.toPx())
             drawPath(
-                p, if (selected) Dusk.Iris else Dusk.TextDim,
-                style = Stroke(2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round),
+                path, if (selected) p.sun.text else p.inkSoft,
+                style = Stroke(2.6.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round),
             )
         }
-        EbText(label, Ink.Eyebrow, color = if (selected) Dusk.Iris else Dusk.TextFaint, caps = false, maxLines = 1, align = TextAlign.Center, modifier = Modifier.padding(top = 4.dp))
+        EbText(label, Ink.NumSmall, color = if (selected) p.sun.text else p.inkSoft, maxLines = 1, align = TextAlign.Center, modifier = Modifier.padding(top = 4.dp))
     }
 }
 
 /**
  * The three beats of a blink as one bar: close, hold, open, each as wide as it lasts. Drag the
- * seams between them to retime the blink; the total updates live.
+ * seams between them to retime the blink; the total updates live. The hold is drawn black, because
+ * on the screen it is pure `#000000`.
  */
 @Composable
 fun TimelineEditor(
@@ -123,6 +123,7 @@ fun TimelineEditor(
     playhead: Float? = null,
     labels: Triple<String, String, String> = Triple("close", "hold", "open"),
 ) {
+    val p = P
     val haptics = LocalHapticFeedback.current
     var widthPx by remember { mutableStateOf(1f) }
     val specNow by rememberUpdatedState(spec)
@@ -132,7 +133,7 @@ fun TimelineEditor(
 
     Column(modifier.fillMaxWidth()) {
         Canvas(
-            Modifier.fillMaxWidth().height(86.dp).onSizeChanged { widthPx = it.width.toFloat() }
+            Modifier.fillMaxWidth().height(92.dp).onSizeChanged { widthPx = it.width.toFloat() }
                 .pointerInput(Unit) {
                     awaitEachGesture {
                         val down = awaitFirstDown()
@@ -171,68 +172,71 @@ fun TimelineEditor(
             val ho = (spec.holdMs / scaleMs) * w
             val o = (spec.openMs / scaleMs) * w
             val top = 8.dp.toPx()
-            val bh = h - 30.dp.toPx()
+            val bh = h - 32.dp.toPx()
             val r = CornerRadius(14.dp.toPx())
 
-            drawRoundRect(Color.White.copy(alpha = 0.04f), Offset(0f, top), Size(w, bh), r)
-            // close: lids sweeping down
-            drawRoundRect(
-                Brush.horizontalGradient(listOf(Dusk.Iris.copy(alpha = 0.10f), Dusk.Iris.copy(alpha = 0.42f)), 0f, c),
-                Offset(0f, top), Size(c, bh), CornerRadius(14.dp.toPx(), 14.dp.toPx()),
-            )
-            // hold: black
-            drawRect(Color.Black, Offset(c, top), Size(ho, bh))
-            drawRect(Color.White.copy(alpha = 0.10f), Offset(c, top), Size(ho, bh), style = Stroke(1.dp.toPx()))
-            // open: lids lifting
-            drawRoundRect(
-                Brush.horizontalGradient(listOf(Dusk.Amber.copy(alpha = 0.42f), Dusk.Amber.copy(alpha = 0.10f)), c + ho, c + ho + o),
-                Offset(c + ho, top), Size(o, bh), CornerRadius(14.dp.toPx(), 14.dp.toPx()),
-            )
+            drawRoundRect(p.track, Offset(0f, top), Size(w, bh), r)
+            // close: the lid sweeping down (sky) ...
+            drawRoundRect(p.sky.fill, Offset(0f, top), Size(c.coerceAtLeast(1f), bh), r)
+            drawRect(p.sky.fill, Offset((c - 14.dp.toPx()).coerceAtLeast(0f), top), Size(14.dp.toPx().coerceAtMost(c), bh))
+            // ... hold: pure black ...
+            drawRect(Color.Black, Offset(c, top), Size(ho.coerceAtLeast(1f), bh))
+            // ... open: the lid lifting (sun)
+            drawRoundRect(p.sun.fill, Offset(c + ho, top), Size(o.coerceAtLeast(1f), bh), r)
+            drawRect(p.sun.fill, Offset(c + ho, top), Size(14.dp.toPx().coerceAtMost(o), bh))
             // handles
             for (x in listOf(c, c + ho)) {
-                drawRoundRect(Color.White.copy(alpha = 0.9f), Offset(x - 2.dp.toPx(), top + 8.dp.toPx()), Size(4.dp.toPx(), bh - 16.dp.toPx()), CornerRadius(2.dp.toPx()))
+                val hw = 6.dp.toPx()
+                drawRoundRect(p.lip(), Offset(x - hw / 2f, top + 8.dp.toPx() + 2.dp.toPx()), Size(hw, bh - 16.dp.toPx()), CornerRadius(3.dp.toPx()))
+                drawRoundRect(Color.White, Offset(x - hw / 2f, top + 8.dp.toPx()), Size(hw, bh - 16.dp.toPx()), CornerRadius(3.dp.toPx()))
             }
             // ruler
             for (i in 0..10) {
                 val x = w * i / 10f
-                drawLine(Color.White.copy(alpha = 0.18f), Offset(x, h - 18.dp.toPx()), Offset(x, h - (if (i % 5 == 0) 8f else 12f).dp.toPx()), strokeWidth = 1.dp.toPx())
+                drawLine(p.inkFaint, Offset(x, h - 18.dp.toPx()), Offset(x, h - (if (i % 5 == 0) 8f else 12f).dp.toPx()), strokeWidth = 1.5.dp.toPx(), cap = StrokeCap.Round)
             }
             playhead?.let {
                 val x = (it / scaleMs) * w
-                drawLine(Color.White, Offset(x, top - 4.dp.toPx()), Offset(x, top + bh + 4.dp.toPx()), strokeWidth = 1.5.dp.toPx())
-                drawCircle(Color.White, 3.dp.toPx(), Offset(x, top - 4.dp.toPx()))
+                drawLine(p.ink, Offset(x, top - 4.dp.toPx()), Offset(x, top + bh + 4.dp.toPx()), strokeWidth = 2.dp.toPx(), cap = StrokeCap.Round)
+                drawCircle(p.ink, 4.dp.toPx(), Offset(x, top - 4.dp.toPx()))
             }
         }
         Row(Modifier.fillMaxWidth().padding(top = 4.dp)) {
             val total = (spec.totalMs).coerceAtLeast(1).toFloat()
             fun w(ms: Int) = (ms / total).coerceAtLeast(0.14f)
-            Column(Modifier.weight(w(spec.closeMs))) { EbText(labels.first, Ink.Eyebrow, color = Dusk.Iris, caps = false); EbText("${spec.closeMs} ms", Ink.MonoSmall, caps = false, maxLines = 1) }
-            Column(Modifier.weight(w(spec.holdMs)), horizontalAlignment = Alignment.CenterHorizontally) { EbText(labels.second, Ink.Eyebrow, color = Dusk.TextDim, caps = false); EbText("${spec.holdMs} ms", Ink.MonoSmall, caps = false, maxLines = 1) }
-            Column(Modifier.weight(w(spec.openMs)), horizontalAlignment = Alignment.End) { EbText(labels.third, Ink.Eyebrow, color = Dusk.Amber, caps = false); EbText("${spec.openMs} ms", Ink.MonoSmall, caps = false, maxLines = 1) }
+            Column(Modifier.weight(w(spec.closeMs))) { EbText(labels.first, Ink.Eyebrow, color = p.sky.text); EbText("${spec.closeMs} ms", Ink.NumSmall, color = p.inkSoft, maxLines = 1) }
+            Column(Modifier.weight(w(spec.holdMs)), horizontalAlignment = Alignment.CenterHorizontally) { EbText(labels.second, Ink.Eyebrow, color = p.ink); EbText("${spec.holdMs} ms", Ink.NumSmall, color = p.inkSoft, maxLines = 1) }
+            Column(Modifier.weight(w(spec.openMs)), horizontalAlignment = Alignment.End) { EbText(labels.third, Ink.Eyebrow, color = p.sun.text); EbText("${spec.openMs} ms", Ink.NumSmall, color = p.inkSoft, maxLines = 1) }
         }
     }
 }
 
-/** A thin gradient meter: how full something is. */
+private fun Palette.lip(): Color = if (dark) Color(0xFF9AA0D6) else Color(0xFFB4C5DC)
+
+/** A fat rounded meter: how full something is. */
 @Composable
-fun Meter(fraction: Float, modifier: Modifier = Modifier, tone: Color = Dusk.Iris) {
-    Canvas(modifier.fillMaxWidth().height(6.dp)) {
-        drawRoundRect(Color.White.copy(alpha = 0.07f), cornerRadius = CornerRadius(3.dp.toPx()))
+fun Meter(fraction: Float, modifier: Modifier = Modifier, tone: Hue? = null) {
+    val p = P
+    val hue = tone ?: p.sky
+    Canvas(modifier.fillMaxWidth().height(12.dp)) {
+        val r = CornerRadius(6.dp.toPx())
+        drawRoundRect(p.track, cornerRadius = r)
         val w = size.width * fraction.coerceIn(0f, 1f)
-        if (w > 0f) drawRoundRect(Brush.horizontalGradient(listOf(tone.copy(alpha = 0.6f), tone)), size = Size(w, size.height), cornerRadius = CornerRadius(3.dp.toPx()))
+        if (w > 0f) drawRoundRect(hue.fill, size = Size(w.coerceAtLeast(size.height), size.height), cornerRadius = r)
     }
 }
 
 /** A meter cut into coloured parts - for example verified, unverified and failed pauses. */
 @Composable
 fun SplitMeter(parts: List<Pair<Float, Color>>, modifier: Modifier = Modifier) {
-    Canvas(modifier.fillMaxWidth().height(8.dp)) {
-        val r = CornerRadius(4.dp.toPx())
-        drawRoundRect(Color.White.copy(alpha = 0.07f), cornerRadius = r)
+    val p = P
+    Canvas(modifier.fillMaxWidth().height(12.dp)) {
+        val r = CornerRadius(6.dp.toPx())
+        drawRoundRect(p.track, cornerRadius = r)
         val live = parts.filter { it.first > 0f }
         val total = live.sumOf { it.first.toDouble() }.toFloat()
         if (total <= 0f) return@Canvas
-        val gap = 2.dp.toPx()
+        val gap = 3.dp.toPx()
         val usable = size.width - gap * (live.size - 1)
         var x = 0f
         live.forEach { (v, c) ->

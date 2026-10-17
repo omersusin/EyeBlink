@@ -19,44 +19,44 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import kotlin.math.roundToInt
 
-/** A modal sheet rising from the bottom over a black scrim. Closed sheets cost nothing: they are not composed. */
+/** A modal sheet rising from the bottom over a dimmed page. Closed sheets cost nothing: they are not composed. */
 @Composable
 fun BottomSheet(visible: Boolean, onDismiss: () -> Unit, modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+    val p = P
     val progress by animateFloatAsState(if (visible) 1f else 0f, Motion.Settle, label = "sheet")
     if (!visible && progress < 0.01f) return
     var height by remember { mutableStateOf(1) }
     val bottomInset = LocalInsets.current.bottom
+    val shape = RoundedCornerShape(topStart = 34.dp, topEnd = 34.dp)
 
     Box(Modifier.fillMaxSize()) {
         Box(
-            Modifier.fillMaxSize().alpha(progress).background(Color.Black.copy(alpha = 0.74f))
+            Modifier.fillMaxSize().alpha(progress).background(p.scrim)
                 .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }, onClick = onDismiss),
         )
         Column(
             modifier.align(Alignment.BottomCenter).fillMaxWidth()
                 .offset { IntOffset(0, ((1f - progress) * height).roundToInt()) }
                 .onSizeChanged { height = it.height }
-                .clip(RoundedCornerShape(topStart = 34.dp, topEnd = 34.dp))
-                .background(Dusk.Ink1)
-                .glass(RoundedCornerShape(topStart = 34.dp, topEnd = 34.dp), strength = 0.9f)
+                .clip(shape)
+                .background(p.card)
                 .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) {}
                 .padding(horizontal = 22.dp).padding(top = 12.dp, bottom = 28.dp + bottomInset)
                 .heightIn(max = 760.dp),
         ) {
-            Box(Modifier.align(Alignment.CenterHorizontally).width(40.dp).height(4.dp).clip(RoundedCornerShape(2.dp)).background(Dusk.HairlineStrong))
+            Box(Modifier.align(Alignment.CenterHorizontally).width(44.dp).height(5.dp).clip(RoundedCornerShape(3.dp)).background(p.line))
             Box(Modifier.height(18.dp))
             Column(Modifier.verticalScroll(rememberScrollState()), content = content)
         }

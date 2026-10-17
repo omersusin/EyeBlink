@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.drag
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -24,8 +25,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,14 +35,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
-import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -56,14 +56,16 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
 import kotlin.math.roundToInt
 
 /**
- * A switch that is a small eye. Off, the lid hangs low over the iris; on, it lifts and the
- * iris glows and the pupil opens. The thumb is the iris, so the control reads as "awake / asleep".
+ * A switch that is a small eye. Off, a lid hangs over the eye in the knob and it looks sleepy;
+ * on, the lid lifts, the iris shows and the groove turns mint. The knob is the eye, so the
+ * control reads as "awake / asleep" at a glance.
  */
 @Composable
 fun LidSwitch(
@@ -72,6 +74,7 @@ fun LidSwitch(
     modifier: Modifier = Modifier,
     description: String? = null,
 ) {
+    val p = P
     val haptics = LocalHapticFeedback.current
     val reduced = LocalReducedMotion.current
     val pos by animateFloatAsState(if (checked) 1f else 0f, if (reduced) spring(stiffness = 3000f) else Motion.Snappy, label = "pos")
@@ -89,60 +92,38 @@ fun LidSwitch(
         val w = size.width
         val h = size.height
         val r = h / 2f
-        val pad = 4.dp.toPx()
+        val pad = 3.dp.toPx()
         val tr = r - pad
-        val trackOff = Dusk.Ink3
-        val trackOn = Color(0xFF0E3A40)
-        val track = lerp(trackOff, trackOn, pos)
+        val track = lerp(p.ink.copy(alpha = 0.22f), p.mint.fill, pos)
+        val trackLip = lerp(p.ink.copy(alpha = 0.34f), p.mint.lip, pos)
 
-        drawRoundRect(track, cornerRadius = CornerRadius(r, r))
-        drawRoundRect(
-            brush = Brush.linearGradient(
-                listOf(Color.White.copy(alpha = 0.22f), Color.White.copy(alpha = 0.04f)), Offset.Zero, Offset(w, h),
-            ),
-            cornerRadius = CornerRadius(r, r), style = Stroke(1.dp.toPx()),
-        )
-        if (pos > 0.01f) {
-            drawRoundRect(
-                brush = Brush.horizontalGradient(listOf(Dusk.Iris.copy(alpha = 0.0f), Dusk.Iris.copy(alpha = 0.32f * pos))),
-                cornerRadius = CornerRadius(r, r),
-            )
-        }
+        drawRoundRect(trackLip, Offset(0f, 2.dp.toPx()), Size(w, h), CornerRadius(r, r))
+        drawRoundRect(track, size = Size(w, h), cornerRadius = CornerRadius(r, r))
 
         val cx = lerp(pad + tr, w - pad - tr, pos)
         val cy = h / 2f
-        if (pos > 0.02f) {
-            drawCircle(
-                Brush.radialGradient(listOf(Dusk.Iris.copy(alpha = 0.55f * pos), Color.Transparent), Offset(cx, cy), tr * 2.2f),
-                radius = tr * 2.2f, center = Offset(cx, cy),
-            )
-        }
-        // iris
-        drawCircle(
-            Brush.radialGradient(
-                listOf(Dusk.IrisGlow, Dusk.Iris, Dusk.IrisDeep, Color(0xFF0B3B44)),
-                center = Offset(cx - tr * 0.2f, cy - tr * 0.25f), radius = tr * 1.25f,
-            ),
-            radius = tr, center = Offset(cx, cy),
-        )
-        val pupil = tr * lerp(0.30f, 0.46f, open)
-        drawCircle(Color.Black, radius = pupil, center = Offset(cx, cy))
-        drawCircle(Color.White.copy(alpha = 0.85f), radius = tr * 0.13f, center = Offset(cx - tr * 0.34f, cy - tr * 0.36f))
+        // the knob: a white eyeball on a lip of its own
+        drawCircle(trackLip, radius = tr, center = Offset(cx, cy + 1.5.dp.toPx()))
+        drawCircle(Color.White, radius = tr, center = Offset(cx, cy))
+        val iris = tr * 0.66f
+        drawCircle(lerp(p.inkFaint, p.sky.fill, open), radius = iris, center = Offset(cx, cy + tr * 0.06f))
+        drawCircle(p.onFill, radius = iris * lerp(0.46f, 0.58f, open), center = Offset(cx, cy + tr * 0.06f))
+        drawCircle(Color.White, radius = tr * 0.13f, center = Offset(cx - tr * 0.26f, cy - tr * 0.2f))
 
-        // the lid over the iris: lifts as the switch turns on
+        // the lid: lifts as the switch turns on
         val lid = (1f - open).coerceIn(0f, 1f)
         if (lid > 0.01f) {
-            val circle = Path().apply { addOval(androidx.compose.ui.geometry.Rect(cx - tr, cy - tr, cx + tr, cy + tr)) }
+            val circle = Path().apply { addOval(Rect(cx - tr, cy - tr, cx + tr, cy + tr)) }
             clipPath(circle) {
-                val bottom = cy - tr + 2f * tr * (0.18f + 0.50f * lid)
-                val p = Path().apply {
+                val bottom = cy - tr + 2f * tr * (0.16f + 0.52f * lid)
+                val lidPath = Path().apply {
                     moveTo(cx - tr, cy - tr); lineTo(cx + tr, cy - tr); lineTo(cx + tr, bottom)
-                    quadraticBezierTo(cx, bottom + tr * 0.55f * lid, cx - tr, bottom); close()
+                    quadraticBezierTo(cx, bottom + tr * 0.5f * lid, cx - tr, bottom); close()
                 }
-                drawPath(p, track)
+                drawPath(lidPath, track)
                 drawPath(
-                    Path().apply { moveTo(cx - tr, bottom); quadraticBezierTo(cx, bottom + tr * 0.55f * lid, cx + tr, bottom) },
-                    Dusk.Amber.copy(alpha = 0.85f * lid), style = Stroke(1.4.dp.toPx(), cap = StrokeCap.Round),
+                    Path().apply { moveTo(cx - tr, bottom); quadraticBezierTo(cx, bottom + tr * 0.5f * lid, cx + tr, bottom) },
+                    p.onFill, style = Stroke(1.6.dp.toPx(), cap = StrokeCap.Round),
                 )
             }
         }
@@ -150,7 +131,7 @@ fun LidSwitch(
 }
 
 /**
- * Slider whose thumb is an iris. A bubble above the thumb shows the value while it is held,
+ * Slider whose thumb is an eye. A tooltip above the thumb shows the value while it is held,
  * detents tick with a haptic, and the whole thing is exposed to accessibility as a real slider.
  */
 @Composable
@@ -163,8 +144,10 @@ fun Horizon(
     steps: Int = 0,
     format: (Float) -> String = { "${(it * 100).roundToInt()}%" },
     description: String = "",
-    accent: Color = Dusk.Iris,
+    accent: Hue? = null,
 ) {
+    val p = P
+    val hue = accent ?: p.sky
     val haptics = LocalHapticFeedback.current
     val density = LocalDensity.current
     var widthPx by remember { mutableStateOf(1f) }
@@ -173,7 +156,7 @@ fun Horizon(
     val target = ((value - range.start) / span).coerceIn(0f, 1f)
     val shown by animateFloatAsState(target, spring(dampingRatio = 0.9f, stiffness = 900f), label = "h")
     val lift by animateFloatAsState(if (held) 1f else 0f, spring(dampingRatio = 0.7f, stiffness = 600f), label = "lift")
-    val padPx = with(density) { 16.dp.toPx() }
+    val padPx = with(density) { 18.dp.toPx() }
 
     fun fromX(x: Float): Float {
         val f = ((x - padPx) / (widthPx - 2 * padPx).coerceAtLeast(1f)).coerceIn(0f, 1f)
@@ -188,7 +171,7 @@ fun Horizon(
     var last by remember { mutableStateOf(value) }
 
     Box(
-        modifier.fillMaxWidth().height(60.dp).onSizeChanged { widthPx = it.width.toFloat() }
+        modifier.fillMaxWidth().height(64.dp).onSizeChanged { widthPx = it.width.toFloat() }
             .semantics {
                 role = Role.Button
                 if (description.isNotEmpty()) contentDescription = description
@@ -218,84 +201,90 @@ fun Horizon(
                 }
             },
     ) {
-        Canvas(Modifier.fillMaxWidth().height(60.dp)) {
+        Canvas(Modifier.fillMaxWidth().height(64.dp)) {
             val w = size.width
-            val cy = size.height * 0.62f
-            val x0 = 16.dp.toPx()
-            val x1 = w - 16.dp.toPx()
+            val cy = size.height * 0.64f
+            val x0 = 18.dp.toPx()
+            val x1 = w - 18.dp.toPx()
             val tx = lerp(x0, x1, shown)
-            val line = 3.dp.toPx()
+            val line = 10.dp.toPx()
 
-            drawLine(Color.White.copy(alpha = 0.12f), Offset(x0, cy), Offset(x1, cy), strokeWidth = line, cap = StrokeCap.Round)
+            drawLine(p.track, Offset(x0, cy), Offset(x1, cy), strokeWidth = line, cap = StrokeCap.Round)
+            if (tx > x0) drawLine(hue.fill, Offset(x0, cy), Offset(tx, cy), strokeWidth = line, cap = StrokeCap.Round)
             if (steps in 1..24) {
                 for (i in 0..steps) {
                     val x = lerp(x0, x1, i / steps.toFloat())
-                    drawLine(Color.White.copy(alpha = if (x <= tx) 0.28f else 0.14f), Offset(x, cy - 7.dp.toPx()), Offset(x, cy - 3.dp.toPx()), strokeWidth = 1.dp.toPx())
+                    drawCircle(if (x <= tx) hue.lip else p.inkFaint.copy(alpha = 0.5f), radius = 1.8.dp.toPx(), center = Offset(x, cy))
                 }
             }
-            drawLine(
-                Brush.horizontalGradient(listOf(accent.copy(alpha = 0.5f), accent), startX = x0, endX = tx.coerceAtLeast(x0 + 1f)),
-                Offset(x0, cy), Offset(tx, cy), strokeWidth = line, cap = StrokeCap.Round,
-            )
-            val r = (10f + 2f * lift).dp.toPx()
-            drawCircle(
-                Brush.radialGradient(listOf(accent.copy(alpha = 0.40f + 0.2f * lift), Color.Transparent), Offset(tx, cy), r * 2.6f),
-                radius = r * 2.6f, center = Offset(tx, cy),
-            )
-            drawCircle(
-                Brush.radialGradient(
-                    listOf(Dusk.IrisGlow, accent, Dusk.IrisDeep, Color(0xFF0B3B44)),
-                    center = Offset(tx - r * 0.2f, cy - r * 0.25f), radius = r * 1.3f,
-                ),
-                radius = r, center = Offset(tx, cy),
-            )
-            drawCircle(Color.Black, radius = r * (0.34f + 0.12f * lift), center = Offset(tx, cy))
-            drawCircle(Color.White.copy(alpha = 0.8f), radius = r * 0.13f, center = Offset(tx - r * 0.34f, cy - r * 0.36f))
+
+            val r = (13f + 1.5f * lift).dp.toPx()
+            val c = Offset(tx, cy - 1.dp.toPx() * lift)
+            drawCircle(hue.lip, radius = r, center = Offset(c.x, c.y + 2.5.dp.toPx()))
+            drawCircle(Color.White, radius = r, center = c)
+            drawCircle(hue.fill, radius = r * 0.64f, center = c)
+            drawCircle(p.onFill, radius = r * (0.30f + 0.06f * lift), center = c)
+            drawCircle(Color.White, radius = r * 0.12f, center = Offset(c.x - r * 0.22f, c.y - r * 0.24f))
         }
 
-        // value bubble
-        val tx = with(density) { lerp(16.dp.toPx(), widthPx - 16.dp.toPx(), shown) }
+        // value tooltip
+        val tx = with(density) { lerp(18.dp.toPx(), widthPx - 18.dp.toPx(), shown) }
         Box(
-            Modifier.offset { IntOffset((tx - with(density) { 28.dp.toPx() }).roundToInt(), (-4.dp.toPx() * lift).roundToInt()) }
-                .width(56.dp).alpha(lift),
+            Modifier.offset { IntOffset((tx - with(density) { 30.dp.toPx() }).roundToInt(), (-2.dp.toPx() * lift).roundToInt()) }
+                .width(60.dp).alpha(lift),
             contentAlignment = Alignment.Center,
         ) {
-            Box(Modifier.glass(RoundedCornerShape(50), strength = 1.3f).padding(horizontal = 10.dp, vertical = 4.dp)) {
-                EbText(format(value), Ink.MonoSmall, color = Dusk.Text, caps = false, maxLines = 1)
+            Box(Modifier.clip(RoundedCornerShape(50)).drawBehind { drawRect(p.ink) }.padding(horizontal = 10.dp, vertical = 4.dp)) {
+                EbText(format(value), Ink.NumSmall, color = p.bg, maxLines = 1)
             }
         }
     }
 }
 
-/** Segmented selector with a glowing seam that slides to the chosen option. */
+/** Segmented selector: a sun-yellow thumb slides to the chosen option. */
 @Composable
 fun Tide(options: List<String>, selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
+    val p = P
     val haptics = LocalHapticFeedback.current
     val pos by animateFloatAsState(selected.toFloat(), Motion.Snappy, label = "tide")
-    BoxWithConstraints(modifier.fillMaxWidth().height(48.dp).glass(RoundedCornerShape(50), strength = 0.8f)) {
+    val shape = RoundedCornerShape(50)
+    BoxWithConstraints(modifier.fillMaxWidth().height(50.dp).clip(shape).drawBehind { drawRect(p.sunk) }) {
         val itemW = maxWidth / options.size
         Box(
-            Modifier.offset(x = itemW * pos + 4.dp, y = 4.dp).width(itemW - 8.dp).height(40.dp)
-                .drawBehind {
-                    val shape = RoundedCornerShape(50).createOutline(size, layoutDirection, this)
-                    drawOutline(shape, Dusk.Iris.copy(alpha = 0.16f))
-                    drawOutline(shape, Dusk.Iris.copy(alpha = 0.55f), style = Stroke(1.dp.toPx()))
-                },
+            Modifier.offset(x = itemW * pos + 4.dp, y = 4.dp).width(itemW - 8.dp).height(42.dp)
+                .raised(shape, p.sun.fill, p.sun.lip, depth = 2.dp),
         )
-        Row(Modifier.fillMaxWidth().height(48.dp)) {
+        Row(Modifier.fillMaxWidth().height(50.dp)) {
             options.forEachIndexed { i, label ->
                 Box(
-                    Modifier.weight(1f).height(48.dp)
+                    Modifier.weight(1f).height(50.dp)
                         .semantics { role = Role.Button; stateDescription = if (i == selected) "selected" else "" }
-                        .clickable(indication = null, interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }) {
+                        .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) {
                             if (i != selected) { haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove); onSelect(i) }
                         },
                     contentAlignment = Alignment.Center,
                 ) {
-                    EbText(label, Ink.Caption, color = if (i == selected) Dusk.Iris else Dusk.TextDim, maxLines = 1, align = androidx.compose.ui.text.style.TextAlign.Center)
+                    EbText(label, Ink.BodyStrong, color = if (i == selected) p.onFill else p.inkSoft, maxLines = 1, align = TextAlign.Center)
                 }
             }
         }
+    }
+}
+
+/** A round tick box: an empty ring, or a sun-yellow disc with a check once it is on. */
+@Composable
+fun CheckDot(on: Boolean, modifier: Modifier = Modifier, size: androidx.compose.ui.unit.Dp = 28.dp) {
+    val p = P
+    Box(modifier.size(size), contentAlignment = Alignment.Center) {
+        Canvas(Modifier.size(size)) {
+            if (on) {
+                drawCircle(p.sun.lip, center = center.copy(y = center.y + 2.dp.toPx()))
+                drawCircle(p.sun.fill)
+            } else {
+                drawCircle(p.line, style = Stroke(2.dp.toPx()))
+            }
+        }
+        if (on) Ico(Icon.Check, size = size * 0.58f, color = p.onFill, weight = 2.8f)
     }
 }
 
@@ -308,25 +297,25 @@ fun SettingRow(
     onClick: (() -> Unit)? = null,
     trailing: @Composable () -> Unit = {},
 ) {
-    val base = if (onClick != null) modifier.clickable(indication = null, interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, onClick = onClick) else modifier
+    val base = if (onClick != null) modifier.clickable(indication = null, interactionSource = remember { MutableInteractionSource() }, onClick = onClick) else modifier
     Row(base.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f).padding(end = 12.dp)) {
             EbText(title, Ink.BodyStrong)
             if (subtitle != null) {
                 Spacer(Modifier.height(2.dp))
-                EbText(subtitle, Ink.Caption, color = Dusk.TextDim)
+                EbText(subtitle, Ink.Caption, color = P.inkSoft)
             }
         }
         trailing()
     }
 }
 
-/** Number stepper: a quiet minus, the value in serif, a quiet plus. */
+/** Number stepper: a round minus, the value, a round plus. */
 @Composable
 fun Stepper(value: String, onMinus: () -> Unit, onPlus: () -> Unit, modifier: Modifier = Modifier, minusDescription: String = "-", plusDescription: String = "+") {
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        RoundIconButton(Icon.Minus, minusDescription, onMinus, size = 38.dp)
-        Box(Modifier.width(64.dp), contentAlignment = Alignment.Center) { EbText(value, Ink.Mono, caps = false, maxLines = 1) }
-        RoundIconButton(Icon.Plus, plusDescription, onPlus, size = 38.dp)
+        RoundIconButton(Icon.Minus, minusDescription, onMinus, size = 40.dp)
+        Box(Modifier.width(66.dp), contentAlignment = Alignment.Center) { EbText(value, Ink.Num, maxLines = 1) }
+        RoundIconButton(Icon.Plus, plusDescription, onPlus, size = 40.dp)
     }
 }

@@ -36,7 +36,7 @@ import kotlin.math.sin
  * the pure `#000000` cover. This is the Compose twin of the system overlay's painter; both
  * read the same numbers from `EyelidGeometry` and `BlinkTimeline`.
  */
-fun DrawScope.drawBlinkFrame(frame: BlinkFrame, spec: BlinkSpec) {
+fun DrawScope.drawBlinkFrame(frame: BlinkFrame, spec: BlinkSpec, rim: Color = Color(0xFFFFC62E)) {
     if (frame.isIdle) return
     if (frame.dim > 0f) drawRect(Color.Black, alpha = frame.dim)
     val w = size.width
@@ -58,11 +58,11 @@ fun DrawScope.drawBlinkFrame(frame: BlinkFrame, spec: BlinkSpec) {
         }
         if (spec.rimLight > 0f && frame.closure < 0.98f) {
             val m = EyelidGeometry.margin(frame.closure, h, spec.curvature)
-            val rim = Dusk.Amber.copy(alpha = 0.55f * spec.rimLight * (1f - frame.closure))
+            val rimColor = rim.copy(alpha = 0.55f * spec.rimLight * (1f - frame.closure))
             val tp = Path().apply { moveTo(0f, m.edge); quadraticBezierTo(w / 2f, m.control, w, m.edge) }
             val bp = Path().apply { moveTo(0f, h - m.edge); quadraticBezierTo(w / 2f, h - m.control, w, h - m.edge) }
-            drawPath(tp, rim, style = Stroke(2.dp.toPx()))
-            drawPath(bp, rim, style = Stroke(2.dp.toPx()))
+            drawPath(tp, rimColor, style = Stroke(2.dp.toPx()))
+            drawPath(bp, rimColor, style = Stroke(2.dp.toPx()))
         }
     }
     if (frame.solid > 0f) drawRect(Color.Black, alpha = frame.solid)
@@ -72,7 +72,7 @@ fun DrawScope.drawBlinkFrame(frame: BlinkFrame, spec: BlinkSpec) {
 private fun DrawScope.drawFauxReel(t: Float) {
     val w = size.width
     val h = size.height
-    drawRect(Brush.verticalGradient(listOf(Color(0xFF2B1B52), Color(0xFF0E3B4A), Color(0xFF5A2B3A)), startY = 0f, endY = h))
+    drawRect(Brush.verticalGradient(listOf(Color(0xFF4B3AA8), Color(0xFF136A83), Color(0xFF9A3F5C)), startY = 0f, endY = h))
     val a = t / 1800f
     fun blob(c: Color, cx: Float, cy: Float, r: Float) =
         drawCircle(Brush.radialGradient(listOf(c, Color.Transparent), Offset(cx, cy), r), radius = r, center = Offset(cx, cy))
@@ -108,11 +108,12 @@ fun PhoneFrame(spec: BlinkSpec, modifier: Modifier = Modifier, description: Stri
     val manual = if (manualElapsed in 0f..timeline.totalMs.toFloat()) timeline.frameAt(manualElapsed) else BlinkFrame.Idle
     val frame = if (!manual.isIdle) manual else auto
     val shape = androidx.compose.foundation.shape.RoundedCornerShape(34.dp)
+    val rim = P.sun.fill
 
     Canvas(
         modifier.fillMaxHeight().aspectRatio(9f / 18.5f)
+            .raised(shape, Color(0xFF16254A), Color(0xFF0B1330), depth = 4.dp)
             .clip(shape)
-            .glass(shape, strength = 1.2f)
             .semantics { if (description.isNotEmpty()) contentDescription = description }
             .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) { tapAt = clock },
     ) {
@@ -124,7 +125,7 @@ fun PhoneFrame(spec: BlinkSpec, modifier: Modifier = Modifier, description: Stri
             drawFauxReel(clock)
             // status bar hint
             drawRoundRect(Color.White.copy(alpha = 0.8f), Offset(size.width * 0.42f, 12.dp.toPx()), Size(size.width * 0.16f, 5.dp.toPx()), CornerRadius(4.dp.toPx()))
-            drawBlinkFrame(frame, spec)
+            drawBlinkFrame(frame, spec, rim)
         }
     }
 }

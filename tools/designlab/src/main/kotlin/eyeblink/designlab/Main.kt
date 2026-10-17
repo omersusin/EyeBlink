@@ -29,13 +29,12 @@ private val fontDir = File("app/src/main/res/font").let { if (it.exists()) it el
 
 fun loadFonts() {
     fun f(name: String, weight: FontWeight, style: FontStyle = FontStyle.Normal) = Font(File(fontDir, name), weight, style)
-    EbFonts.serif = FontFamily(f("instrument_serif_regular.ttf", FontWeight.Normal))
-    EbFonts.serifItalic = FontFamily(f("instrument_serif_italic.ttf", FontWeight.Normal, FontStyle.Italic))
+    EbFonts.display = FontFamily(f("bricolage_grotesque_bold.ttf", FontWeight.Bold), f("bricolage_grotesque_extrabold.ttf", FontWeight.ExtraBold))
     EbFonts.sans = FontFamily(
-        f("instrument_sans_regular.ttf", FontWeight.Normal), f("instrument_sans_medium.ttf", FontWeight.Medium),
-        f("instrument_sans_semibold.ttf", FontWeight.SemiBold), f("instrument_sans_bold.ttf", FontWeight.Bold),
+        f("figtree_regular.ttf", FontWeight.Normal), f("figtree_medium.ttf", FontWeight.Medium),
+        f("figtree_semibold.ttf", FontWeight.SemiBold), f("figtree_bold.ttf", FontWeight.Bold),
     )
-    EbFonts.mono = FontFamily(f("dm_mono_regular.ttf", FontWeight.Normal), f("dm_mono_medium.ttf", FontWeight.Medium))
+    EbFonts.mono = FontFamily(f("dm_mono_regular.ttf", FontWeight.Normal))
 }
 
 fun main(args: Array<String>) {
@@ -56,26 +55,31 @@ fun main(args: Array<String>) {
     }
 
     val en = Strings.EN
-    shot("home") { EyeBlinkApp(Sample.state(), NoActions, en) }
+    // Every screen is rendered twice: bright Daylight and deep-indigo Moonlit ("-dark").
+    fun both(name: String, timeMs: Long = 1_800, h: Int = 1560, content: @Composable (dark: Boolean) -> Unit) {
+        shot(name, timeMs, h = h) { content(false) }
+        shot("$name-dark", timeMs, h = h) { content(true) }
+    }
+    both("home") { d -> EyeBlinkApp(Sample.state(), NoActions, en, systemDark = d) }
     shot("home-tr") { EyeBlinkApp(Sample.state(Language.TR), NoActions, Strings.TR) }
-    shot("home-off") { EyeBlinkApp(Sample.state(running = false, notReady = true), NoActions, en) }
-    shot("rhythm") { EyeBlinkApp(Sample.state(), NoActions, en, initialTab = Tab.RHYTHM) }
+    both("home-off") { d -> EyeBlinkApp(Sample.state(running = false, notReady = true), NoActions, en, systemDark = d) }
+    both("rhythm") { d -> EyeBlinkApp(Sample.state(), NoActions, en, initialTab = Tab.RHYTHM, systemDark = d) }
     shot("rhythm-tall", h = 3400) { EyeBlinkApp(Sample.state().let { it.copy(settings = it.settings.copy(advanced = true)) }, NoActions, en, initialTab = Tab.RHYTHM) }
-    shot("calib-intro", h = 2000) { EyeBlinkApp(Sample.calibration(CalibrationStage.INTRO), NoActions, en, initialPage = Page.CALIBRATION) }
+    both("calib-intro", h = 2000) { d -> EyeBlinkApp(Sample.calibration(CalibrationStage.INTRO), NoActions, en, initialPage = Page.CALIBRATION, systemDark = d) }
     shot("calib-video", h = 1700) { EyeBlinkApp(Sample.calibration(CalibrationStage.RUNNING, Phase.VIDEO), NoActions, en, initialPage = Page.CALIBRATION) }
     shot("calib-read", h = 1700) { EyeBlinkApp(Sample.calibration(CalibrationStage.RUNNING, Phase.READING), NoActions, en, initialPage = Page.CALIBRATION) }
     shot("calib-blink", h = 1700) { EyeBlinkApp(Sample.calibration(CalibrationStage.RUNNING, Phase.DELIBERATE), NoActions, en, initialPage = Page.CALIBRATION) }
     shot("calib-result", h = 2300) { EyeBlinkApp(Sample.calibration(CalibrationStage.RESULT), NoActions, en, initialPage = Page.CALIBRATION) }
-    shot("apps") { EyeBlinkApp(Sample.state(), NoActions, en, initialTab = Tab.APPS) }
-    shot("more") { EyeBlinkApp(Sample.state(), NoActions, en, initialTab = Tab.MORE) }
-    shot("studio") { EyeBlinkApp(Sample.state(), NoActions, en, initialTab = Tab.BLINK) }
+    both("apps") { d -> EyeBlinkApp(Sample.state(), NoActions, en, initialTab = Tab.APPS, systemDark = d) }
+    both("more") { d -> EyeBlinkApp(Sample.state(), NoActions, en, initialTab = Tab.MORE, systemDark = d) }
+    both("studio") { d -> EyeBlinkApp(Sample.state(), NoActions, en, initialTab = Tab.BLINK, systemDark = d) }
     shot("studio-tall", h = 3000) { EyeBlinkApp(Sample.state(), NoActions, en, initialTab = Tab.BLINK) }
-    shot("night", h = 2500) { EyeBlinkApp(Sample.state().let { it.copy(settings = it.settings.copy(night = it.settings.night.copy(enabled = true))) }, NoActions, en, initialPage = Page.NIGHT) }
-    shot("power", h = 4300) { EyeBlinkApp(Sample.state(), NoActions, en, initialPage = Page.POWER) }
-    shot("diag", h = 3300) { EyeBlinkApp(Sample.state(), NoActions, en, initialPage = Page.DIAGNOSTICS) }
-    shot("stats", h = 2900) { EyeBlinkApp(Sample.state(), NoActions, en, initialPage = Page.STATS) }
-    shot("privacy", h = 3600) { EyeBlinkApp(Sample.state(), NoActions, en, initialPage = Page.PRIVACY) }
-    shot("about", h = 2300) { EyeBlinkApp(Sample.state(), NoActions, en, initialPage = Page.ABOUT) }
+    both("night", h = 2500) { d -> EyeBlinkApp(Sample.state().let { it.copy(settings = it.settings.copy(night = it.settings.night.copy(enabled = true))) }, NoActions, en, initialPage = Page.NIGHT, systemDark = d) }
+    both("power", h = 4300) { d -> EyeBlinkApp(Sample.state(), NoActions, en, initialPage = Page.POWER, systemDark = d) }
+    both("diag", h = 3300) { d -> EyeBlinkApp(Sample.state(), NoActions, en, initialPage = Page.DIAGNOSTICS, systemDark = d) }
+    both("stats", h = 2900) { d -> EyeBlinkApp(Sample.state(), NoActions, en, initialPage = Page.STATS, systemDark = d) }
+    both("privacy", h = 3600) { d -> EyeBlinkApp(Sample.state(), NoActions, en, initialPage = Page.PRIVACY, systemDark = d) }
+    both("about", h = 2300) { d -> EyeBlinkApp(Sample.state(), NoActions, en, initialPage = Page.ABOUT, systemDark = d) }
     fun rest(style: RestStyle, view: RestView, tr: Boolean = false) = @Composable {
         EbTheme(if (tr) Strings.TR else en) { RestScene(view, style, onSkip = {}, onTap = {}) }
     }
@@ -87,8 +91,9 @@ fun main(args: Array<String>) {
     shot("rest-black", timeMs = 2_400, content = rest(RestStyle.BLACKOUT, resting))
     shot("rest-black-done", timeMs = 2_400, content = rest(RestStyle.BLACKOUT, waiting))
     val fresh = Sample.state().let { it.copy(settings = it.settings.copy(onboardingDone = false, apps = emptyList()), perms = com.eyeblink.app.ui.state.PermissionUi()) }
-    for (i in 0..4) shot("onboard-$i", h = 1560) { EyeBlinkApp(fresh, NoActions, en, onboardingStep = i) }
+    for (i in 0..4) both("onboard-$i") { d -> EyeBlinkApp(fresh, NoActions, en, onboardingStep = i, systemDark = d) }
     shot("onboard-1-tr", h = 1560) { EyeBlinkApp(fresh.let { it.copy(settings = it.settings.copy(language = Language.TR)) }, NoActions, Strings.TR, onboardingStep = 1) }
-    shot("gallery", h = 2200) { KitGallery() }
+    shot("gallery", h = 2400) { KitGallery() }
+    shot("gallery-dark", h = 2400) { EbTheme(en, dark = true) { KitGallery() } }
     println("ok")
 }

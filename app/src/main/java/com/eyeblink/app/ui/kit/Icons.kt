@@ -20,7 +20,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
- * EyeBlink's own icon set: hand-drawn 24x24 line glyphs, round caps, one stroke weight.
+ * EyeBlink's own icon set: 24x24 line glyphs with round caps and joins, one stroke weight.
  * Each is an SVG path string, so the same shapes can be reused for vector assets.
  * `dots` are filled circles given as `cx,cy,r` triples.
  */
@@ -94,8 +94,8 @@ fun Ico(
     icon: Icon,
     modifier: Modifier = Modifier,
     size: Dp = 22.dp,
-    color: Color = Dusk.Text,
-    weight: Float = 1.75f,
+    color: Color = P.ink,
+    weight: Float = 2.0f,
     description: String? = null,
 ) {
     val parsed = remember(icon) {
@@ -110,6 +110,7 @@ fun Ico(
             if (icon == Icon.Search) {
                 drawCircle(color, radius = 6f, center = Offset(11f, 11f), style = stroke)
             }
+            if (icon == Icon.Globe) drawCircle(color, radius = 8.5f, center = Offset(12f, 12f), style = stroke)
             if (icon == Icon.Sun) drawCircle(color, radius = 3.6f, center = Offset(12f, 12f), style = stroke)
             if (icon == Icon.Clock) drawCircle(color, radius = 8.5f, center = Offset(12f, 12f), style = stroke)
             if (icon == Icon.Info || icon == Icon.Warning) {

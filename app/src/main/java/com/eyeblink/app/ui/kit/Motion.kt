@@ -21,9 +21,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.graphicsLayer
 import com.eyeblink.core.anim.EyelidGeometry
@@ -85,12 +85,15 @@ fun Modifier.pressScale(amount: Float, depth: Float = 0.035f): Modifier =
 
 /**
  * Switches between destinations with a *blink*: lids close over the old screen, the content
- * is swapped while everything is black, and the lids open on the new one. The app's own signature
- * motion doubles as its page transition. With reduced motion it is a plain cross-dim.
+ * is swapped while everything is covered, and the lids open on the new one. The app's own signature
+ * motion doubles as its page transition. The lids are pale sun-yellow by day and deep indigo at
+ * night - the real blink on the screen is pure black, this one only borrows its rhythm. With
+ * reduced motion it is a plain cross-fade through the same colour.
  */
 @Composable
 fun <T> BlinkTransition(target: T, modifier: Modifier = Modifier, content: @Composable (T) -> Unit) {
     val reduced = LocalReducedMotion.current
+    val p = P
     var shown by remember { mutableStateOf(target) }
     val closure = remember { Animatable(0f) }
 
@@ -110,15 +113,15 @@ fun <T> BlinkTransition(target: T, modifier: Modifier = Modifier, content: @Comp
     Box(modifier) {
         content(shown)
         if (closure.value > 0.001f) {
-            Canvas(Modifier.fillMaxSize()) { drawScreenLids(closure.value, reduced) }
+            Canvas(Modifier.fillMaxSize()) { drawScreenLids(closure.value, reduced, p.lid, p.sun.fill, p.sun.lip) }
         }
     }
 }
 
-/** Opaque black lids with a thin warm seam, for transitions. The overlay's own look is in BlinkPainter. */
-fun DrawScope.drawScreenLids(closure: Float, fade: Boolean) {
+/** Opaque lids with a seam and a row of lashes, for transitions. The overlay's own look is in BlinkPainter. */
+fun DrawScope.drawScreenLids(closure: Float, fade: Boolean, lid: Color, seam: Color, lash: Color) {
     if (fade) {
-        drawRect(Dusk.Void, alpha = closure.coerceIn(0f, 1f))
+        drawRect(lid, alpha = closure.coerceIn(0f, 1f))
         return
     }
     val h = size.height
@@ -134,20 +137,23 @@ fun DrawScope.drawScreenLids(closure: Float, fade: Boolean) {
             moveTo(0f, h); lineTo(w, h); lineTo(w, h - m.edge)
             quadraticBezierTo(w / 2f, h - m.control, 0f, h - m.edge); close()
         }
-        drawPath(top, Dusk.Void, alpha = layer.alpha)
-        drawPath(bottom, Dusk.Void, alpha = layer.alpha)
+        drawPath(top, lid, alpha = layer.alpha)
+        drawPath(bottom, lid, alpha = layer.alpha)
     }
-    if (closure >= 0.999f) drawRect(Dusk.Void)
+    if (closure >= 0.999f) drawRect(lid)
 
-    // The seam: a hairline of amber where the lids meet, brightest as they touch.
+    // The seam where the lids meet, with a few lashes hanging from it, brightest as they touch.
     val glow = ((closure - 0.55f) / 0.45f).coerceIn(0f, 1f)
     if (glow > 0f) {
         val y = h / 2f
-        drawLine(
-            brush = Brush.horizontalGradient(
-                listOf(Color.Transparent, Dusk.Amber.copy(alpha = 0.9f * glow), Dusk.Rose.copy(alpha = 0.8f * glow), Dusk.Amber.copy(alpha = 0.9f * glow), Color.Transparent),
-            ),
-            start = Offset(w * 0.08f, y), end = Offset(w * 0.92f, y), strokeWidth = 2f + 3f * glow,
-        )
+        val x0 = w * 0.14f
+        val x1 = w * 0.86f
+        drawLine(seam.copy(alpha = glow), Offset(x0, y), Offset(x1, y), strokeWidth = 5f + 4f * glow, cap = StrokeCap.Round)
+        for (i in 0..6) {
+            val t = i / 6f
+            val x = x0 + (x1 - x0) * t
+            val len = (14f + 18f * kotlin.math.sin(Math.PI.toFloat() * t)) * glow
+            drawLine(lash.copy(alpha = glow), Offset(x, y + 6f), Offset(x + (t - 0.5f) * 14f, y + 6f + len), strokeWidth = 4f, cap = StrokeCap.Round)
+        }
     }
 }

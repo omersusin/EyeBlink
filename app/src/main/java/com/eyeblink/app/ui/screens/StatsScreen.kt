@@ -26,9 +26,9 @@ import com.eyeblink.app.ui.i18n.fmtMinutes
 import com.eyeblink.app.ui.i18n.label
 import com.eyeblink.app.ui.kit.Badge
 import com.eyeblink.app.ui.kit.ButtonKind
-import com.eyeblink.app.ui.kit.Dusk
+import com.eyeblink.app.ui.kit.P
 import com.eyeblink.app.ui.kit.EbText
-import com.eyeblink.app.ui.kit.Glass
+import com.eyeblink.app.ui.kit.Card
 import com.eyeblink.app.ui.kit.Hairline
 import com.eyeblink.app.ui.kit.Icon
 import com.eyeblink.app.ui.kit.Ink
@@ -58,7 +58,7 @@ fun StatsScreen(state: UiState, actions: UiActions, onBack: () -> Unit) {
 
     PageColumn(s.t("Statistics", "İstatistikler"), s.t("Only on this phone", "Yalnızca bu telefonda"), onBack) {
         if (!state.settings.privacy.localStats) {
-            Glass(Modifier.reveal(1).fillMaxWidth(), glow = Dusk.Amber) {
+            Card(Modifier.reveal(1).fillMaxWidth(), tint = P.sun) {
                 EbText(s.t("Counting is switched off", "Sayım kapalı"), Ink.Title)
                 Spacer(Modifier.height(4.dp))
                 EbText(s.t("Nothing is being recorded. Turn it on in Privacy if you would like a record of your breaks.", "Hiçbir şey kaydedilmiyor. Molalarının kaydını istersen Gizlilik'ten aç."), Ink.Caption)
@@ -66,8 +66,8 @@ fun StatsScreen(state: UiState, actions: UiActions, onBack: () -> Unit) {
         }
 
         // ── today ───────────────────────────────────────────────
-        Glass(Modifier.reveal(1).fillMaxWidth(), glow = Dusk.Iris) {
-            EbText(s.t("Today", "Bugün"), Ink.Eyebrow, color = Dusk.Amber)
+        Card(Modifier.reveal(1).fillMaxWidth(), tint = P.sky) {
+            EbText(s.t("Today", "Bugün"), Ink.Title)
             Spacer(Modifier.height(14.dp))
             val (activeValue, activeUnit) = fmtActive(today.activeMs, s)
             Row(Modifier.fillMaxWidth()) {
@@ -78,10 +78,10 @@ fun StatsScreen(state: UiState, actions: UiActions, onBack: () -> Unit) {
         }
 
         // ── the week ────────────────────────────────────────────
-        Glass(Modifier.reveal(2).fillMaxWidth()) {
+        Card(Modifier.reveal(2).fillMaxWidth()) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                EbText(s.t("Last 7 days", "Son 7 gün"), Ink.Eyebrow, color = Dusk.Amber, modifier = Modifier.weight(1f))
-                EbText(s.t("${week.microShown} blinks · ${week.restsCompleted} rests", "${week.microShown} kırpma · ${week.restsCompleted} mola"), Ink.MonoSmall, color = Dusk.TextDim, caps = false, maxLines = 1)
+                EbText(s.t("Last 7 days", "Son 7 gün"), Ink.Title, modifier = Modifier.weight(1f))
+                EbText(s.t("${week.microShown} blinks · ${week.restsCompleted} rests", "${week.microShown} kırpma · ${week.restsCompleted} mola"), Ink.NumSmall, color = P.inkSoft, caps = false, maxLines = 1)
             }
             Spacer(Modifier.height(14.dp))
             if (st.series.isEmpty()) {
@@ -92,12 +92,12 @@ fun StatsScreen(state: UiState, actions: UiActions, onBack: () -> Unit) {
         }
 
         // ── what the camera saw ─────────────────────────────────
-        Glass(Modifier.reveal(3).fillMaxWidth()) {
+        Card(Modifier.reveal(3).fillMaxWidth()) {
             val observed = week.observedBlinksPerMinute
             val calibrated = state.personal.general.blinksPerMinute
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                EbText(s.t("What the camera saw", "Kameranın gördüğü"), Ink.Eyebrow, color = Dusk.Amber, modifier = Modifier.weight(1f))
-                Badge(if (observed != null) s.t("observed", "gözlenen") else s.t("no data", "veri yok"), if (observed != null) Tone.Iris else Tone.Quiet)
+                EbText(s.t("What the camera saw", "Kameranın gördüğü"), Ink.Title, modifier = Modifier.weight(1f))
+                Badge(if (observed != null) s.t("observed", "gözlenen") else s.t("no data", "veri yok"), if (observed != null) Tone.Sky else Tone.Quiet)
             }
             Spacer(Modifier.height(10.dp))
             if (observed != null) {
@@ -111,7 +111,7 @@ fun StatsScreen(state: UiState, actions: UiActions, onBack: () -> Unit) {
                     Hairline(Modifier.padding(vertical = 10.dp))
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         EbText(s.t("From your calibration", "Kalibrasyonundan"), Ink.Caption, modifier = Modifier.weight(1f))
-                        EbText(s.t("${fmtDecimal(calibrated, s)} / min", "${fmtDecimal(calibrated, s)} / dk"), Ink.Mono, caps = false)
+                        EbText(s.t("${fmtDecimal(calibrated, s)} / min", "${fmtDecimal(calibrated, s)} / dk"), Ink.Num, caps = false)
                     }
                 }
             } else {
@@ -120,39 +120,39 @@ fun StatsScreen(state: UiState, actions: UiActions, onBack: () -> Unit) {
         }
 
         // ── playback safety ─────────────────────────────────────
-        Glass(Modifier.reveal(4).fillMaxWidth()) {
-            EbText(s.t("Playback safety", "Oynatma güvenliği"), Ink.Eyebrow, color = Dusk.Amber)
+        Card(Modifier.reveal(4).fillMaxWidth()) {
+            EbText(s.t("Playback safety", "Oynatma güvenliği"), Ink.Title)
             Spacer(Modifier.height(4.dp))
             EbText(s.t("A pause only counts once EyeBlink has seen the player stop. A resume only happens if nothing changed in the meantime.", "Duraklatma, EyeBlink oynatıcının durduğunu görmeden sayılmaz. Sürdürme, bu arada hiçbir şey değişmediyse yapılır."), Ink.Caption)
             Spacer(Modifier.height(14.dp))
             Outcome(
                 s.t("Pauses", "Duraklatmalar"),
                 listOf(
-                    Triple(week.pausesVerified, s.t("verified", "doğrulandı"), Dusk.Ok),
-                    Triple(week.pausesUnverified, s.t("unverified", "doğrulanamadı"), Dusk.Warn),
-                    Triple(week.pausesFailed, s.t("failed", "başarısız"), Dusk.Bad),
+                    Triple(week.pausesVerified, s.t("verified", "doğrulandı"), P.mint.fill),
+                    Triple(week.pausesUnverified, s.t("unverified", "doğrulanamadı"), P.sun.fill),
+                    Triple(week.pausesFailed, s.t("failed", "başarısız"), P.coral.fill),
                 ),
             )
             Spacer(Modifier.height(16.dp))
             Outcome(
                 s.t("Resumes", "Sürdürmeler"),
                 listOf(
-                    Triple(week.resumesOk, s.t("resumed", "sürdürüldü"), Dusk.Ok),
-                    Triple(week.resumesRefused, s.t("left to you", "sana bırakıldı"), Dusk.Iris),
-                    Triple(week.resumesFailed, s.t("failed", "başarısız"), Dusk.Bad),
+                    Triple(week.resumesOk, s.t("resumed", "sürdürüldü"), P.mint.fill),
+                    Triple(week.resumesRefused, s.t("left to you", "sana bırakıldı"), P.sky.fill),
+                    Triple(week.resumesFailed, s.t("failed", "başarısız"), P.coral.fill),
                 ),
             )
             if (week.resumesRefused > 0) {
                 Spacer(Modifier.height(10.dp))
-                EbText(s.t("\"Left to you\" means you had taken over - you paused it, switched videos or left the app - so EyeBlink did not touch it.", "\"Sana bırakıldı\", kontrolü sen almışsın demektir - kendin duraklattın, videoyu değiştirdin ya da uygulamadan çıktın - EyeBlink dokunmadı."), Ink.Caption, color = Dusk.TextFaint)
+                EbText(s.t("\"Left to you\" means you had taken over - you paused it, switched videos or left the app - so EyeBlink did not touch it.", "\"Sana bırakıldı\", kontrolü sen almışsın demektir - kendin duraklattın, videoyu değiştirdin ya da uygulamadan çıktın - EyeBlink dokunmadı."), Ink.Caption, color = P.inkFaint)
             }
         }
 
         // ── why a break waited ─────────────────────────────────
         val waits = week.deferredByReason.entries.sortedByDescending { it.value }.take(5)
         if (waits.isNotEmpty()) {
-            Glass(Modifier.reveal(5).fillMaxWidth()) {
-                EbText(s.t("Why a break waited", "Mola neden bekledi"), Ink.Eyebrow, color = Dusk.Amber)
+            Card(Modifier.reveal(5).fillMaxWidth()) {
+                EbText(s.t("Why a break waited", "Mola neden bekledi"), Ink.Title)
                 Spacer(Modifier.height(4.dp))
                 EbText(s.t("EyeBlink waits for a calm moment instead of interrupting a gesture.", "EyeBlink bir hareketi bölmek yerine sakin bir an bekler."), Ink.Caption)
                 Spacer(Modifier.height(12.dp))
@@ -161,11 +161,11 @@ fun StatsScreen(state: UiState, actions: UiActions, onBack: () -> Unit) {
                     val label = Reason.entries.firstOrNull { it.name == key }?.label(s) ?: key
                     Column(Modifier.padding(vertical = 6.dp)) {
                         Row(Modifier.fillMaxWidth()) {
-                            EbText(label, Ink.Caption, color = Dusk.Text, modifier = Modifier.weight(1f))
-                            EbText(count.toString(), Ink.MonoSmall, caps = false)
+                            EbText(label, Ink.Caption, color = P.ink, modifier = Modifier.weight(1f))
+                            EbText(count.toString(), Ink.NumSmall)
                         }
                         Spacer(Modifier.height(6.dp))
-                        Meter(count.toFloat() / top, tone = Dusk.Violet)
+                        Meter(count.toFloat() / top, tone = P.grape)
                     }
                 }
             }
@@ -202,7 +202,7 @@ private fun Outcome(title: String, parts: List<Triple<Int, String, androidx.comp
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             parts.forEach { (count, label, color) ->
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Box(Modifier.size(6.dp).clip(CircleShape).background(color))
+                    Box(Modifier.size(10.dp).clip(CircleShape).background(color))
                     EbText("$count $label", Ink.Caption, maxLines = 1)
                 }
             }

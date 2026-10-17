@@ -1,6 +1,5 @@
 package com.eyeblink.app.ui.kit
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,9 +14,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -26,11 +22,11 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
-enum class ButtonKind { Primary, Glass, Ghost, Danger }
+enum class ButtonKind { Primary, Soft, Ghost, Danger }
 
 /**
- * Pill button. Primary is the amber of a lid seam catching light; pressing it lowers a soft
- * shadow from the top, as if a lid were beginning to close over it.
+ * The pill button. Primary is sun-yellow with a deeper yellow lip; Soft is a white (or indigo)
+ * pill; Danger is a pale coral one. Pressing any of them sinks the face onto its lip.
  */
 @Composable
 fun PillButton(
@@ -42,45 +38,38 @@ fun PillButton(
     enabled: Boolean = true,
     compact: Boolean = false,
 ) {
+    val p = P
     val (source, press) = rememberPress()
     val shape = RoundedCornerShape(50)
     val fg = when (kind) {
-        ButtonKind.Primary -> Color(0xFF1A1006)
-        ButtonKind.Danger -> Dusk.Bad
-        ButtonKind.Glass -> Dusk.Text
-        ButtonKind.Ghost -> Dusk.TextDim
+        ButtonKind.Primary -> p.onFill
+        ButtonKind.Danger -> p.coral.text
+        ButtonKind.Soft -> p.ink
+        ButtonKind.Ghost -> p.inkSoft
     }
     val base = modifier
-        .alpha(if (enabled) 1f else 0.4f)
-        .pressScale(press.value)
+        .alpha(if (enabled) 1f else 0.45f)
         .let { m ->
             when (kind) {
-                ButtonKind.Primary -> m.clip(shape).background(Dusk.dawn(Offset.Zero, Offset(400f, 200f)))
-                ButtonKind.Danger -> m.glass(shape, glow = Dusk.Bad)
-                ButtonKind.Glass -> m.glass(shape)
-                ButtonKind.Ghost -> m.clip(shape)
+                ButtonKind.Primary -> m.raised(shape, p.sun.fill, p.sun.lip, sink = { press.value })
+                ButtonKind.Danger -> m.raised(shape, p.coral.soft, p.coral.softLip, sink = { press.value })
+                ButtonKind.Soft -> m.raised(shape, p.card, p.cardLip, border = p.line, sink = { press.value })
+                ButtonKind.Ghost -> m.pressScale(press.value, 0.04f)
             }
         }
-        .drawWithContent {
-            drawContent()
-            val p = press.value
-            if (p > 0.01f) {
-                drawRect(
-                    Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.34f * p), Color.Transparent), endY = size.height * 0.7f),
-                )
-            }
-        }
+        .clip(shape)
         .semantics { role = Role.Button }
         .let { if (enabled) it.clickable(interactionSource = source, indication = null, onClick = onClick) else it }
-        .defaultMinSize(minHeight = if (compact) 40.dp else 52.dp)
-        .padding(horizontal = if (compact) 16.dp else 24.dp)
+        .defaultMinSize(minHeight = if (compact) 42.dp else 54.dp)
+        .padding(horizontal = if (compact) 18.dp else 26.dp)
 
     Row(base, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)) {
-        if (icon != null) Ico(icon, size = 18.dp, color = fg)
+        if (icon != null) Ico(icon, size = 20.dp, color = fg, weight = 2.1f)
         EbText(text, Ink.Button, color = fg, maxLines = 1)
     }
 }
 
+/** A round button. Plain it is a white disc; with a [hue] it takes that colour. */
 @Composable
 fun RoundIconButton(
     icon: Icon,
@@ -88,18 +77,24 @@ fun RoundIconButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     size: Dp = 44.dp,
-    tint: Color = Dusk.Text,
-    glow: Color? = null,
+    tint: Color? = null,
+    hue: Hue? = null,
 ) {
+    val p = P
     val (source, press) = rememberPress()
+    val face = hue?.fill ?: p.card
+    val lip = hue?.lip ?: p.cardLip
     Box(
-        modifier.size(size).pressScale(press.value).glass(CircleShape, glow = glow).clip(CircleShape)
+        modifier.size(size)
+            .raised(CircleShape, face, lip, depth = 3.dp, border = if (hue == null) p.line else null, sink = { press.value })
+            .clip(CircleShape)
             .semantics { role = Role.Button; contentDescription = description }
             .clickable(interactionSource = source, indication = null, onClick = onClick),
         contentAlignment = Alignment.Center,
-    ) { Ico(icon, size = size * 0.46f, color = tint) }
+    ) { Ico(icon, size = size * 0.46f, color = tint ?: if (hue != null) p.onFill else p.ink, weight = 2.1f) }
 }
 
+/** A choice. Unselected it is a white pill; selected it turns sun-yellow, which is the colour of "this one". */
 @Composable
 fun Chip(
     text: String,
@@ -107,21 +102,27 @@ fun Chip(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     icon: Icon? = null,
+    iconTint: Color? = null,
 ) {
+    val p = P
     val (source, press) = rememberPress()
     val shape = RoundedCornerShape(50)
-    val fg = if (selected) Dusk.Iris else Dusk.TextDim
+    val fg = if (selected) p.onFill else p.ink
     Row(
-        modifier.pressScale(press.value, 0.05f)
-            .let { if (selected) it.clip(shape).background(Dusk.Iris.copy(alpha = 0.14f)).glass(shape, strength = 0.2f, border = true) else it.glass(shape, strength = 0.7f) }
+        modifier
+            .let {
+                if (selected) it.raised(shape, p.sun.fill, p.sun.lip, depth = 2.dp, sink = { press.value })
+                else it.raised(shape, p.card, p.cardLip, depth = 2.dp, border = p.line, sink = { press.value })
+            }
+            .clip(shape)
             .semantics { role = Role.Button }
             .clickable(interactionSource = source, indication = null, onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 9.dp),
+            .padding(horizontal = 13.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(7.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
     ) {
-        if (icon != null) Ico(icon, size = 16.dp, color = fg)
-        EbText(text, Ink.Caption, color = fg, maxLines = 1)
+        if (icon != null) Ico(icon, size = 17.dp, color = iconTint ?: fg, weight = 2.1f)
+        EbText(text, Ink.Chip, color = fg, maxLines = 1)
     }
 }
 
@@ -131,18 +132,20 @@ fun Chip(
  */
 @Composable
 fun LanguageChip(label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val p = P
     val (source, press) = rememberPress()
     val shape = RoundedCornerShape(50)
     Row(
-        modifier.pressScale(press.value, 0.05f).glass(shape, strength = 0.9f)
+        modifier.raised(shape, p.card, p.cardLip, depth = 2.dp, border = p.line, sink = { press.value })
+            .clip(shape)
             .semantics { role = Role.Button; contentDescription = label }
             .clickable(interactionSource = source, indication = null, onClick = onClick)
             .padding(start = 12.dp, end = 10.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(7.dp),
     ) {
-        Ico(Icon.Globe, size = 17.dp, color = Dusk.Iris)
-        EbText(label, Ink.Caption, color = Dusk.Text, maxLines = 1)
-        Ico(Icon.ChevronDown, size = 15.dp, color = Dusk.TextDim)
+        Ico(Icon.Globe, size = 18.dp, color = p.sky.text, weight = 2.0f)
+        EbText(label, Ink.BodyStrong, color = p.ink, maxLines = 1)
+        Ico(Icon.ChevronDown, size = 15.dp, color = p.inkSoft, weight = 2.2f)
     }
 }

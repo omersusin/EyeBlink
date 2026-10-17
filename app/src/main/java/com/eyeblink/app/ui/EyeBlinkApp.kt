@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
@@ -26,6 +25,8 @@ import com.eyeblink.app.ui.kit.DockItem
 import com.eyeblink.app.ui.kit.EbTheme
 import com.eyeblink.app.ui.kit.Icon
 import com.eyeblink.app.ui.kit.Insets
+import com.eyeblink.app.ui.kit.isDark
+import com.eyeblink.app.ui.kit.P
 import com.eyeblink.app.ui.kit.S
 import com.eyeblink.app.ui.screens.AboutScreen
 import com.eyeblink.app.ui.screens.CalibrationScreen
@@ -51,8 +52,9 @@ import com.eyeblink.app.ui.state.UiState
  * The whole app UI. Platform-free: it takes a state and an action sink, so the same code runs
  * inside the Android activity and in the desktop design lab.
  *
- * [backHandler] is supplied by the platform (Android's back gesture); the shared UI only says
- * when back should be intercepted.
+ * [systemDark] says whether the phone is in dark mode; it only matters while the appearance
+ * setting is "Auto". [backHandler] is supplied by the platform (Android's back gesture); the
+ * shared UI only says when back should be intercepted.
  */
 @Composable
 fun EyeBlinkApp(
@@ -64,9 +66,11 @@ fun EyeBlinkApp(
     initialTab: Tab = Tab.TODAY,
     initialPage: Page? = null,
     onboardingStep: Int = 0,
+    systemDark: Boolean = false,
     backHandler: @Composable (enabled: Boolean, onBack: () -> Unit) -> Unit = { _, _ -> },
 ) {
-    EbTheme(strings, reducedMotion, insets) {
+    val dark = state.settings.appearance.isDark(systemDark)
+    EbTheme(strings, reducedMotion, insets, dark) {
         Backdrop {
             var languageSheet by remember { mutableStateOf(false) }
             val openLanguage = { languageSheet = true }
@@ -128,10 +132,11 @@ private fun MainShell(
         }
 
         if (page == null && !picker) {
-            // Content fades into black before it reaches the dock, so nothing shows through it.
+            // Content fades into the page before it reaches the dock, so nothing shows through it.
+            val bg = P.bg
             Box(
                 Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(150.dp + insets.bottom)
-                    .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.82f), Color.Black))),
+                    .background(Brush.verticalGradient(listOf(bg.copy(alpha = 0f), bg.copy(alpha = 0.9f), bg))),
             )
             val s = S
             Dock(

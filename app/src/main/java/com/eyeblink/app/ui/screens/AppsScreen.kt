@@ -10,8 +10,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -19,8 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.eyeblink.app.ui.i18n.Strings
@@ -28,13 +26,14 @@ import com.eyeblink.app.ui.i18n.fmtAgo
 import com.eyeblink.app.ui.kit.AppAvatar
 import com.eyeblink.app.ui.kit.Badge
 import com.eyeblink.app.ui.kit.ButtonKind
-import com.eyeblink.app.ui.kit.Dusk
+import com.eyeblink.app.ui.kit.P
 import com.eyeblink.app.ui.kit.EbText
 import com.eyeblink.app.ui.kit.Flow
-import com.eyeblink.app.ui.kit.Glass
+import com.eyeblink.app.ui.kit.Card
+import com.eyeblink.app.ui.kit.CheckDot
+import com.eyeblink.app.ui.kit.IconBadge
 import com.eyeblink.app.ui.kit.Hairline
 import com.eyeblink.app.ui.kit.Horizon
-import com.eyeblink.app.ui.kit.Ico
 import com.eyeblink.app.ui.kit.Icon
 import com.eyeblink.app.ui.kit.Ink
 import com.eyeblink.app.ui.kit.LidSwitch
@@ -73,7 +72,7 @@ fun AppsScreen(state: UiState, actions: UiActions, onPick: () -> Unit, modifier:
     ScreenColumn(modifier) {
         Row(Modifier.fillMaxWidth().reveal(0), verticalAlignment = Alignment.Bottom) {
             Box(Modifier.weight(1f)) { SectionHeader(s.t("Apps", "Uygulamalar"), s.t("Where it works", "Nerede çalışır")) }
-            RoundIconButton(Icon.Plus, s.t("Add an app", "Uygulama ekle"), onPick, glow = Dusk.Amber)
+            RoundIconButton(Icon.Plus, s.t("Add an app", "Uygulama ekle"), onPick, hue = P.sun)
         }
         EbText(
             s.t("EyeBlink only ever interrupts the apps on this list. Anywhere else - calls, payments, sign-in screens, your camera - it stays out of the way.", "EyeBlink yalnızca bu listedeki uygulamalara müdahale eder. Başka her yerde (aramalar, ödemeler, giriş ekranları, kameran) yoldan çekilir."),
@@ -81,10 +80,10 @@ fun AppsScreen(state: UiState, actions: UiActions, onPick: () -> Unit, modifier:
         )
 
         if (state.settings.apps.isEmpty()) {
-            Glass(Modifier.reveal(2).fillMaxWidth(), glow = Dusk.Iris) {
+            Card(Modifier.reveal(2).fillMaxWidth(), tint = P.sky) {
                 Column(Modifier.fillMaxWidth().padding(vertical = 14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Ico(Icon.Grid, size = 36.dp, color = Dusk.Iris)
-                    Spacer(Modifier.height(12.dp))
+                    IconBadge(Icon.Grid, P.sky, size = 58.dp)
+                    Spacer(Modifier.height(14.dp))
                     EbText(s.t("No apps yet", "Henüz uygulama yok"), Ink.Headline, align = TextAlign.Center)
                     Spacer(Modifier.height(6.dp))
                     EbText(s.t("Pick the apps where you scroll or watch for long stretches.", "Uzun süre kaydırdığın ya da izlediğin uygulamaları seç."), Ink.Caption, align = TextAlign.Center)
@@ -106,7 +105,7 @@ fun AppsScreen(state: UiState, actions: UiActions, onPick: () -> Unit, modifier:
         if (state.settings.apps.isNotEmpty()) {
             EbText(
                 s.t("A pause method is only called \"verified\" after a real test on this phone passes - pausing, confirming it paused, resuming, and confirming that too. Until then EyeBlink blinks over the app without touching playback.", "Bir duraklatma yöntemi, bu telefonda gerçek bir test geçilmeden \"doğrulandı\" sayılmaz: duraklat, durduğunu doğrula, devam ettir, onu da doğrula. O zamana dek EyeBlink oynatmaya dokunmadan uygulamanın üstünde göz kırpar."),
-                Ink.Caption, color = Dusk.TextFaint, modifier = Modifier.reveal(8).padding(horizontal = 4.dp),
+                Ink.Caption, color = P.inkFaint, modifier = Modifier.reveal(8).padding(horizontal = 4.dp),
             )
         }
     }
@@ -116,7 +115,7 @@ fun AppsScreen(state: UiState, actions: UiActions, onPick: () -> Unit, modifier:
 private fun AppCard(profile: AppProfile, compat: CompatUi, nowMs: Long, expanded: Boolean, onToggle: () -> Unit, actions: UiActions, modifier: Modifier) {
     val s = S
     fun set(f: (AppProfile) -> AppProfile) = actions.update { cur -> cur.withApp(f(profile).validated()) }
-    Glass(modifier.fillMaxWidth(), glow = if (profile.enabled) Dusk.Iris else null, strength = if (profile.enabled) 1f else 0.6f, onClick = onToggle, padding = androidx.compose.foundation.layout.PaddingValues(16.dp)) {
+    Card(modifier.fillMaxWidth().alpha(if (profile.enabled) 1f else 0.7f), onClick = onToggle, padding = PaddingValues(16.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             AppAvatar(profile.label.ifBlank { profile.packageName }, profile.packageName)
             Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
@@ -138,7 +137,7 @@ private fun AppCard(profile: AppProfile, compat: CompatUi, nowMs: Long, expanded
                         profile.intervalScalePercent > 102 -> s.t("less often", "daha seyrek")
                         else -> s.t("normal", "normal")
                     } + " · ${profile.intervalScalePercent}%",
-                    Ink.MonoSmall, color = Dusk.Iris, caps = false,
+                    Ink.NumSmall, color = P.sky.text, caps = false,
                 )
             }
             Horizon(
@@ -154,7 +153,7 @@ private fun AppCard(profile: AppProfile, compat: CompatUi, nowMs: Long, expanded
             CompatSection(profile, compat, nowMs, actions)
             Spacer(Modifier.height(12.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                PillButton(s.t("Open", "Aç"), { actions.openApp(profile.packageName) }, kind = ButtonKind.Glass, compact = true, icon = Icon.Play)
+                PillButton(s.t("Open", "Aç"), { actions.openApp(profile.packageName) }, kind = ButtonKind.Soft, compact = true, icon = Icon.Play)
                 PillButton(s.t("Remove", "Kaldır"), { actions.removeApp(profile.packageName) }, kind = ButtonKind.Ghost, compact = true, icon = Icon.Trash)
             }
         }
@@ -175,7 +174,7 @@ internal fun CompatBadge(status: CompatStatus) {
 @Composable
 private fun CompatSection(profile: AppProfile, compat: CompatUi, nowMs: Long, actions: UiActions) {
     val s = S
-    EbText(s.t("Playback control", "Oynatma kontrolü"), Ink.Eyebrow, color = Dusk.Amber)
+    EbText(s.t("Playback control", "Oynatma kontrolü"), Ink.Eyebrow, color = P.sky.text)
     Spacer(Modifier.height(8.dp))
     EbText(
         when (compat.status) {
@@ -206,11 +205,11 @@ private fun CompatSection(profile: AppProfile, compat: CompatUi, nowMs: Long, ac
     }
     Spacer(Modifier.height(12.dp))
     if (compat.testing) {
-        EbText(s.t("Testing... keep a video playing in the app.", "Test ediliyor... uygulamada bir video oynat."), Ink.Caption, color = Dusk.Iris)
+        EbText(s.t("Testing... keep a video playing in the app.", "Test ediliyor... uygulamada bir video oynat."), Ink.Caption, color = P.sky.text)
     } else {
         PillButton(s.t("Test compatibility", "Uyumluluğu test et"), { actions.testCompat(profile.packageName) }, icon = Icon.Sparkle, compact = true)
         Spacer(Modifier.height(8.dp))
-        EbText(s.t("Open the app, start a video, then tap. EyeBlink pauses it, checks it paused, resumes it and checks that too.", "Uygulamayı aç, bir video başlat, sonra dokun. EyeBlink duraklatır, durduğunu doğrular, devam ettirir ve onu da doğrular."), Ink.Caption, color = Dusk.TextFaint)
+        EbText(s.t("Open the app, start a video, then tap. EyeBlink pauses it, checks it paused, resumes it and checks that too.", "Uygulamayı aç, bir video başlat, sonra dokun. EyeBlink duraklatır, durduğunu doğrular, devam ettirir ve onu da doğrular."), Ink.Caption, color = P.inkFaint)
     }
 }
 
@@ -226,12 +225,12 @@ fun AppPickerSheet(state: UiState, actions: UiActions, onDone: () -> Unit) {
     val known = state.apps.filter { it.known }
     val others = state.apps.filterNot { it.known }
     if (known.isNotEmpty()) {
-        EbText(s.t("Suggested", "Önerilenler"), Ink.Eyebrow, color = Dusk.Amber)
+        EbText(s.t("Suggested", "Önerilenler"), Ink.Eyebrow, color = P.sky.text)
         known.forEach { PickRow(it.label, it.packageName, it.packageName in selected, actions) }
     }
     if (others.isNotEmpty()) {
         Spacer(Modifier.height(14.dp))
-        EbText(s.t("Installed", "Yüklü"), Ink.Eyebrow, color = Dusk.Amber)
+        EbText(s.t("Installed", "Yüklü"), Ink.Eyebrow, color = P.sky.text)
         others.forEach { PickRow(it.label, it.packageName, it.packageName in selected, actions) }
     }
     Spacer(Modifier.height(18.dp))
@@ -247,21 +246,9 @@ private fun PickRow(label: String, pkg: String, on: Boolean, actions: UiActions)
         AppAvatar(label, pkg, size = 42.dp)
         Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
             EbText(label, Ink.BodyStrong, maxLines = 1)
-            EbText(pkg, Ink.MonoSmall, color = Dusk.TextFaint, caps = false, maxLines = 1)
+            EbText(pkg, Ink.NumSmall, color = P.inkFaint, caps = false, maxLines = 1)
         }
-        Box(
-            Modifier.size(26.dp).clip(CircleShape).let { if (on) it.then(Modifier) else it },
-            contentAlignment = Alignment.Center,
-        ) {
-            androidx.compose.foundation.Canvas(Modifier.size(26.dp)) {
-                if (on) {
-                    drawCircle(Dusk.Iris)
-                } else {
-                    drawCircle(Dusk.HairlineStrong, style = androidx.compose.ui.graphics.drawscope.Stroke(1.5.dp.toPx()))
-                }
-            }
-            if (on) Ico(Icon.Check, size = 16.dp, color = Color(0xFF04201C), weight = 2.4f)
-        }
+        CheckDot(on)
     }
 }
 

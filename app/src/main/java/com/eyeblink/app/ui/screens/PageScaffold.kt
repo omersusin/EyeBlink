@@ -17,9 +17,9 @@ import com.eyeblink.app.ui.kit.RoundIconButton
 import com.eyeblink.app.ui.kit.S
 import com.eyeblink.app.ui.kit.ScreenColumn
 import com.eyeblink.app.ui.kit.reveal
-import com.eyeblink.app.ui.kit.Dusk
+import com.eyeblink.app.ui.kit.P
 
-/** A full-screen sub-page: a back button, an eyebrow and a title, then scrolling content. */
+/** A full-screen sub-page: a back button, a small label and a title, then scrolling content. */
 @Composable
 fun PageColumn(
     eyebrow: String,
@@ -33,8 +33,8 @@ fun PageColumn(
         Row(Modifier.fillMaxWidth().reveal(0), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             RoundIconButton(Icon.ChevronLeft, S.t("Back", "Geri"), onBack)
             Column(Modifier.weight(1f)) {
-                EbText(eyebrow, Ink.Eyebrow, color = Dusk.Amber)
-                EbText(title, Ink.Headline, maxLines = 1)
+                EbText(eyebrow, Ink.Eyebrow, color = P.sky.text)
+                EbText(title, Ink.Headline, maxLines = 2)
             }
         }
         content()

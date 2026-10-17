@@ -1,5 +1,6 @@
 package com.eyeblink.app.system
 
+import android.annotation.SuppressLint
 import android.app.PendingIntent
 import android.content.Intent
 import android.os.Build
@@ -67,6 +68,8 @@ class BlinkTileService : TileService() {
         tile.updateTile()
     }
 
+    // The Intent overload is the only one that exists before Android 14; lint flags it even behind the check.
+    @SuppressLint("StartActivityAndCollapseDeprecated")
     private fun openApp() {
         val launch = packageManager.getLaunchIntentForPackage(packageName)?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) ?: return
         if (Build.VERSION.SDK_INT >= 34) {

@@ -14,16 +14,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.eyeblink.app.ui.kit.Badge
 import com.eyeblink.app.ui.kit.ButtonKind
-import com.eyeblink.app.ui.kit.Dusk
+import com.eyeblink.app.ui.kit.P
 import com.eyeblink.app.ui.kit.EbText
 import com.eyeblink.app.ui.kit.Flow
-import com.eyeblink.app.ui.kit.Glass
+import com.eyeblink.app.ui.kit.Card
 import com.eyeblink.app.ui.kit.Hairline
+import com.eyeblink.app.ui.kit.Hue
 import com.eyeblink.app.ui.kit.Ico
+import com.eyeblink.app.ui.kit.IconBadge
 import com.eyeblink.app.ui.kit.Icon
 import com.eyeblink.app.ui.kit.Ink
 import com.eyeblink.app.ui.kit.LidSwitch
@@ -48,10 +49,10 @@ fun PrivacyScreen(state: UiState, actions: UiActions, onBack: () -> Unit) {
 
     PageColumn(s.t("Privacy", "Gizlilik"), s.t("Stays on your phone", "Telefonunda kalır"), onBack) {
         // ── the promise ─────────────────────────────────────────
-        Glass(Modifier.reveal(1).fillMaxWidth(), glow = Dusk.Rose) {
+        Card(Modifier.reveal(1).fillMaxWidth(), tint = P.mint) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Ico(Icon.Shield, size = 28.dp, color = Dusk.Rose)
-                EbText(s.t("No network. By design.", "Ağ yok. Bilerek."), Ink.Title, modifier = Modifier.weight(1f).padding(start = 12.dp))
+                IconBadge(Icon.Shield, P.mint, size = 46.dp)
+                EbText(s.t("No network. By design.", "Ağ yok. Bilerek."), Ink.Lead, modifier = Modifier.weight(1f).padding(start = 12.dp))
             }
             Spacer(Modifier.height(10.dp))
             EbText(
@@ -59,44 +60,44 @@ fun PrivacyScreen(state: UiState, actions: UiActions, onBack: () -> Unit) {
                     "EyeBlink does not even ask Android for the Internet permission. There is no account, no analytics, no ads and no server for anything to be sent to. The face model is inside the app.",
                     "EyeBlink, Android'den İnternet iznini bile istemez. Hesap, analiz, reklam ve bir şeyin gönderileceği bir sunucu yok. Yüz modeli uygulamanın içinde.",
                 ),
-                Ink.Body, color = Dusk.TextDim,
+                Ink.Body, color = P.ink,
             )
             Spacer(Modifier.height(12.dp))
             Badge(s.t("no Internet permission", "İnternet izni yok"), Tone.Ok)
         }
 
         // ── every access ────────────────────────────────────────
-        Glass(Modifier.reveal(2).fillMaxWidth()) {
-            EbText(s.t("Each access, in plain words", "Her erişim, sade bir dille"), Ink.Eyebrow, color = Dusk.Amber)
+        Card(Modifier.reveal(2).fillMaxWidth()) {
+            EbText(s.t("Each access, in plain words", "Her erişim, sade bir dille"), Ink.Title)
             Spacer(Modifier.height(6.dp))
             Access(
-                Icon.Camera, Dusk.Iris, s.t("Camera", "Kamera"),
+                Icon.Camera, P.sky, s.t("Camera", "Kamera"),
                 sees = s.t("How open your eyes are, as a number, worked out in memory for each frame - only in camera-assisted mode.", "Gözlerinin ne kadar açık olduğu; her kare için bellekte hesaplanan bir sayı olarak - yalnızca kamera destekli modda."),
                 never = s.t("Saves, records or sends a picture. A visible indicator shows whenever the camera is on, and the Quick Settings tile switches it off at once.", "Bir görüntüyü kaydetmez, saklamaz ya da göndermez. Kamera açıkken görünür bir gösterge yanar ve Hızlı Ayarlar karosu onu hemen kapatır."),
             )
             Hairline()
             Access(
-                Icon.Eye, Dusk.Amber, s.t("Accessibility", "Erişilebilirlik"),
+                Icon.Eye, P.sun, s.t("Accessibility", "Erişilebilirlik"),
                 sees = s.t("Which app is in front, and that a finger is on the screen - so a swipe is never interrupted.", "Hangi uygulamanın önde olduğu ve ekranda bir parmak olduğu - böylece bir kaydırma asla bölünmez."),
                 never = s.t("Reads what is on your screen, what you type, or where you touch. EyeBlink does not request permission to read window content at all.", "Ekranında ne olduğunu, ne yazdığını ya da nereye dokunduğunu okumaz. EyeBlink pencere içeriğini okuma iznini hiç istemez."),
             )
             Hairline()
             Access(
-                Icon.Play, Dusk.Violet, s.t("Media sessions", "Medya oturumları"),
+                Icon.Play, P.grape, s.t("Media sessions", "Medya oturumları"),
                 sees = s.t("Whether a player is playing, and a fingerprint of the current item, to tell if you changed videos.", "Bir oynatıcının çalıp çalmadığını ve videoyu değiştirip değiştirmediğini anlamak için geçerli öğenin parmak izini."),
                 never = s.t("Reads your notifications or keeps titles. The fingerprint lives in memory for as long as a break lasts.", "Bildirimlerini okumaz, başlıkları saklamaz. Parmak izi, bir mola sürdüğü kadar bellekte yaşar."),
             )
             Hairline()
             Access(
-                Icon.Terminal, Dusk.Rose, s.t("Shizuku & Root", "Shizuku ve Root"),
+                Icon.Terminal, P.coral, s.t("Shizuku & Root", "Shizuku ve Root"),
                 sees = s.t("Runs a short, fixed list of commands: reading media sessions, granting EyeBlink its own permissions, switching Night Light.", "Kısa ve sabit bir komut listesi çalıştırır: medya oturumlarını okuma, EyeBlink'e kendi izinlerini verme, Gece Işığı'nı değiştirme."),
                 never = s.t("Runs anything it was not built with, downloads code, or touches other apps' data.", "Kendisiyle gelmeyen bir şey çalıştırmaz, kod indirmez, başka uygulamaların verilerine dokunmaz."),
             )
         }
 
         // ── what is stored ──────────────────────────────────────
-        Glass(Modifier.reveal(3).fillMaxWidth()) {
-            EbText(s.t("What is kept on this phone", "Bu telefonda neler tutulur"), Ink.Eyebrow, color = Dusk.Amber)
+        Card(Modifier.reveal(3).fillMaxWidth()) {
+            EbText(s.t("What is kept on this phone", "Bu telefonda neler tutulur"), Ink.Title)
             Spacer(Modifier.height(10.dp))
             Kept(s.t("Your settings and per-app rules", "Ayarların ve uygulama başına kuralların"))
             Kept(s.t("Calibration numbers: how often and how long you blink - never images", "Kalibrasyon sayıları: ne sıklıkla ve ne kadar kırptığın - asla görüntü değil"))
@@ -124,8 +125,8 @@ fun PrivacyScreen(state: UiState, actions: UiActions, onBack: () -> Unit) {
         }
 
         // ── you stay in charge ──────────────────────────────────
-        Glass(Modifier.reveal(4).fillMaxWidth()) {
-            EbText(s.t("You stay in charge", "Kontrol sende"), Ink.Eyebrow, color = Dusk.Amber)
+        Card(Modifier.reveal(4).fillMaxWidth()) {
+            EbText(s.t("You stay in charge", "Kontrol sende"), Ink.Title)
             Spacer(Modifier.height(10.dp))
             Kept(s.t("The Quick Settings tile suspends EyeBlink - camera included - from anywhere", "Hızlı Ayarlar karosu EyeBlink'i - kamera dahil - her yerden askıya alır"))
             Kept(s.t("If anything goes wrong, whatever EyeBlink drew disappears by itself", "Bir şeyler ters giderse EyeBlink'in çizdiği her şey kendiliğinden kaybolur"))
@@ -136,20 +137,20 @@ fun PrivacyScreen(state: UiState, actions: UiActions, onBack: () -> Unit) {
 }
 
 @Composable
-private fun Access(icon: Icon, tone: Color, title: String, sees: String, never: String) {
+private fun Access(icon: Icon, hue: Hue, title: String, sees: String, never: String) {
     val s = S
     Row(Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
-        Ico(icon, size = 24.dp, color = tone)
+        IconBadge(icon, hue, size = 42.dp)
         Column(Modifier.weight(1f).padding(start = 14.dp)) {
             EbText(title, Ink.Title)
             Spacer(Modifier.height(8.dp))
-            EbText(s.t("Uses", "Kullanır"), Ink.Eyebrow, color = tone)
+            EbText(s.t("Uses", "Kullanır"), Ink.Eyebrow, color = P.mint.text)
             Spacer(Modifier.height(2.dp))
-            EbText(sees, Ink.Caption, color = Dusk.Text)
+            EbText(sees, Ink.Caption, color = P.ink)
             Spacer(Modifier.height(8.dp))
-            EbText(s.t("Never", "Asla"), Ink.Eyebrow, color = Dusk.Bad)
+            EbText(s.t("Never", "Asla"), Ink.Eyebrow, color = P.coral.text)
             Spacer(Modifier.height(2.dp))
-            EbText(never, Ink.Caption, color = Dusk.TextDim)
+            EbText(never, Ink.Caption, color = P.inkSoft)
         }
     }
 }
@@ -157,7 +158,7 @@ private fun Access(icon: Icon, tone: Color, title: String, sees: String, never: 
 @Composable
 private fun Kept(text: String) {
     Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), verticalAlignment = Alignment.Top) {
-        Ico(Icon.Check, size = 16.dp, color = Dusk.Iris, modifier = Modifier.padding(top = 2.dp))
-        EbText(text, Ink.Caption, color = Dusk.Text, modifier = Modifier.weight(1f).padding(start = 10.dp))
+        Ico(Icon.Check, size = 16.dp, color = P.mint.text, weight = 2.6f, modifier = Modifier.padding(top = 2.dp))
+        EbText(text, Ink.Caption, color = P.ink, modifier = Modifier.weight(1f).padding(start = 10.dp))
     }
 }

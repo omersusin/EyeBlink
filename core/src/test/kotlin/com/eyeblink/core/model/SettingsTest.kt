@@ -16,6 +16,7 @@ class SettingsTest {
         val s = EyeBlinkSettings(
             onboardingDone = true,
             language = Language.TR,
+            appearance = Appearance.DARK,
             mode = OperatingMode.SHIZUKU,
             blink = BlinkSpec(closeMs = 200, closeEase = EaseKind.CUBIC_IN_OUT, curvature = 0.8f),
             apps = listOf(AppProfile("com.instagram.android", "Instagram", intervalScalePercent = 70)),
@@ -128,5 +129,13 @@ class SettingsTest {
         assertEquals(Language.EN, EyeBlinkSettings().language)
         // A phone set to Turkish does not change that: language is the user's choice, made in the app.
         assertEquals(Language.EN, SettingsCodec.decode(null).language)
+    }
+
+    @Test
+    fun `the theme follows the phone until the user picks one`() {
+        assertEquals(Appearance.SYSTEM, EyeBlinkSettings().appearance)
+        // An unknown value from a future version falls back to following the phone.
+        assertEquals(Appearance.SYSTEM, SettingsCodec.decode("""{"appearance":"NEON"}""").appearance)
+        assertEquals(Appearance.LIGHT, SettingsCodec.decode("""{"appearance":"LIGHT"}""").appearance)
     }
 }

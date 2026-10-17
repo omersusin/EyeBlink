@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -19,18 +21,20 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.eyeblink.app.ui.eye.EyeArt.drawEye
+import com.eyeblink.app.ui.eye.EyeColors
 import com.eyeblink.app.ui.eye.EyeLook
 import com.eyeblink.app.ui.i18n.Strings
 import com.eyeblink.app.ui.i18n.fmtClock
 import com.eyeblink.app.ui.kit.AmbientReel
 import com.eyeblink.app.ui.kit.Badge
 import com.eyeblink.app.ui.kit.ButtonKind
-import com.eyeblink.app.ui.kit.Dusk
+import com.eyeblink.app.ui.kit.P
 import com.eyeblink.app.ui.kit.EbText
 import com.eyeblink.app.ui.kit.Flow
-import com.eyeblink.app.ui.kit.Glass
+import com.eyeblink.app.ui.kit.Card
 import com.eyeblink.app.ui.kit.Hairline
-import com.eyeblink.app.ui.kit.Ico
+import com.eyeblink.app.ui.kit.Hue
+import com.eyeblink.app.ui.kit.IconBadge
 import com.eyeblink.app.ui.kit.Icon
 import com.eyeblink.app.ui.kit.Ink
 import com.eyeblink.app.ui.kit.Meter
@@ -47,8 +51,6 @@ import com.eyeblink.core.calibration.CalibrationSession.Phase
 import com.eyeblink.core.calibration.ContextProfile
 import com.eyeblink.core.calibration.Provenance
 import com.eyeblink.core.calibration.QualityIssue
-import androidx.compose.ui.graphics.Color
-import androidx.compose.foundation.layout.fillMaxSize
 import kotlin.math.roundToInt
 
 @Composable
@@ -72,17 +74,17 @@ private fun Intro(state: UiState, actions: UiActions) {
     val s = S
     val c = state.calibration
     EbText(
-        s.t("A short, guided session so EyeBlink knows how *you* blink - not how an average person does.", "EyeBlink'in ortalama bir insanın değil, *senin* nasıl göz kırptığını bilmesi için kısa, rehberli bir oturum."),
+        s.t("A short, guided session so EyeBlink knows how you blink - not how an average person does.", "EyeBlink'in ortalama bir insanın değil, senin nasıl göz kırptığını bilmesi için kısa, rehberli bir oturum."),
         Ink.Body, modifier = Modifier.reveal(1),
     )
     Column(Modifier.reveal(2), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        StepCard(Icon.Film, Dusk.Iris, s.t("Watch", "İzle"), s.t("A calm moving picture while EyeBlink notes your natural blinks.", "Sakin bir görüntü; EyeBlink doğal kırpmalarını not eder."), "${state.settings.calibration.videoSec} ${s.t("s", "sn")}")
-        StepCard(Icon.Book, Dusk.Amber, s.t("Read", "Oku"), s.t("A short passage, because reading changes how often we blink.", "Kısa bir metin; çünkü okumak göz kırpma sıklığını değiştirir."), "${state.settings.calibration.readingSec} ${s.t("s", "sn")}")
-        StepCard(Icon.Eye, Dusk.Rose, s.t("Blink on purpose", "Bilerek kırp"), s.t("A few full, deliberate blinks so it learns what a closed eye looks like on you.", "Kapalı gözün sende nasıl göründüğünü öğrenmesi için birkaç tam, bilinçli kırpma."), "${state.settings.calibration.deliberateBlinks}×")
+        StepCard(Icon.Film, P.sky, s.t("Watch", "İzle"), s.t("A calm moving picture while EyeBlink notes your natural blinks.", "Sakin bir görüntü; EyeBlink doğal kırpmalarını not eder."), "${state.settings.calibration.videoSec} ${s.t("s", "sn")}")
+        StepCard(Icon.Book, P.sun, s.t("Read", "Oku"), s.t("A short passage, because reading changes how often we blink.", "Kısa bir metin; çünkü okumak göz kırpma sıklığını değiştirir."), "${state.settings.calibration.readingSec} ${s.t("s", "sn")}")
+        StepCard(Icon.Eye, P.coral, s.t("Blink on purpose", "Bilerek kırp"), s.t("A few full, deliberate blinks so it learns what a closed eye looks like on you.", "Kapalı gözün sende nasıl göründüğünü öğrenmesi için birkaç tam, bilinçli kırpma."), "${state.settings.calibration.deliberateBlinks}×")
     }
-    Glass(Modifier.reveal(3).fillMaxWidth(), glow = Dusk.Iris) {
+    Card(Modifier.reveal(3).fillMaxWidth(), tint = P.sky) {
         Row(verticalAlignment = Alignment.Top) {
-            Ico(Icon.Shield, size = 22.dp, color = Dusk.Iris)
+            IconBadge(Icon.Shield, P.sky, size = 40.dp)
             Column(Modifier.padding(start = 12.dp)) {
                 EbText(s.t("Nothing leaves your phone", "Hiçbir şey telefonundan çıkmaz"), Ink.BodyStrong)
                 Spacer(Modifier.height(4.dp))
@@ -91,7 +93,7 @@ private fun Intro(state: UiState, actions: UiActions) {
         }
     }
     if (!c.hasCameraPermission) {
-        EbText(s.t("EyeBlink will ask for camera access when you begin. It is the only thing it asks for here.", "Başlayınca EyeBlink kamera erişimi isteyecek. Burada istediği tek şey bu."), Ink.Caption, color = Dusk.TextDim, modifier = Modifier.reveal(4))
+        EbText(s.t("EyeBlink will ask for camera access when you begin. It is the only thing it asks for here.", "Başlayınca EyeBlink kamera erişimi isteyecek. Burada istediği tek şey bu."), Ink.Caption, color = P.inkSoft, modifier = Modifier.reveal(4))
     }
     Column(Modifier.reveal(5), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         PillButton(s.t("Begin", "Başla"), { actions.startCalibration() }, icon = Icon.Eye, modifier = Modifier.fillMaxWidth())
@@ -102,15 +104,15 @@ private fun Intro(state: UiState, actions: UiActions) {
 }
 
 @Composable
-private fun StepCard(icon: Icon, tone: Color, title: String, body: String, meta: String) {
-    Glass(Modifier.fillMaxWidth(), padding = androidx.compose.foundation.layout.PaddingValues(16.dp)) {
+private fun StepCard(icon: Icon, hue: Hue, title: String, body: String, meta: String) {
+    Card(Modifier.fillMaxWidth(), padding = PaddingValues(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Ico(icon, size = 26.dp, color = tone)
+            IconBadge(icon, hue, size = 46.dp)
             Column(Modifier.weight(1f).padding(horizontal = 14.dp)) {
                 EbText(title, Ink.Title)
                 EbText(body, Ink.Caption)
             }
-            EbText(meta, Ink.MonoSmall, color = tone, caps = false)
+            EbText(meta, Ink.NumSmall, color = hue.text)
         }
     }
 }
@@ -124,16 +126,16 @@ private fun Running(c: CalibrationUi, actions: UiActions) {
             val done = c.phase.ordinal > p.ordinal
             val now = c.phase == p
             Column(Modifier.weight(1f)) {
-                Meter(if (done) 1f else if (now) (if (p == Phase.DELIBERATE) (1f - c.deliberateLeft / c.deliberateTotal.coerceAtLeast(1).toFloat()) else c.phaseProgress) else 0f, tone = if (now) Dusk.Amber else Dusk.Iris)
+                Meter(if (done) 1f else if (now) (if (p == Phase.DELIBERATE) (1f - c.deliberateLeft / c.deliberateTotal.coerceAtLeast(1).toFloat()) else c.phaseProgress) else 0f, tone = if (now) P.sun else P.sky)
                 Spacer(Modifier.height(6.dp))
-                EbText(label, Ink.Eyebrow, color = if (now) Dusk.Amber else Dusk.TextFaint, caps = false)
+                EbText(label, Ink.Eyebrow, color = if (now) P.sun.text else P.inkFaint)
             }
         }
     }
     Row(Modifier.fillMaxWidth().reveal(2), verticalAlignment = Alignment.CenterVertically) {
         Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            PulseDot(Dusk.Bad)
-            EbText(s.t("Camera on - analysed on this phone, nothing saved", "Kamera açık - bu telefonda analiz ediliyor, hiçbir şey kaydedilmiyor"), Ink.Caption, color = Dusk.TextDim)
+            PulseDot(P.coral.fill)
+            EbText(s.t("Camera on - analysed on this phone, nothing saved", "Kamera açık - bu telefonda analiz ediliyor, hiçbir şey kaydedilmiyor"), Ink.Caption, color = P.inkSoft)
         }
     }
 
@@ -143,21 +145,25 @@ private fun Running(c: CalibrationUi, actions: UiActions) {
             EbText(s.t("Just watch. Blink the way you normally do.", "Sadece izle. Her zamanki gibi göz kırp."), Ink.Title, align = TextAlign.Center, modifier = Modifier.reveal(4).fillMaxWidth())
         }
         Phase.READING -> {
-            Glass(Modifier.reveal(3).fillMaxWidth(), glow = Dusk.Amber, padding = androidx.compose.foundation.layout.PaddingValues(22.dp)) {
+            Card(Modifier.reveal(3).fillMaxWidth(), tint = P.sun, padding = PaddingValues(22.dp)) {
                 EbText(passage(s), Ink.Body)
             }
             EbText(s.t("Read at your own pace.", "Kendi hızında oku."), Ink.Title, align = TextAlign.Center, modifier = Modifier.reveal(4).fillMaxWidth())
         }
         Phase.DELIBERATE, Phase.COMPLETE -> {
-            Glass(Modifier.reveal(3).fillMaxWidth(), glow = Dusk.Rose) {
+            Card(Modifier.reveal(3).fillMaxWidth(), tint = P.sky) {
                 Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                     LiveEye(c.liveOpenness)
                     Spacer(Modifier.height(10.dp))
+                    val p = P
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         repeat(c.deliberateTotal) { i ->
                             val lit = i < c.deliberateTotal - c.deliberateLeft
-                            Canvas(Modifier.size(14.dp)) {
-                                if (lit) drawCircle(Dusk.Amber) else drawCircle(Dusk.HairlineStrong, style = androidx.compose.ui.graphics.drawscope.Stroke(1.5.dp.toPx()))
+                            Canvas(Modifier.size(18.dp)) {
+                                if (lit) {
+                                    drawCircle(p.sun.lip, center = center.copy(y = center.y + 1.5.dp.toPx()))
+                                    drawCircle(p.sun.fill)
+                                } else drawCircle(p.card)
                             }
                         }
                     }
@@ -183,7 +189,7 @@ private fun Running(c: CalibrationUi, actions: UiActions) {
     }
 
     Row(Modifier.fillMaxWidth().reveal(6), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        PillButton(s.t("Skip this step", "Bu adımı atla"), { actions.skipCalibrationPhase() }, kind = ButtonKind.Glass, compact = true, modifier = Modifier.weight(1f))
+        PillButton(s.t("Skip this step", "Bu adımı atla"), { actions.skipCalibrationPhase() }, kind = ButtonKind.Soft, compact = true, modifier = Modifier.weight(1f))
         PillButton(s.t("Cancel", "Vazgeç"), { actions.cancelCalibration() }, kind = ButtonKind.Ghost, compact = true, modifier = Modifier.weight(1f))
     }
 }
@@ -191,15 +197,16 @@ private fun Running(c: CalibrationUi, actions: UiActions) {
 /** A small eye that mirrors what the camera sees: open when your eye is open, closed when it blinks. */
 @Composable
 private fun LiveEye(openness: Float?) {
-    Canvas(Modifier.fillMaxWidth().height(110.dp)) {
-        val w = size.width * 0.52f
-        val h = w * 0.5f
+    val p = P
+    val colors = remember(p) { EyeColors.of(p) }
+    Canvas(Modifier.fillMaxWidth().height(120.dp)) {
+        val w = size.width * 0.5f
+        val h = w * 0.62f
         val closure = if (openness == null) 0.55f else (1f - openness).coerceIn(0f, 1f)
         drawEye(
             Rect(Offset((size.width - w) / 2f, (size.height - h) / 2f), Size(w, h)),
-            EyeLook(closure = closure, glow = if (openness == null) 0.3f else 1f),
-            dp = density,
-            withLashes = false,
+            EyeLook(closure = closure, awake = if (openness == null) 0.3f else 1f),
+            colors, dp = density,
         )
     }
 }
@@ -223,7 +230,7 @@ private fun Result(state: UiState, actions: UiActions) {
     val s = S
     val r = state.calibration.result
     if (r == null || !r.hasEnoughSpontaneous) {
-        Glass(Modifier.reveal(1).fillMaxWidth(), glow = Dusk.Amber) {
+        Card(Modifier.reveal(1).fillMaxWidth(), tint = P.sun) {
             EbText(s.t("Not enough to learn from yet", "Henüz öğrenecek kadar veri yok"), Ink.Headline)
             Spacer(Modifier.height(8.dp))
             EbText(s.t("The camera didn't see enough of your natural blinks - often because of dim light or a face too far from the lens. Nothing was saved. Try again in a brighter spot.", "Kamera doğal kırpmalarını yeterince göremedi; çoğunlukla loş ışık ya da lensten uzak bir yüz yüzünden. Hiçbir şey kaydedilmedi. Daha aydınlık bir yerde tekrar dene."), Ink.Body)
@@ -234,21 +241,22 @@ private fun Result(state: UiState, actions: UiActions) {
         return
     }
     val p = state.personal.takeIf { it.isCalibrated } ?: r.profile
-    EbText(s.t("Here is what I learned", "Öğrendiklerim"), Ink.DisplayItalic, modifier = Modifier.reveal(1))
+    EbText(s.t("Here is what I learned", "Öğrendiklerim"), Ink.Lead, modifier = Modifier.reveal(1))
 
     Row(Modifier.reveal(2).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         listOf(ContextProfile.VIDEO to s.t("Watching", "İzlerken"), ContextProfile.READING to s.t("Reading", "Okurken")).forEach { (ctx, label) ->
             val b = r.profile.byContext[ctx]
-            Glass(Modifier.weight(1f), glow = if (ctx == ContextProfile.VIDEO) Dusk.Iris else Dusk.Amber) {
-                EbText(label, Ink.Eyebrow, color = if (ctx == ContextProfile.VIDEO) Dusk.Iris else Dusk.Amber)
+            val hue = if (ctx == ContextProfile.VIDEO) P.sky else P.sun
+            Card(Modifier.weight(1f), tint = hue) {
+                EbText(label, Ink.Eyebrow, color = hue.text)
                 Spacer(Modifier.height(8.dp))
-                EbText(b?.blinksPerMinute?.let { "%.1f".format(it) } ?: "—", Ink.Headline)
-                EbText(s.t("blinks / min", "kırpma / dk"), Ink.Eyebrow, caps = false)
+                EbText(b?.blinksPerMinute?.let { "%.1f".format(it) } ?: "—", Ink.Display)
+                EbText(s.t("blinks / min", "kırpma / dk"), Ink.Caption)
             }
         }
     }
 
-    Glass(Modifier.reveal(3).fillMaxWidth()) {
+    Card(Modifier.reveal(3).fillMaxWidth()) {
         val b = r.baseline
         DetailRow(s.t("Typical gap between blinks", "Kırpmalar arası tipik süre"), "${"%.1f".format(b.medianIbiMs / 1000f)} ${s.t("s", "sn")}")
         Hairline()
@@ -263,27 +271,27 @@ private fun Result(state: UiState, actions: UiActions) {
         DetailRow(s.t("Detector fitted to you", "Sana göre ayarlanan algılayıcı"), if (r.profile.thresholds.personalised) s.t("yes", "evet") else s.t("defaults", "varsayılan"))
     }
 
-    Glass(Modifier.reveal(4).fillMaxWidth()) {
-        EbText(s.t("What is measured and what is guessed", "Neler ölçüldü, neler tahmin"), Ink.Eyebrow, color = Dusk.Amber)
+    Card(Modifier.reveal(4).fillMaxWidth()) {
+        EbText(s.t("What is measured and what is guessed", "Neler ölçüldü, neler tahmin"), Ink.Title)
         Spacer(Modifier.height(10.dp))
         Flow(Modifier.fillMaxWidth()) {
             ContextProfile.entries.forEach { ctx ->
                 val pr = p.baselineFor(ctx)
                 Badge(
                     "${contextShort(ctx, s)}: " + when (pr.provenance) { Provenance.OBSERVED -> s.t("measured", "ölçüldü"); Provenance.ESTIMATED -> s.t("estimated", "tahmin"); Provenance.NONE -> s.t("unknown", "bilinmiyor") },
-                    when (pr.provenance) { Provenance.OBSERVED -> Tone.Iris; Provenance.ESTIMATED -> Tone.Quiet; Provenance.NONE -> Tone.Quiet },
+                    when (pr.provenance) { Provenance.OBSERVED -> Tone.Sky; Provenance.ESTIMATED -> Tone.Quiet; Provenance.NONE -> Tone.Quiet },
                     dot = pr.provenance == Provenance.OBSERVED,
                 )
             }
         }
         Spacer(Modifier.height(8.dp))
-        EbText(s.t("Contexts you haven't been measured in are estimated from your general profile. EyeBlink keeps refining the measured ones, slowly, from reliable camera moments only.", "Ölçülmediğin bağlamlar genel profilinden tahmin edilir. EyeBlink ölçülenleri yalnızca güvenilir kamera anlarından, yavaş yavaş iyileştirmeye devam eder."), Ink.Caption, color = Dusk.TextFaint)
+        EbText(s.t("Contexts you haven't been measured in are estimated from your general profile. EyeBlink keeps refining the measured ones, slowly, from reliable camera moments only.", "Ölçülmediğin bağlamlar genel profilinden tahmin edilir. EyeBlink ölçülenleri yalnızca güvenilir kamera anlarından, yavaş yavaş iyileştirmeye devam eder."), Ink.Caption, color = P.inkFaint)
     }
 
     Column(Modifier.reveal(5), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         PillButton(s.t("Save my profile", "Profilimi kaydet"), { actions.saveCalibration() }, icon = Icon.Check, modifier = Modifier.fillMaxWidth())
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            PillButton(s.t("Retry", "Tekrar dene"), { actions.startCalibration() }, kind = ButtonKind.Glass, compact = true, icon = Icon.Refresh, modifier = Modifier.weight(1f))
+            PillButton(s.t("Retry", "Tekrar dene"), { actions.startCalibration() }, kind = ButtonKind.Soft, compact = true, icon = Icon.Refresh, modifier = Modifier.weight(1f))
             PillButton(s.t("Discard", "Çöpe at"), { actions.resetCalibration() }, kind = ButtonKind.Ghost, compact = true, modifier = Modifier.weight(1f))
         }
     }
@@ -300,6 +308,6 @@ private fun contextShort(c: ContextProfile, s: Strings) = when (c) {
 private fun DetailRow(label: String, value: String) {
     Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
         EbText(label, Ink.Body, modifier = Modifier.weight(1f))
-        EbText(value, Ink.Mono, caps = false, maxLines = 1)
+        EbText(value, Ink.Num, maxLines = 1)
     }
 }

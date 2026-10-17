@@ -19,9 +19,9 @@ import androidx.compose.ui.unit.dp
 import com.eyeblink.app.ui.kit.ButtonKind
 import com.eyeblink.app.ui.kit.Chip
 import com.eyeblink.app.ui.kit.CurveThumb
-import com.eyeblink.app.ui.kit.Dusk
+import com.eyeblink.app.ui.kit.P
 import com.eyeblink.app.ui.kit.EbText
-import com.eyeblink.app.ui.kit.Glass
+import com.eyeblink.app.ui.kit.Card
 import com.eyeblink.app.ui.kit.Hairline
 import com.eyeblink.app.ui.kit.Horizon
 import com.eyeblink.app.ui.kit.Icon
@@ -91,7 +91,7 @@ fun StudioScreen(state: UiState, actions: UiActions, modifier: Modifier = Modifi
             }
         }
 
-        Glass(Modifier.reveal(3).fillMaxWidth()) {
+        Card(Modifier.reveal(3).fillMaxWidth()) {
             SectionHeader(s.t("Timing", "Zamanlama"), null)
             Spacer(Modifier.height(14.dp))
             TimelineEditor(
@@ -99,26 +99,26 @@ fun StudioScreen(state: UiState, actions: UiActions, modifier: Modifier = Modifi
                 labels = Triple(s.t("close", "kapanma"), s.t("black", "siyah"), s.t("open", "açılma")),
             )
             Spacer(Modifier.height(10.dp))
-            EbText(s.t("Drag the white handles. The black part is a pure #000000 hold: on OLED screens those pixels emit no light at all.", "Beyaz tutamaçları sürükle. Siyah bölüm saf #000000 beklemedir: OLED ekranlarda bu pikseller hiç ışık yaymaz."), Ink.Caption, color = Dusk.TextFaint)
+            EbText(s.t("Drag the white handles. The black part is a pure #000000 hold: on OLED screens those pixels emit no light at all.", "Beyaz tutamaçları sürükle. Siyah bölüm saf #000000 beklemedir: OLED ekranlarda bu pikseller hiç ışık yaymaz."), Ink.Caption, color = P.inkFaint)
         }
 
-        Glass(Modifier.reveal(4).fillMaxWidth()) {
+        Card(Modifier.reveal(4).fillMaxWidth()) {
             SectionHeader(s.t("Curves", "Eğriler"), null)
             Spacer(Modifier.height(12.dp))
-            EbText(s.t("Closing", "Kapanırken"), Ink.Eyebrow, color = Dusk.Iris)
+            EbText(s.t("Closing", "Kapanırken"), Ink.Eyebrow, color = P.sky.text)
             Spacer(Modifier.height(8.dp))
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 EaseKind.entries.forEach { k -> CurveThumb(k, easeName(k, s), spec.closeEase == k, { set { it.copy(closeEase = k) } }, Modifier.width(92.dp)) }
             }
             Spacer(Modifier.height(14.dp))
-            EbText(s.t("Opening", "Açılırken"), Ink.Eyebrow, color = Dusk.Amber)
+            EbText(s.t("Opening", "Açılırken"), Ink.Eyebrow, color = P.sun.text)
             Spacer(Modifier.height(8.dp))
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 EaseKind.entries.forEach { k -> CurveThumb(k, easeName(k, s), spec.openEase == k, { set { it.copy(openEase = k) } }, Modifier.width(92.dp)) }
             }
         }
 
-        Glass(Modifier.reveal(5).fillMaxWidth()) {
+        Card(Modifier.reveal(5).fillMaxWidth()) {
             SectionHeader(s.t("Look", "Görünüm"), null)
             Spacer(Modifier.height(6.dp))
             LookSlider(s.t("Eyelid curve", "Göz kapağı kavisi"), spec.curvature, s.t("How strongly the lids bow into an almond", "Kapakların badem şeklini ne kadar alacağı")) { v -> set { it.copy(curvature = v) } }
@@ -130,7 +130,7 @@ fun StudioScreen(state: UiState, actions: UiActions, modifier: Modifier = Modifi
             LookSlider(s.t("Rim light", "Kenar ışığı"), spec.rimLight, s.t("A warm line along the lid. Lit pixels weaken the OLED effect, so it is off by default.", "Kapak boyunca sıcak bir çizgi. Yanan pikseller OLED etkisini azaltır, bu yüzden varsayılan kapalı.")) { v -> set { it.copy(rimLight = v) } }
         }
 
-        Glass(Modifier.reveal(6).fillMaxWidth()) {
+        Card(Modifier.reveal(6).fillMaxWidth()) {
             SettingRow(
                 s.t("Reduced motion", "Azaltılmış hareket"),
                 subtitle = s.t("Fade to black instead of sweeping lids. Also applied automatically when Android's animations are off.", "Süpüren kapaklar yerine siyaha geçiş. Android animasyonları kapalıysa otomatik uygulanır."),
@@ -139,11 +139,11 @@ fun StudioScreen(state: UiState, actions: UiActions, modifier: Modifier = Modifi
 
         PillButton(
             s.t("Reset to natural", "Doğala sıfırla"), { set { BlinkSpec() } },
-            kind = ButtonKind.Glass, icon = Icon.Refresh, modifier = Modifier.reveal(7).fillMaxWidth(),
+            kind = ButtonKind.Soft, icon = Icon.Refresh, modifier = Modifier.reveal(7).fillMaxWidth(),
         )
         EbText(
             s.t("On LCD screens the animation looks the same, but the backlight stays on - EyeBlink never claims otherwise. It is a short visual break, not a replacement for real blinking.", "LCD ekranlarda animasyon aynı görünür ama arka ışık açık kalır; EyeBlink aksini iddia etmez. Kısa bir görsel moladır, gerçek göz kırpmanın yerini tutmaz."),
-            Ink.Caption, color = Dusk.TextFaint, modifier = Modifier.reveal(8).padding(horizontal = 4.dp),
+            Ink.Caption, color = P.inkFaint, modifier = Modifier.reveal(8).padding(horizontal = 4.dp),
         )
     }
 }
@@ -153,9 +153,9 @@ private fun LookSlider(title: String, value: Float, hint: String?, onChange: (Fl
     Column(Modifier.padding(top = 10.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             EbText(title, Ink.BodyStrong, modifier = Modifier.weight(1f))
-            EbText("${(value * 100).roundToInt()}%", Ink.MonoSmall, color = Dusk.Iris, caps = false)
+            EbText("${(value * 100).roundToInt()}%", Ink.NumSmall, color = P.sky.text, caps = false)
         }
-        if (hint != null) EbText(hint, Ink.Caption, color = Dusk.TextDim)
+        if (hint != null) EbText(hint, Ink.Caption, color = P.inkSoft)
         Horizon(value, onChange, steps = 20, description = title)
     }
 }

@@ -16,9 +16,9 @@ import com.eyeblink.app.ui.i18n.fmtMinutes
 import com.eyeblink.app.ui.i18n.fmtSeconds
 import com.eyeblink.app.ui.kit.Badge
 import com.eyeblink.app.ui.kit.ButtonKind
-import com.eyeblink.app.ui.kit.Dusk
+import com.eyeblink.app.ui.kit.P
 import com.eyeblink.app.ui.kit.EbText
-import com.eyeblink.app.ui.kit.Glass
+import com.eyeblink.app.ui.kit.Card
 import com.eyeblink.app.ui.kit.Hairline
 import com.eyeblink.app.ui.kit.Horizon
 import com.eyeblink.app.ui.kit.Icon
@@ -78,7 +78,7 @@ fun RhythmScreen(state: UiState, actions: UiActions, onPage: (Page) -> Unit, mod
                 },
                 Ink.Caption,
             )
-            Glass(Modifier.fillMaxWidth(), padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 18.dp, vertical = 6.dp)) {
+            Card(Modifier.fillMaxWidth(), padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 18.dp, vertical = 6.dp)) {
                 SettingRow(s.t("Fine-tune everything", "Her şeyi ince ayarla"), subtitle = s.t("Simple and automatic by default. Switch on for every control.", "Varsayılan olarak basit ve otomatik. Tüm ayarlar için aç.")) {
                     LidSwitch(st.advanced, { v -> setS { it.copy(advanced = v) } }, description = s.t("Advanced", "Gelişmiş"))
                 }
@@ -86,7 +86,7 @@ fun RhythmScreen(state: UiState, actions: UiActions, onPage: (Page) -> Unit, mod
         }
 
         // ── Micro Blink ─────────────────────────────────────────
-        Glass(Modifier.reveal(2).fillMaxWidth(), glow = Dusk.Iris) {
+        Card(Modifier.reveal(2).fillMaxWidth(), tint = P.sky) {
             SectionHeader(s.t("Micro Blink", "Mikro Göz Kırpma"), null)
             Spacer(Modifier.height(6.dp))
             EbText(s.t("The half-second screen blink.", "Yarım saniyelik ekran göz kırpması."), Ink.Caption)
@@ -110,16 +110,16 @@ fun RhythmScreen(state: UiState, actions: UiActions, onPage: (Page) -> Unit, mod
                 Spacer(Modifier.height(8.dp))
                 com.eyeblink.app.ui.kit.Flow(Modifier.fillMaxWidth()) {
                     state.runtime.factors.filter { it.code != com.eyeblink.core.engine.FactorCode.BASE }.take(4).forEach { f ->
-                        Badge("${factorName(f.code, s)} ×${"%.2f".format(f.multiplier)}", if (f.observed) Tone.Iris else Tone.Quiet, dot = f.observed)
+                        Badge("${factorName(f.code, s)} ×${"%.2f".format(f.multiplier)}", if (f.observed) Tone.Sky else Tone.Quiet, dot = f.observed)
                     }
                 }
                 Spacer(Modifier.height(6.dp))
-                EbText(s.t("Teal means measured by the camera; grey is an estimate.", "Turkuaz kamerayla ölçüldü demek; gri tahmindir."), Ink.Caption, color = Dusk.TextFaint)
+                EbText(s.t("Blue means measured by the camera; grey is an estimate.", "Mavi kamerayla ölçüldü demek; gri tahmindir."), Ink.Caption, color = P.inkFaint)
             }
         }
 
         // ── Smart Rest ──────────────────────────────────────────
-        Glass(Modifier.reveal(3).fillMaxWidth(), glow = Dusk.Amber) {
+        Card(Modifier.reveal(3).fillMaxWidth(), tint = P.sun) {
             SettingRow(
                 s.t("Smart Rest", "Akıllı Mola"),
                 subtitle = s.t("A longer break that asks you to look away - the 20-20-20 idea.", "Uzağa bakmanı isteyen daha uzun bir mola: 20-20-20 fikri."),
@@ -149,14 +149,14 @@ fun RhythmScreen(state: UiState, actions: UiActions, onPage: (Page) -> Unit, mod
                 val dur = st.rest.effectiveDurationSec
                 Row(Modifier.fillMaxWidth()) {
                     EbText(s.t("Length", "Süre"), Ink.BodyStrong, modifier = Modifier.weight(1f))
-                    EbText(fmtSeconds(dur, s), Ink.MonoSmall, color = Dusk.Amber, caps = false)
+                    EbText(fmtSeconds(dur, s), Ink.NumSmall, color = P.sun.text, caps = false)
                 }
                 Horizon(
                     ((dur - 5) / 115f).coerceIn(0f, 1f), { x ->
                         val v = (5 + x * 115).roundToInt()
                         setS { it.copy(rest = if (it.rest.style == RestStyle.BLACKOUT) it.rest.copy(blackoutDurationSec = v) else it.rest.copy(durationSec = v)) }
                     },
-                    format = { fmtSeconds((5 + it * 115).roundToInt(), s) }, description = s.t("Rest length", "Mola süresi"), accent = Dusk.Amber,
+                    format = { fmtSeconds((5 + it * 115).roundToInt(), s) }, description = s.t("Rest length", "Mola süresi"), accent = P.sun,
                 )
                 Spacer(Modifier.height(4.dp))
                 EbText(s.t("When it ends", "Bittiğinde"), Ink.Eyebrow, caps = false)
@@ -165,16 +165,16 @@ fun RhythmScreen(state: UiState, actions: UiActions, onPage: (Page) -> Unit, mod
                     setS { it.copy(rest = it.rest.copy(confirm = ConfirmMode.entries[i])) }
                 })
                 Spacer(Modifier.height(6.dp))
-                EbText(s.t("Blink needs the camera; without it EyeBlink asks for a tap instead. One blink or one tap is always enough, and you can skip any rest.", "Göz kırpma için kamera gerekir; yoksa EyeBlink dokunma ister. Tek bir kırpma ya da dokunuş her zaman yeter ve her molayı atlayabilirsin."), Ink.Caption, color = Dusk.TextFaint)
+                EbText(s.t("Blink needs the camera; without it EyeBlink asks for a tap instead. One blink or one tap is always enough, and you can skip any rest.", "Göz kırpma için kamera gerekir; yoksa EyeBlink dokunma ister. Tek bir kırpma ya da dokunuş her zaman yeter ve her molayı atlayabilirsin."), Ink.Caption, color = P.inkFaint)
             }
         }
 
         // ── Camera ──────────────────────────────────────────────
-        Glass(Modifier.reveal(4).fillMaxWidth()) {
+        Card(Modifier.reveal(4).fillMaxWidth()) {
             SectionHeader(s.t("Camera", "Kamera"), null, trailing = {
                 Badge(
                     if (state.runtime.triggerMode == TriggerMode.CAMERA_ASSISTED) s.t("observing", "gözlemliyor") else s.t("timer only", "yalnızca zamanlayıcı"),
-                    if (state.runtime.triggerMode == TriggerMode.CAMERA_ASSISTED) Tone.Iris else Tone.Quiet,
+                    if (state.runtime.triggerMode == TriggerMode.CAMERA_ASSISTED) Tone.Sky else Tone.Quiet,
                 )
             })
             Spacer(Modifier.height(12.dp))
@@ -194,15 +194,15 @@ fun RhythmScreen(state: UiState, actions: UiActions, onPage: (Page) -> Unit, mod
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 PillButton(
                     if (state.personal.isCalibrated) s.t("Recalibrate", "Yeniden kalibre et") else s.t("Calibrate", "Kalibre et"),
-                    { onPage(Page.CALIBRATION) }, kind = ButtonKind.Glass, icon = Icon.Eye, compact = true,
+                    { onPage(Page.CALIBRATION) }, kind = ButtonKind.Soft, icon = Icon.Eye, compact = true,
                 )
             }
             Spacer(Modifier.height(10.dp))
-            EbText(s.t("Frames are analysed on this phone and thrown away. No video is saved and nothing is uploaded. A visible indicator shows whenever the camera is on.", "Kareler bu telefonda analiz edilip atılır. Video kaydedilmez, hiçbir şey yüklenmez. Kamera açıkken görünür bir gösterge belirir."), Ink.Caption, color = Dusk.TextFaint)
+            EbText(s.t("Frames are analysed on this phone and thrown away. No video is saved and nothing is uploaded. A visible indicator shows whenever the camera is on.", "Kareler bu telefonda analiz edilip atılır. Video kaydedilmez, hiçbir şey yüklenmez. Kamera açıkken görünür bir gösterge belirir."), Ink.Caption, color = P.inkFaint)
         }
 
         // ── Playback ────────────────────────────────────────────
-        Glass(Modifier.reveal(5).fillMaxWidth()) {
+        Card(Modifier.reveal(5).fillMaxWidth()) {
             SectionHeader(s.t("Your video", "Videon"), null)
             Spacer(Modifier.height(4.dp))
             SettingRow(s.t("Pause during breaks", "Molalarda duraklat"), subtitle = s.t("Only when EyeBlink can prove the pause worked for that app.", "Yalnızca EyeBlink o uygulamada duraklatmanın işlediğini kanıtlayabiliyorsa.")) {
@@ -221,13 +221,13 @@ fun RhythmScreen(state: UiState, actions: UiActions, onPage: (Page) -> Unit, mod
                     setS { it.copy(playback = it.playback.copy(fallback = NoPauseFallback.entries[i])) }
                 })
                 Spacer(Modifier.height(6.dp))
-                EbText(s.t("Not every app lets another app pause it. This is what happens when it doesn't.", "Her uygulama başka bir uygulamanın kendini duraklatmasına izin vermez. İzin vermediğinde olacak şey bu."), Ink.Caption, color = Dusk.TextFaint)
+                EbText(s.t("Not every app lets another app pause it. This is what happens when it doesn't.", "Her uygulama başka bir uygulamanın kendini duraklatmasına izin vermez. İzin vermediğinde olacak şey bu."), Ink.Caption, color = P.inkFaint)
             }
         }
 
         // ── Politeness (advanced) ───────────────────────────────
         if (st.advanced) {
-            Glass(Modifier.reveal(6).fillMaxWidth()) {
+            Card(Modifier.reveal(6).fillMaxWidth()) {
                 SectionHeader(s.t("Good manners", "Nezaket"), null)
                 Spacer(Modifier.height(4.dp))
                 SettingRow(s.t("Between any two breaks", "İki mola arası en az"), subtitle = null) {
