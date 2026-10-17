@@ -33,6 +33,8 @@
 # class keeps the method as it is.
 -keep class com.google.common.flogger.** { *; }
 -dontwarn com.google.common.flogger.**
+# Belt and braces for the same thing: nothing in FluentLogger may be inlined into its callers.
+-neverinline class com.google.common.flogger.FluentLogger { *; }
 
 # Keep source file + line numbers for readable production stack traces, but
 # hide the original source file name from the class file.
