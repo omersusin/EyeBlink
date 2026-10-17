@@ -147,7 +147,7 @@ Signing secrets, if you have them, are read from `keystore.properties` (git-igno
 EyeBlink is deliberately not Material. The page is a pale sky (or deep indigo at night), cards and buttons are flat and stand on a darker *lip* that they sink
 onto when pressed - a lid coming down - and nothing glows or is translucent. Five hues (sun, sky, mint, coral, grape) carry all the colour; text on a bright fill is always navy.
 Headlines and numerals are set in Bricolage Grotesque, reading text in Figtree. The mascot eye on the home screen, the logo, the launcher icon and the status-bar glyph are one drawing:
-`python3 docs/brand/build_brand.py` writes them all.
+`python3 docs/brand/build_brand.py` writes them all, and `docs/brand/refresh_docs.py` rebuilds the screenshots, the tour and (with `render.mjs`) the banner from the design lab.
 
 ## Credits and licenses
 

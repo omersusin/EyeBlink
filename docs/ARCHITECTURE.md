@@ -91,7 +91,7 @@ there is no shared mutable state to lock. It publishes an immutable `UiState` as
 ### What EyeBlink may read
 
 * **Accessibility service** - `canRetrieveWindowContent` is `false`. It reads only the package name, the class name, whether
-  the source is a password field, and event *types* (scroll, text change, window change). It never reads text.
+  the source is a password field, and which of three event *types* happened: a window changed, something scrolled, a field took focus. It is not subscribed to text changes and never reads text.
 * **Notification listener** - used for media sessions and to know that a navigation notification is active.
 * **Camera** - frames are analysed in memory by MediaPipe and reduced to a `FaceFrame` (eye openness, quality, luma). Pixels never leave `camera/`.
 
