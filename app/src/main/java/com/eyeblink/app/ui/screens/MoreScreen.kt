@@ -27,15 +27,14 @@ import com.eyeblink.app.ui.kit.androidxClickable
 import com.eyeblink.app.ui.kit.S
 import com.eyeblink.app.ui.kit.ScreenColumn
 import com.eyeblink.app.ui.kit.SectionHeader
-import com.eyeblink.app.ui.kit.Tide
+import com.eyeblink.app.ui.kit.LanguageChip
 import com.eyeblink.app.ui.kit.reveal
 import com.eyeblink.app.ui.state.Page
 import com.eyeblink.app.ui.state.UiActions
 import com.eyeblink.app.ui.state.UiState
-import com.eyeblink.core.model.Language
 
 @Composable
-fun MoreScreen(state: UiState, actions: UiActions, onPage: (Page) -> Unit, modifier: Modifier = Modifier) {
+fun MoreScreen(state: UiState, actions: UiActions, onPage: (Page) -> Unit, onLanguage: () -> Unit, modifier: Modifier = Modifier) {
     val s = S
     ScreenColumn(modifier) {
         Box(Modifier.reveal(0)) { SectionHeader(s.t("More", "Daha fazla"), s.t("Everything else", "Geri kalan her şey")) }
@@ -63,11 +62,14 @@ fun MoreScreen(state: UiState, actions: UiActions, onPage: (Page) -> Unit, modif
         }
 
         Glass(Modifier.reveal(5).fillMaxWidth()) {
-            SectionHeader(s.t("Language", "Dil"), null)
-            Spacer(Modifier.height(12.dp))
-            Tide(listOf(s.t("System", "Sistem"), "English", "Türkçe"), state.settings.language.ordinal, { i ->
-                actions.update { it.copy(language = Language.entries[i]) }
-            })
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f).padding(end = 12.dp)) {
+                    EbText(s.t("Language", "Dil"), Ink.Title)
+                    Spacer(Modifier.height(2.dp))
+                    EbText(s.t("Tap to pick from the list.", "Listeden seçmek için dokun."), Ink.Caption)
+                }
+                LanguageChip(languageLabel(state.settings.language, s), onLanguage)
+            }
         }
 
         Glass(Modifier.reveal(6).fillMaxWidth(), glow = Dusk.Bad) {

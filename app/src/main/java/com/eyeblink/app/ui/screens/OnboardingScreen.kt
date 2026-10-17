@@ -49,17 +49,16 @@ import com.eyeblink.app.ui.kit.PhoneFrame
 import com.eyeblink.app.ui.kit.PillButton
 import com.eyeblink.app.ui.kit.RevealScope
 import com.eyeblink.app.ui.kit.S
-import com.eyeblink.app.ui.kit.Tide
+import com.eyeblink.app.ui.kit.LanguageChip
 import com.eyeblink.app.ui.kit.Tone
 import com.eyeblink.app.ui.kit.reveal
 import com.eyeblink.app.ui.state.PermissionKind
 import com.eyeblink.app.ui.state.UiActions
 import com.eyeblink.app.ui.state.UiState
-import com.eyeblink.core.model.Language
 
 /** First run: who EyeBlink is, how it behaves, which apps, what to allow. Every step can be skipped past. */
 @Composable
-fun OnboardingScreen(state: UiState, actions: UiActions, initialStep: Int = 0, modifier: Modifier = Modifier) {
+fun OnboardingScreen(state: UiState, actions: UiActions, onLanguage: () -> Unit, initialStep: Int = 0, modifier: Modifier = Modifier) {
     val s = S
     var step by rememberSaveable { mutableStateOf(initialStep.coerceIn(0, LAST_STEP)) }
     val insets = LocalInsets.current
@@ -73,7 +72,7 @@ fun OnboardingScreen(state: UiState, actions: UiActions, initialStep: Int = 0, m
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
                         when (shown) {
-                            0 -> Welcome(state, actions)
+                            0 -> Welcome(state, onLanguage)
                             1 -> HowItWorks(state)
                             2 -> PickApps(state, actions)
                             3 -> Allow(state, actions)
@@ -129,7 +128,7 @@ private fun Dots(step: Int) {
 // ── 0 · welcome ─────────────────────────────────────────────────
 
 @Composable
-private fun ColumnScope.Welcome(state: UiState, actions: UiActions) {
+private fun ColumnScope.Welcome(state: UiState, onLanguage: () -> Unit) {
     val s = S
     Spacer(Modifier.height(8.dp))
     Box(Modifier.reveal(0).fillMaxWidth(), contentAlignment = Alignment.Center) { EyeHero(Modifier.fillMaxWidth(0.92f), description = s.t("The EyeBlink eye. Tap it to blink.", "EyeBlink gözü. Kırpması için dokun.")) }
@@ -146,10 +145,9 @@ private fun ColumnScope.Welcome(state: UiState, actions: UiActions) {
             Ink.Body, color = Dusk.TextDim, align = TextAlign.Center,
         )
     }
-    Column(Modifier.reveal(2).fillMaxWidth().padding(top = 6.dp)) {
-        EbText(s.t("Language", "Dil"), Ink.Eyebrow, color = Dusk.TextDim)
-        Spacer(Modifier.height(8.dp))
-        Tide(listOf(s.t("System", "Sistem"), "English", "Türkçe"), state.settings.language.ordinal, { i -> actions.update { it.copy(language = Language.entries[i]) } })
+    Row(Modifier.reveal(2).fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        EbText(s.t("Language", "Dil"), Ink.Eyebrow, color = Dusk.TextDim, modifier = Modifier.weight(1f))
+        LanguageChip(languageLabel(state.settings.language, s), onLanguage)
     }
 }
 

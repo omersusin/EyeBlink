@@ -31,6 +31,7 @@ import com.eyeblink.app.ui.screens.AboutScreen
 import com.eyeblink.app.ui.screens.CalibrationScreen
 import com.eyeblink.app.ui.screens.DiagnosticsScreen
 import com.eyeblink.app.ui.screens.HomeScreen
+import com.eyeblink.app.ui.screens.LanguageSheet
 import com.eyeblink.app.ui.screens.AppPickerSheet
 import com.eyeblink.app.ui.screens.AppsScreen
 import com.eyeblink.app.ui.screens.MoreScreen
@@ -67,65 +68,87 @@ fun EyeBlinkApp(
 ) {
     EbTheme(strings, reducedMotion, insets) {
         Backdrop {
-            if (!state.settings.onboardingDone) {
-                OnboardingScreen(state, actions, initialStep = onboardingStep)
-                return@Backdrop
-            }
-            var tabIndex by rememberSaveable { mutableStateOf(initialTab.ordinal) }
-            var page by remember { mutableStateOf(initialPage) }
-            var picker by remember { mutableStateOf(false) }
-            val tab = Tab.entries[tabIndex]
-
-            backHandler(page != null || picker) { if (picker) picker = false else page = null }
+            var languageSheet by remember { mutableStateOf(false) }
+            val openLanguage = { languageSheet = true }
 
             Box(Modifier.fillMaxSize()) {
-                BlinkTransition(target = page ?: tab, modifier = Modifier.fillMaxSize()) { dest ->
-                    when (dest) {
-                        is Tab -> when (dest) {
-                            Tab.TODAY -> HomeScreen(state, actions, onTab = { tabIndex = it.ordinal }, onPage = { page = it })
-                            Tab.BLINK -> StudioScreen(state, actions)
-                            Tab.RHYTHM -> RhythmScreen(state, actions, onPage = { page = it })
-                            Tab.APPS -> AppsScreen(state, actions, onPick = { picker = true })
-                            Tab.MORE -> MoreScreen(state, actions, onPage = { page = it })
-                            else -> Placeholder(dest.name)
-                        }
-                        is Page -> when (dest) {
-                            Page.CALIBRATION -> CalibrationScreen(state, actions, onBack = { page = null })
-                            Page.NIGHT -> NightScreen(state, actions, onBack = { page = null }, onPage = { page = it })
-                            Page.POWER -> PowerScreen(state, actions, onBack = { page = null })
-                            Page.DIAGNOSTICS -> DiagnosticsScreen(state, actions, onBack = { page = null })
-                            Page.STATS -> StatsScreen(state, actions, onBack = { page = null })
-                            Page.PRIVACY -> PrivacyScreen(state, actions, onBack = { page = null })
-                            Page.ABOUT -> AboutScreen(state, actions, onBack = { page = null })
-                        }
-                        else -> Unit
-                    }
+                if (!state.settings.onboardingDone) {
+                    OnboardingScreen(state, actions, initialStep = onboardingStep, onLanguage = openLanguage)
+                } else {
+                    MainShell(state, actions, insets, initialTab, initialPage, openLanguage, backHandler)
                 }
+                // Hosted here, above everything, so the same list serves onboarding and More.
+                BottomSheet(visible = languageSheet, onDismiss = { languageSheet = false }) { LanguageSheet(state, actions) { languageSheet = false } }
+            }
+            backHandler(languageSheet) { languageSheet = false }
+        }
+    }
+}
 
-                if (page == null && !picker) {
-                    // Content fades into black before it reaches the dock, so nothing shows through it.
-                    Box(
-                        Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(150.dp + insets.bottom)
-                            .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.82f), Color.Black))),
-                    )
-                    val s = S
-                    Dock(
-                        items = listOf(
-                            DockItem(Icon.Eye, s.t("Today", "Bugün")),
-                            DockItem(Icon.Sliders, s.t("Blink", "Kırpma")),
-                            DockItem(Icon.Pulse, s.t("Rhythm", "Ritim")),
-                            DockItem(Icon.Grid, s.t("Apps", "Uygulamalar")),
-                            DockItem(Icon.Dots, s.t("More", "Daha")),
-                        ),
-                        selected = tabIndex,
-                        onSelect = { tabIndex = it },
-                        modifier = Modifier.align(Alignment.BottomCenter).padding(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 14.dp + insets.bottom),
-                    )
+/** The five tabs, the pages reached from More, the dock and the app picker. */
+@Composable
+private fun MainShell(
+    state: UiState,
+    actions: UiActions,
+    insets: Insets,
+    initialTab: Tab,
+    initialPage: Page?,
+    onLanguage: () -> Unit,
+    backHandler: @Composable (enabled: Boolean, onBack: () -> Unit) -> Unit,
+) {
+    var tabIndex by rememberSaveable { mutableStateOf(initialTab.ordinal) }
+    var page by remember { mutableStateOf(initialPage) }
+    var picker by remember { mutableStateOf(false) }
+    val tab = Tab.entries[tabIndex]
+
+    backHandler(page != null || picker) { if (picker) picker = false else page = null }
+
+    Box(Modifier.fillMaxSize()) {
+        BlinkTransition(target = page ?: tab, modifier = Modifier.fillMaxSize()) { dest ->
+            when (dest) {
+                is Tab -> when (dest) {
+                    Tab.TODAY -> HomeScreen(state, actions, onTab = { tabIndex = it.ordinal }, onPage = { page = it })
+                    Tab.BLINK -> StudioScreen(state, actions)
+                    Tab.RHYTHM -> RhythmScreen(state, actions, onPage = { page = it })
+                    Tab.APPS -> AppsScreen(state, actions, onPick = { picker = true })
+                    Tab.MORE -> MoreScreen(state, actions, onPage = { page = it }, onLanguage = onLanguage)
+                    else -> Placeholder(dest.name)
                 }
-
-                BottomSheet(visible = picker, onDismiss = { picker = false }) { AppPickerSheet(state, actions) { picker = false } }
+                is Page -> when (dest) {
+                    Page.CALIBRATION -> CalibrationScreen(state, actions, onBack = { page = null })
+                    Page.NIGHT -> NightScreen(state, actions, onBack = { page = null }, onPage = { page = it })
+                    Page.POWER -> PowerScreen(state, actions, onBack = { page = null })
+                    Page.DIAGNOSTICS -> DiagnosticsScreen(state, actions, onBack = { page = null })
+                    Page.STATS -> StatsScreen(state, actions, onBack = { page = null })
+                    Page.PRIVACY -> PrivacyScreen(state, actions, onBack = { page = null })
+                    Page.ABOUT -> AboutScreen(state, actions, onBack = { page = null })
+                }
+                else -> Unit
             }
         }
+
+        if (page == null && !picker) {
+            // Content fades into black before it reaches the dock, so nothing shows through it.
+            Box(
+                Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(150.dp + insets.bottom)
+                    .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.82f), Color.Black))),
+            )
+            val s = S
+            Dock(
+                items = listOf(
+                    DockItem(Icon.Eye, s.t("Today", "Bugün")),
+                    DockItem(Icon.Sliders, s.t("Blink", "Kırpma")),
+                    DockItem(Icon.Pulse, s.t("Rhythm", "Ritim")),
+                    DockItem(Icon.Grid, s.t("Apps", "Uygulamalar")),
+                    DockItem(Icon.Dots, s.t("More", "Daha")),
+                ),
+                selected = tabIndex,
+                onSelect = { tabIndex = it },
+                modifier = Modifier.align(Alignment.BottomCenter).padding(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 14.dp + insets.bottom),
+            )
+        }
+
+        BottomSheet(visible = picker, onDismiss = { picker = false }) { AppPickerSheet(state, actions) { picker = false } }
     }
 }
 

@@ -122,4 +122,11 @@ class SettingsTest {
         assertEquals(AppCategory.OTHER, KnownApps.categoryOf("some.random.app"))
         assertTrue("both TikTok package names are listed", KnownApps.catalog.count { it.label == "TikTok" } == 2)
     }
+
+    @Test
+    fun `the app speaks English until told otherwise`() {
+        assertEquals(Language.EN, EyeBlinkSettings().language)
+        // A phone set to Turkish does not change that: language is the user's choice, made in the app.
+        assertEquals(Language.EN, SettingsCodec.decode(null).language)
+    }
 }

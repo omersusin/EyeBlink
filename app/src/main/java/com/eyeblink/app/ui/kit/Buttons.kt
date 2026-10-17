@@ -124,3 +124,25 @@ fun Chip(
         EbText(text, Ink.Caption, color = fg, maxLines = 1)
     }
 }
+
+/**
+ * The language control: a small pill that says which language is on and opens the list when tapped.
+ * It is a chip, not a toggle, so it keeps working however many languages the list grows to.
+ */
+@Composable
+fun LanguageChip(label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val (source, press) = rememberPress()
+    val shape = RoundedCornerShape(50)
+    Row(
+        modifier.pressScale(press.value, 0.05f).glass(shape, strength = 0.9f)
+            .semantics { role = Role.Button; contentDescription = label }
+            .clickable(interactionSource = source, indication = null, onClick = onClick)
+            .padding(start = 12.dp, end = 10.dp, top = 8.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(7.dp),
+    ) {
+        Ico(Icon.Globe, size = 17.dp, color = Dusk.Iris)
+        EbText(label, Ink.Caption, color = Dusk.Text, maxLines = 1)
+        Ico(Icon.ChevronDown, size = 15.dp, color = Dusk.TextDim)
+    }
+}

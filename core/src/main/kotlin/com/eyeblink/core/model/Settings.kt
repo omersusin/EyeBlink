@@ -252,7 +252,8 @@ data class AppProfile(
 @Serializable
 data class EyeBlinkSettings(
     val onboardingDone: Boolean = false,
-    val language: Language = Language.SYSTEM,
+    /** English is the app's main language; following the phone's language is a choice, not the default. */
+    val language: Language = Language.EN,
     val mode: OperatingMode = OperatingMode.ROOTLESS,
     /** Simple: sensible automatic behaviour. Advanced exposes every knob. */
     val advanced: Boolean = false,
