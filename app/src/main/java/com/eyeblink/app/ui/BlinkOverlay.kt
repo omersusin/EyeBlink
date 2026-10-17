@@ -2,7 +2,6 @@ package com.eyeblink.app.ui
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.animation.core.asState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -15,7 +14,10 @@ import com.eyeblink.app.core.BlinkConfig
 
 @Composable
 fun BlinkOverlay(animator: BlinkAnimator, config: BlinkConfig) {
-    val p by animator.progress.asState()
+    // Animatable is itself a State<Float> backed by snapshot state, so reading
+    // .value in a composable subscribes to it. (Animatable.asState() does not
+    // exist; there is no such extension for this type.)
+    val p = animator.progress.value
     Canvas(Modifier.fillMaxSize()) {
         val w = size.width
         val h = size.height

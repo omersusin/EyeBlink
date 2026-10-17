@@ -19,8 +19,10 @@ class PlaybackController(private val context: Context) {
     private val sessionManager: MediaSessionManager? =
         context.getSystemService(Context.MEDIA_SESSION_SERVICE) as? MediaSessionManager
 
+    // `MediaController.isActive` is a hidden system API, so select on the public
+    // playbackState instead: a session with no state cannot be controlled.
     private val controller: MediaController? get() = try {
-        sessionManager?.getActiveSessions(null)?.firstOrNull { it.isActive }
+        sessionManager?.getActiveSessions(null)?.firstOrNull { it.playbackState != null }
     } catch (e: SecurityException) {
         Log.w(TAG, "no MEDIA_CONTENT_CONTROL grant: ${e.message}")
         null

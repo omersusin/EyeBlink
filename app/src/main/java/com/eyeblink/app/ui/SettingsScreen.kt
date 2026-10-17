@@ -83,10 +83,10 @@ fun SettingsScreen(
         Spacer(Modifier.height(4.dp))
         BasicText("Appearance", style = TextStyle(color = EyeBlinkColors.textDim, fontSize = 13.sp))
 
-        SliderRow("Eyelid curve", config.curve, 0f, 1f) {
+        SliderRow("Eyelid curve", config.curve) {
             onConfigChange(config.copy(curve = it))
         }
-        SliderRow("Darken", config.darkenStrength, 0f, 1f) {
+        SliderRow("Darken", config.darkenStrength) {
             onConfigChange(config.copy(darkenStrength = it))
         }
 

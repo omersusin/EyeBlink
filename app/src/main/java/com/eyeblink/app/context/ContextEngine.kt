@@ -35,7 +35,12 @@ class ContextEngine(private val context: Context) {
     /** False when the screen is off or the device is locked. */
     fun isScreenOn(): Boolean = powerManager?.isInteractive ?: false
 
-    fun isDeviceUnlocked(): Boolean = keyguardManager?.isDeviceUnlocked ?: false
+    /**
+     * `KeyguardManager.isDeviceUnlocked()` is a hidden/system API, so it is not
+     * available to apps. `isDeviceLocked()` is public since API 16 and is the
+     * supported equivalent (inverted).
+     */
+    fun isDeviceUnlocked(): Boolean = keyguardManager?.let { !it.isDeviceLocked } ?: false
 
     /**
      * Safe to interrupt only when: screen on, device unlocked, and no blocking

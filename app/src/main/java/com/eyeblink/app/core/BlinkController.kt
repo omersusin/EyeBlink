@@ -1,5 +1,6 @@
 package com.eyeblink.app.core
 
+import com.eyeblink.app.animation.BlinkAnimator
 import com.eyeblink.app.context.ContextEngine
 import com.eyeblink.app.playback.PlaybackController
 import kotlinx.coroutines.CoroutineScope
