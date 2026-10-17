@@ -6,9 +6,9 @@
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">false</item>
-        <item name="android:enforceNavigationBarContrast">false</item>
         <item name="android:windowDrawsSystemBarBackgrounds">true</item>
-        <!-- The launch splash is true black with the icon, so opening the app is already part of the design. -->
+        <item name="android:enforceNavigationBarContrast">false</item>
+        <!-- The launch splash is part of the design too. -->
         <item name="android:windowSplashScreenBackground">@android:color/black</item>
     </style>
 </resources>

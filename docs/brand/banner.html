@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>EyeBlink banner</title>
+<!--
+  The README banner, 1920 x 1080 (16:9). Rendered with Chromium; see docs/brand/render.mjs.
+  Everything here is the app's own design language: true black, an aqua iris, an amber seam,
+  Instrument Serif for the human moments and DM Mono for the technical ones.
+-->
+<style>
+  @font-face { font-family: "Instrument Serif"; src: url("../../app/src/main/res/font/instrument_serif_regular.ttf"); font-style: normal; }
+  @font-face { font-family: "Instrument Serif"; src: url("../../app/src/main/res/font/instrument_serif_italic.ttf"); font-style: italic; }
+  @font-face { font-family: "Instrument Sans"; src: url("../../app/src/main/res/font/instrument_sans_regular.ttf"); font-weight: 400; }
+  @font-face { font-family: "Instrument Sans"; src: url("../../app/src/main/res/font/instrument_sans_medium.ttf"); font-weight: 500; }
+  @font-face { font-family: "Instrument Sans"; src: url("../../app/src/main/res/font/instrument_sans_semibold.ttf"); font-weight: 600; }
+  @font-face { font-family: "DM Mono"; src: url("../../app/src/main/res/font/dm_mono_regular.ttf"); font-weight: 400; }
+  @font-face { font-family: "DM Mono"; src: url("../../app/src/main/res/font/dm_mono_medium.ttf"); font-weight: 500; }
+
+  :root { --iris:#52E6D2; --iris-deep:#14A9BC; --amber:#FFBC70; --rose:#FF6B8E; --violet:#8E83FF; --text:#F3EFE8; --dim:#B4B0BB; --faint:#7C7986; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1920px; height: 1080px; background: #000; overflow: hidden; }
+  body { position: relative; font-family: "Instrument Sans", system-ui, sans-serif; color: var(--text); -webkit-font-smoothing: antialiased; }
+
+  /* the room: true black with three faint lights drifting in it */
+  .aurora { position: absolute; inset: 0;
+    background:
+      radial-gradient(1100px 900px at 8% -6%, rgba(82,230,210,.20), transparent 62%),
+      radial-gradient(900px 800px at 98% 60%, rgba(255,188,112,.12), transparent 64%),
+      radial-gradient(1100px 900px at 20% 112%, rgba(142,131,255,.11), transparent 64%),
+      radial-gradient(700px 700px at 74% 22%, rgba(20,169,188,.10), transparent 66%); }
+  .grain { position: absolute; inset: 0; opacity: .10; mix-blend-mode: overlay; pointer-events: none; }
+
+  /* a hairline almond behind everything: the eye, drawn very quietly */
+  .eye-bg { position: absolute; left: -140px; top: 120px; width: 1400px; height: 840px; opacity: .55; }
+
+  .left { position: absolute; left: 132px; top: 100px; width: 960px; }
+  .brand { display: flex; align-items: center; gap: 22px; }
+  .brand img { width: 84px; height: 84px; border-radius: 22px; box-shadow: 0 0 0 1px rgba(255,255,255,.08), 0 18px 50px rgba(82,230,210,.18); }
+  .brand span { font-family: "Instrument Serif", serif; font-size: 58px; letter-spacing: -1px; }
+  .brand span i { color: var(--amber); }
+  .eyebrow { margin-top: 62px; font-family: "DM Mono", monospace; font-weight: 500; font-size: 22px; letter-spacing: 6px; color: var(--amber); text-transform: uppercase; }
+  h1 { margin-top: 20px; font-family: "Instrument Serif", serif; font-weight: 400; font-size: 148px; line-height: .96; letter-spacing: -4.5px; }
+  h1 i { background: linear-gradient(95deg, var(--amber) 0%, var(--rose) 72%); -webkit-background-clip: text; background-clip: text; color: transparent; padding-right: 14px; }
+  .lede { margin-top: 34px; width: 840px; font-size: 34px; line-height: 1.42; color: var(--dim); font-weight: 400; }
+  .lede b { color: var(--text); font-weight: 500; }
+  .chips { margin-top: 40px; display: flex; flex-wrap: wrap; gap: 14px; width: 900px; }
+  .chip { font-family: "DM Mono", monospace; font-size: 20px; letter-spacing: 2px; text-transform: uppercase; color: var(--dim);
+    padding: 13px 22px; border-radius: 40px; background: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.02)); box-shadow: inset 0 0 0 1px rgba(255,255,255,.09); }
+  .chip.hot { color: var(--iris); box-shadow: inset 0 0 0 1px rgba(82,230,210,.35); background: rgba(82,230,210,.10); }
+
+  /* the lid seam: a line of warm light, brightest in the middle */
+  .seam { position: absolute; left: 132px; bottom: 100px; width: 820px; height: 3px; border-radius: 2px;
+    background: linear-gradient(90deg, transparent, var(--amber) 22%, var(--rose) 50%, var(--amber) 78%, transparent);
+    box-shadow: 0 0 36px 4px rgba(255,140,100,.45); }
+  .seam-note { position: absolute; left: 132px; bottom: 52px; font-family: "DM Mono", monospace; font-size: 18px; letter-spacing: 3px; color: var(--faint); text-transform: uppercase; }
+
+  .phone { position: absolute; border-radius: 64px; padding: 11px; background: #06080b;
+    box-shadow: 0 0 0 1.5px rgba(255,255,255,.14), inset 0 0 0 1px rgba(255,255,255,.05), 0 70px 140px rgba(0,0,0,.75), 0 0 150px rgba(82,230,210,.16); }
+  .phone img { display: block; width: 100%; height: 100%; border-radius: 54px; object-fit: cover; object-position: top; }
+  .p1 { width: 470px; height: 1004px; left: 1052px; top: 150px; transform: rotate(-3.5deg); z-index: 3; }
+  .p2 { width: 450px; height: 962px; left: 1388px; top: 62px; transform: rotate(5deg); z-index: 2; opacity: .96; }
+</style>
+</head>
+<body>
+  <div class="aurora"></div>
+
+  <svg class="eye-bg" viewBox="0 0 1400 840" fill="none" aria-hidden="true">
+    <defs>
+      <linearGradient id="lid" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#FFBC70" stop-opacity="0"/><stop offset=".35" stop-color="#FFBC70" stop-opacity=".55"/>
+        <stop offset=".5" stop-color="#FF6B8E" stop-opacity=".6"/><stop offset=".65" stop-color="#FFBC70" stop-opacity=".55"/><stop offset="1" stop-color="#FFBC70" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    <path d="M40 420 C260 120 1140 120 1360 420" stroke="url(#lid)" stroke-width="3"/>
+    <path d="M40 420 C260 720 1140 720 1360 420" stroke="#52E6D2" stroke-opacity=".16" stroke-width="2"/>
+    <circle cx="700" cy="420" r="196" stroke="#52E6D2" stroke-opacity=".10" stroke-width="2"/>
+    <circle cx="700" cy="420" r="300" stroke="#52E6D2" stroke-opacity=".06" stroke-width="2"/>
+  </svg>
+
+  <svg class="grain" width="1920" height="1080"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" stitchTiles="stitch"/><feColorMatrix values="0 0 0 0 .5  0 0 0 0 .5  0 0 0 0 .5  0 0 0 1.2 -.1"/></filter><rect width="100%" height="100%" filter="url(#n)"/></svg>
+
+  <div class="left">
+    <div class="brand"><img src="logo.svg" alt=""><span>Eye<i>Blink</i></span></div>
+    <div class="eyebrow">Smart eye comfort for Android</div>
+    <h1>Give your eyes<br><i>the pause back.</i></h1>
+    <p class="lede">A half-second lid over your screen, a proper rest when it matters, and a video that <b>waits for you</b> - only when it can prove it paused.</p>
+    <div class="chips">
+      <span class="chip hot">Camera-assisted · camera-free</span><span class="chip">Shizuku · Root · LSPosed</span>
+      <span class="chip">Türkçe · English</span><span class="chip hot">On-device · no network</span>
+    </div>
+  </div>
+
+  <div class="seam"></div>
+  <div class="seam-note">Kotlin · Compose · MediaPipe · no Material</div>
+
+  <div class="phone p2"><img src="../screens/studio.png" alt=""></div>
+  <div class="phone p1"><img src="../screens/home.png" alt=""></div>
+</body>
+</html>

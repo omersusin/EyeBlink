@@ -2,7 +2,8 @@
 <resources>
     <!--
       A plain framework theme with nothing in it that EyeBlink does not draw itself: the whole screen is
-      Compose, so the window only has to be black and let the system bars disappear into it.
+      Compose, so the window only has to get out of the way and let the system bars disappear into it.
+      Newer Android versions add what only they understand in values-v29 and values-v31.
     -->
     <style name="Theme.EyeBlink" parent="@android:style/Theme.DeviceDefault.NoActionBar">
         <item name="android:windowBackground">@android:color/black</item>
@@ -10,7 +11,6 @@
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">false</item>
-        <item name="android:enforceNavigationBarContrast">false</item>
         <item name="android:windowDrawsSystemBarBackgrounds">true</item>
     </style>
 </resources>

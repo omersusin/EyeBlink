@@ -74,6 +74,16 @@ jobs:
       - name: Lint
         run: ./gradlew :app:lintDebug :lsposed:lintDebug --continue --stacktrace
 
+      # Lint prints only its first failure on the console; the full report is what is needed to fix them all.
+      - name: Show lint reports
+        if: failure()
+        run: |
+          shopt -s nullglob
+          for f in app/build/reports/lint-results-debug.txt lsposed/build/reports/lint-results-debug.txt \
+                   app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt; do
+            echo "=== $f ==="; sed -n 1,220p "$f"
+          done
+
       - name: Assemble debug APKs
         run: ./gradlew :app:assembleDebug :lsposed:assembleDebug --stacktrace
 

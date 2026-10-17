@@ -123,7 +123,7 @@ object Sample {
             stats = StatsUi(today = week.last(), week = week.fold(DayStats(), com.eyeblink.core.stats.UsageLedger.Companion::merge), series = week, seriesLabels = listOf("M", "T", "W", "T", "F", "S", "S")),
             night = NightUi(),
             diag = DiagnosticsUi(appVersion = "0.2.0", androidSdk = 34, device = "Pixel 8", serviceRunning = true, accessibilityConnected = true, listenerConnected = true, overlayKind = "Accessibility overlay", frameP50Ms = 14, frameP95Ms = 31, cameraDutyPercent = 18, batteryPercent = 71),
-            nowMs = 1_000_000L, clock = "21:40",
+            nowMs = System.currentTimeMillis(), clock = "21:40",
         )
     }
 }
