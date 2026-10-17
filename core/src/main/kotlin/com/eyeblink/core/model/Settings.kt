@@ -215,6 +215,20 @@ data class BatterySettings(
     fun validated(): BatterySettings = copy(saverBelowPercent = saverBelowPercent.coerceIn(5, 60))
 }
 
+/** Durations of the guided calibration. All adjustable; the user can also skip any phase. */
+@Serializable
+data class CalibrationSettings(
+    val videoSec: Int = 60,
+    val readingSec: Int = 60,
+    val deliberateBlinks: Int = 5,
+) {
+    fun validated(): CalibrationSettings = copy(
+        videoSec = videoSec.coerceIn(15, 300),
+        readingSec = readingSec.coerceIn(15, 300),
+        deliberateBlinks = deliberateBlinks.coerceIn(3, 12),
+    )
+}
+
 @Serializable
 data class PrivacySettings(
     val localStats: Boolean = true,
@@ -250,6 +264,7 @@ data class EyeBlinkSettings(
     val night: NightSettings = NightSettings(),
     val battery: BatterySettings = BatterySettings(),
     val privacy: PrivacySettings = PrivacySettings(),
+    val calibration: CalibrationSettings = CalibrationSettings(),
     val apps: List<AppProfile> = emptyList(),
     val startOnBoot: Boolean = false,
 ) {
@@ -261,6 +276,7 @@ data class EyeBlinkSettings(
         playback = playback.validated(),
         night = night.validated(),
         battery = battery.validated(),
+        calibration = calibration.validated(),
         apps = apps.map { it.validated() }.distinctBy { it.packageName },
     )
 

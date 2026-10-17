@@ -1,8 +1,7 @@
 pluginManagement {
     repositories {
-        // Google Maven only hosts the Android/AndroidX/MediaPipe groups. Restricting it
-        // keeps every other lookup on Maven Central, which also lets the pure-JVM
-        // modules build on a machine that has no route to Google's repository.
+        // Google Maven only hosts the Android/AndroidX/MediaPipe groups; restricting it keeps
+        // every other lookup on Maven Central.
         google {
             content {
                 includeGroupByRegex("com\\.android.*")
@@ -46,16 +45,9 @@ include(":core")
 // Compile-only stubs of the legacy Xposed API (never packaged).
 include(":xposed-api")
 
-// -Peyeblink.jvmOnly=true builds only the JVM modules (core + design lab). This is what
-// you want on a machine without the Android SDK; CI and Android Studio build everything.
-val jvmOnly = providers.gradleProperty("eyeblink.jvmOnly").orNull == "true"
+include(":app")
+include(":lsposed")
 
-if (!jvmOnly) {
-    include(":app")
-    include(":lsposed")
-}
-
-// The design lab renders the real Compose UI headlessly (screenshots, README animation).
-if (jvmOnly || providers.gradleProperty("eyeblink.designlab").orNull == "true") {
-    include(":tools:designlab")
-}
+// Renders the real Compose UI headlessly: screenshots and the README animation.
+// `./gradlew :tools:designlab:run`
+include(":tools:designlab")
