@@ -25,23 +25,25 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # AGP 8.5 requires JDK 17; the project's source/target compatibility is 17.
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
 
+      # v3 is unusable on current runners: it runs `sdkmanager tools`, and the
+      # legacy "tools" package was removed from Google's repository, so it exits
+      # 1 with "Failed to find package 'tools'". v4 drops that step.
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
 
       # Must match compileSdk/targetSdk in app/build.gradle.kts.
+      # setup-android already accepts the SDK licenses and puts sdkmanager on PATH.
       - name: Install SDK packages
-        run: |
-          sdkmanager --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
-          sdkmanager --licenses <<< $'\nyes\n' || true
+        run: sdkmanager --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
       # Caches Gradle deps, the wrapper distribution and build outputs.
       - name: Set up Gradle
