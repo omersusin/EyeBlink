@@ -33,6 +33,13 @@ android {
 
     signingConfigs {
         create("release") {
+            // Play requires v2+; v3 adds key rotation support and v4 produces a
+            // detached .idsig for incremental delivery. These are properties of
+            // the SigningConfig, not of the build type. v1 stays off (minSdk 26).
+            enableV2Signing = true
+            enableV3Signing = true
+            enableV4Signing = true
+
             val store = secret("storeFile", "KEYSTORE_FILE")
             store?.let {
                 storeFile = rootProject.file(it)
@@ -57,11 +64,6 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            // Play requires v2+; v3 adds key rotation support and v4 produces a
-            // detached .idsig for incremental delivery. v1 stays off (minSdk 26).
-            enableV2Signing = true
-            enableV3Signing = true
-            enableV4Signing = true
             // Only sign when credentials are actually present, so a fork or a
             // secretless CI run still produces an unsigned release.
             signingConfig = signingConfigs.findByName("release")
