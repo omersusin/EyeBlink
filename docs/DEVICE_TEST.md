@@ -21,6 +21,17 @@ cat ~/eyeblink-crash.txt
 Without root, `adb logcat -b crash -d` from a computer shows the same thing. What helps most is the block that starts at
 `FATAL EXCEPTION`, with every `Caused by:` line, and whether it happened at launch or after a particular tap.
 
+If nothing crashes but the camera does not do what it should (calibration stops, no pictures), the app's own log, under the
+tag `EyeBlink`, says how far it got: the front camera binding, the state CameraX reports (a camera that is in use or switched
+off shows up here), the first picture and its analysis.
+
+```
+su -c "logcat -c"
+# press Begin in Calibration, wait half a minute, then:
+su -c "logcat -d -s EyeBlink:V" > ~/eyeblink-camera.txt
+cat ~/eyeblink-camera.txt
+```
+
 ## Rootless basics
 
 1. **Onboarding.** Open the app. The welcome page offers a language chip and an Auto / Light / Dark switch; both should change the app at once.
