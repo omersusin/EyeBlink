@@ -21,3 +21,7 @@ bin/
 gen/
 out/
 proguard/
+
+# Python bytecode from the helper scripts
+__pycache__/
+*.pyc
