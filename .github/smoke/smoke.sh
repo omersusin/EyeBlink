@@ -219,6 +219,43 @@ if tools tap Dark --scroll --timeout 15; then
 fi
 health "after language and theme"
 
+# Every page the app has, so a page that only breaks on a real Android runtime is found here and not on somebody's phone.
+# The theme is Moonlit by now, which also puts the dark palette through every one of them.
+step "Every page"
+page_number=40
+for page in Night "Power modes" Diagnostics Statistics Privacy; do
+  page_number=$((page_number + 1))
+  if tools tap "$page" --scroll --timeout 15; then
+    sleep 3
+    snap "$page_number-page-$(echo "$page" | tr '[:upper:] ' '[:lower:]-')"
+    if [ "$page" = Diagnostics ]; then
+      tools tap "Copy report" --scroll --timeout 10 && sleep 1
+    fi
+    adb shell input keyevent KEYCODE_BACK
+    sleep 2
+  else
+    warn "could not open the '$page' page"
+  fi
+done
+health "after every page"
+
+step "Blink Studio and the app picker"
+if tools tap Blink --bottommost --timeout 10; then
+  sleep 3
+  snap 50-studio
+  tools tap "Tap to blink" --timeout 8 && sleep 2
+fi
+if tools tap Apps --bottommost --timeout 10; then
+  sleep 2
+  if tools tap "Add an app" --timeout 10; then
+    sleep 3
+    snap 51-app-picker
+    adb shell input keyevent KEYCODE_BACK
+    sleep 2
+  fi
+fi
+health "after the studio and the app picker"
+
 adb logcat -d -v threadtime > "$OUT/logcat-1-walkthrough.txt" 2>&1
 
 # ── 2. the automatic path: accessibility service, a selected app, a short interval ─────────────────────────────────

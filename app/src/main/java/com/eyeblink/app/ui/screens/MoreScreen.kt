@@ -45,7 +45,7 @@ fun MoreScreen(state: UiState, actions: UiActions, onPage: (Page) -> Unit, onLan
     val s = S
     val p = P
     ScreenColumn(modifier) {
-        Box(Modifier.reveal(0)) { SectionHeader(s.t("More", "Daha fazla"), s.t("Everything else", "Geri kalan her şey")) }
+        Box(Modifier.reveal(0)) { SectionHeader(s.t("More", "Diğer"), s.t("Everything else", "Geri kalan her şey")) }
 
         val tiles = listOf(
             Tile(Page.CALIBRATION, Icon.Eye, p.sky, s.t("Calibration", "Kalibrasyon"), s.t("Learn your blink", "Kırpmanı öğren")),
