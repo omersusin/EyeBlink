@@ -80,7 +80,8 @@ class CalibrationSession(
     val hint: Hint
         get() {
             if (phase != Phase.DELIBERATE) return Hint.NONE
-            if (detector.isShut) return Hint.OPEN_BETWEEN
+            val held = detector.longClosureAtMs
+            if (held > 0L && lastSampleAtMs - held < HINT_HOLD_MS) return Hint.OPEN_BETWEEN
             val eased = easedAtMs
             if (eased != null && lastSampleAtMs - eased < HINT_HOLD_MS) return Hint.EASED
             if (trackedSinceCountMs >= CLOSE_MORE_AFTER_MS && peakSinceCount < detector.startDepth) return Hint.CLOSE_MORE

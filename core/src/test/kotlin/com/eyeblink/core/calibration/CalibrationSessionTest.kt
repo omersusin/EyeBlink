@@ -181,7 +181,9 @@ class CalibrationSessionTest {
         while (t < 6_000) { s.process(sample(t, 0.05f)); t += 33 }
         assertEquals(CalibrationSession.Hint.OPEN_BETWEEN, s.hint)
         while (t < 6_500) { s.process(sample(t, 0.60f)); t += 33 }
-        assertTrue("and it goes when they open", s.hint != CalibrationSession.Hint.OPEN_BETWEEN)
+        assertEquals("it stays a moment, so that it can be read", CalibrationSession.Hint.OPEN_BETWEEN, s.hint)
+        while (t < 14_000) { s.process(sample(t, 0.60f)); t += 33 }
+        assertTrue("and it goes", s.hint != CalibrationSession.Hint.OPEN_BETWEEN)
         assertEquals(0, s.instructed.size)
     }
 

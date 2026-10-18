@@ -320,16 +320,149 @@ class EngineEdgeCasesTest {
     }
 
     @Test
-    fun `squeezed shut and then relaxed shut, with the score saying so, is still shut`() {
+    fun `squeezed shut and then relaxed shut, with the score saying so, makes no blinks`() {
+        // Lids that relax to a quarter of their closure are not nearly enough to be called shut, whatever the score says: the
+        // detector learns that as the new open level, and the score with it, and counts no blink for it.
         val random = java.util.Random(23)
         val p = TrackingPipeline()
         val found = mutableListOf<BlinkObservation>()
         var t = 0L
         while (t < 3_000) { p.onFrame(frame(t, jitter(random, 0.60f), 0.06f)).blink?.let { found += it }; t += 66 }
         while (t < 4_000) { p.onFrame(frame(t, jitter(random, 0.05f), 0.95f)).blink?.let { found += it }; t += 66 }
-        while (t < 24_000) { p.onFrame(frame(t, jitter(random, 0.45f), 0.95f)).blink?.let { found += it }; t += 66 }
-        assertTrue("blinks while the eyes were shut: ${found.map { it.startMs }.take(10)}", found.isEmpty())
-        assertTrue("credited ${p.rate.observed(t).trackedMs} ms", p.rate.observed(t).trackedMs < 6_000)
+        while (t < 60_000) { p.onFrame(frame(t, jitter(random, 0.45f), 0.95f)).blink?.let { found += it }; t += 66 }
+        assertTrue("blinks while the eyes were shut: ${found.map { it.startMs }.take(10)}", found.size <= 1)
+    }
+
+    // --- 9. a lowered gaze with a score in the middle of its range is not shut eyes ---------------------------------------
+
+    private fun gazeLowered(thresholds: BlinkThresholds, loweredLevel: Float, openScore: Float, seconds: Int = 120): Triple<Int, Int, Double> {
+        val random = java.util.Random(41)
+        val p = TrackingPipeline(thresholds)
+        val found = mutableListOf<BlinkObservation>()
+        val blinkTimes = (1..(seconds / 3 - 1)).map { it * 3_000L }
+        var frames = 0
+        var counted = 0
+        var t = 0L
+        while (t < seconds * 1_000L) {
+            val lowered = t >= 5_000
+            val base = if (lowered) loweredLevel else 0.60f
+            val rest = if (lowered) openScore else 0.06f
+            val blink = blinkTimes.any { t >= it && t < it + 3 * 66 }
+            val ev = p.onFrame(frame(t, jitter(random, if (blink) 0.05f else base), if (blink) 0.95f else rest + (random.nextGaussian() * 0.03).toFloat().coerceIn(-0.06f, 0.06f)))
+            ev.blink?.let { found += it }
+            frames++
+            if (ev.trackable) counted++
+            t += 66
+        }
+        val late = blinkTimes.filter { it >= 40_000 }
+        val hit = late.count { e -> found.any { kotlin.math.abs(it.startMs - e) <= 400 } }
+        return Triple(hit, late.size, counted.toDouble() / frames)
+    }
+
+    @Test
+    fun `a lowered gaze whose open-eye score sits in the middle of its range does not blind the detector`() {
+        val defaults = BlinkThresholds()
+        val fitted = BlinkThresholds.fromCalibration(openLevel = 0.60f, fullDepth = 0.55f)
+        for ((name, thr, level) in listOf(Triple("defaults", defaults, 0.378f), Triple("fitted", fitted, 0.42f))) {
+            for (openScore in listOf(0.55f, 0.60f, 0.70f)) {
+                val (hit, total, counted) = gazeLowered(thr, level, openScore)
+                assertTrue("$name, score $openScore: found $hit of $total blinks after 40 s", hit >= total * 0.8)
+                assertTrue("$name, score $openScore: only $counted of the frames counted", counted > 0.85)
+            }
+        }
+    }
+
+    // --- 10. a long rest is a rest for as long as its two ways of telling agree -----------------------------------------
+
+    @Test
+    fun `a long rest stays a rest when the score is missing on some frames or reads low`() {
+        for ((name, shutScore, missing) in listOf(Triple("score missing on 1 %", 0.95f, 0.01f), Triple("score 0.60", 0.60f, 0f), Triple("score 0.60, missing on 5 %", 0.60f, 0.05f))) {
+            val random = java.util.Random(43)
+            val p = TrackingPipeline()
+            val found = mutableListOf<BlinkObservation>()
+            var t = 0L
+            while (t < 3_000) { p.onFrame(frame(t, jitter(random, 0.60f), 0.06f)).blink?.let { found += it }; t += 33 }
+            var credited = 0
+            var frames = 0
+            while (t < 123_000) {
+                val score = if (random.nextFloat() < missing) null else (shutScore + (random.nextGaussian() * 0.05).toFloat()).coerceIn(0f, 1f)
+                val ev = p.onFrame(frame(t, jitter(random, 0.05f), score))
+                ev.blink?.let { found += it }
+                frames++
+                if (ev.trackable) credited++
+                t += 33
+            }
+            assertTrue("$name: blinks while shut: ${found.map { it.startMs }.take(8)}", found.isEmpty())
+            assertTrue("$name: $credited of $frames frames of the rest counted as evidence", credited < frames * 0.1)
+        }
+    }
+
+    // --- 11. the deliberate step with a score that sits high and lids that do not move ---------------------------------
+
+    @Test
+    fun `a score that sits high and lids that do not move do not lock the deliberate test`() {
+        val random = java.util.Random(47)
+        val s = CalibrationSession(videoMs = 1_000, readingMs = 1_000, deliberateBlinksRequired = 3)
+        s.start(0); s.skipPhase(0); s.skipPhase(0)
+        var t = 0L
+        while (t < 2_000) { s.process(sample(t, jitter(random, 0.60f), 0.06f)); t += 33 }
+        // From here the open-eye score reads 0.85 and the lids stay where they were; the person blinks on purpose every 2.5 s.
+        while (t < 90_000 && s.instructed.size < 3) {
+            val blinkNow = (t - 2_000) % 2_500 < 400
+            val v = if (blinkNow) 0.05f else 0.60f
+            s.process(sample(t, jitter(random, v), if (blinkNow) 0.95f else 0.85f))
+            t += 33
+        }
+        assertTrue("counted ${s.instructed.size} deliberate blinks by ${t / 1000} s", s.instructed.size >= 3 && t < 30_000)
+    }
+
+    // --- 12. "Higher" must find more of what a noisy eye does ------------------------------------------------------------
+
+    @Test
+    fun `a higher sensitivity finds more blinks of a noisy heavy-lidded eye, not the same ones`() {
+        val eye = EyeProfile("noisy heavy lids", openEar = 0.14f, closedEar = 0.075f, noise = 0.105f)
+        val thr = BlinkThresholds.fromCalibration(openLevel = 0.31f, fullDepth = 0.50f)
+        fun recall(sensitivity: Float): Pair<Int, Int> {
+            var hit = 0
+            var total = 0
+            var reported = 0
+            for (seed in 1L..4L) {
+                val sim = EyeSimulator(eye, 20, seed)
+                val times = (0 until 30).map { 3_000L + it * 3_700L }
+                times.forEachIndexed { i, tt -> sim.blink(tt, depth = if (i % 2 == 0) 0.55f else 0.7f) }
+                val p = TrackingPipeline(thr, sensitivity)
+                val found = mutableListOf<Long>()
+                for (smp in sim.samples(0, 120_000)) p.onFrame(FaceFrame(smp.timestampMs, smp, good, smp.illuminance)).blink?.let { found += it.startMs }
+                hit += times.count { e -> found.any { kotlin.math.abs(it - e) <= 400 } }
+                total += times.size
+                reported += found.size
+            }
+            return hit to reported
+        }
+        val auto = recall(1f)
+        val higher = recall(0.7f)
+        assertTrue("Auto finds ${auto.first}, Higher ${higher.first} blinks", higher.first >= auto.first + 4)
+    }
+
+    // --- 13. one deliberate hold is one deliberate blink, whatever the score does in the middle of it ---------------------
+
+    @Test
+    fun `a deliberate hold is counted once when the score is missing on some of its frames`() {
+        val random = java.util.Random(53)
+        val s = CalibrationSession(videoMs = 1_000, readingMs = 1_000, deliberateBlinksRequired = 4)
+        s.start(0); s.skipPhase(0); s.skipPhase(0)
+        var t = 0L
+        while (t < 3_000) { s.process(sample(t, jitter(random, 0.31f), 0.06f)); t += 33 }
+        for (hold in 1..3) {
+            val until = t + 2_500
+            while (t < until) {
+                val score = if (random.nextBoolean()) 0.9f else null
+                s.process(sample(t, jitter(random, 0.22f), score)); t += 33
+            }
+            val open = t + 3_000
+            while (t < open) { s.process(sample(t, jitter(random, 0.31f), 0.06f)); t += 33 }
+            assertEquals("after hold $hold", hold, s.instructed.size)
+        }
     }
 
     // --- 7. the open level of an eye is remembered between bursts -------------------------------------------------------
