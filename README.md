@@ -47,6 +47,13 @@ When it can't, it says so instead of guessing.
     <td><img src="docs/screens/privacy.png" width="170" alt="Privacy"></td>
     <td><img src="docs/screens/stats.png" width="170" alt="Statistics"></td>
   </tr>
+  <tr>
+    <td><img src="docs/screens/eyetest-live.png" width="170" alt="Blink test: what the camera engine sees of your eyes"></td>
+    <td><img src="docs/screens/calib-blink-close-more.png" width="170" alt="Calibration: blink on purpose, with a hint"></td>
+    <td><img src="docs/screens/calib-intro.png" width="170" alt="Calibration: how long each step takes"></td>
+    <td><img src="docs/screens/calib-result.png" width="170" alt="Calibration: what it learned"></td>
+    <td><img src="docs/screens/diag.png" width="170" alt="Diagnostics"></td>
+  </tr>
 </table>
 
 *Every screenshot above is the app's real Compose UI, rendered headlessly on a laptop by the [design lab](tools/designlab) - not a mock-up.*
