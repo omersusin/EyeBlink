@@ -75,6 +75,12 @@ fun main(args: Array<String>) {
     shot("calib-blink-eased-tr", h = 1900) {
         EyeBlinkApp(Sample.calibration(CalibrationStage.RUNNING, Phase.DELIBERATE, com.eyeblink.core.calibration.CalibrationSession.Hint.EASED), NoActions, Strings.TR, initialPage = Page.CALIBRATION)
     }
+    shot("calib-blink-open-between-tr", h = 1900) {
+        EyeBlinkApp(Sample.calibration(CalibrationStage.RUNNING, Phase.DELIBERATE, com.eyeblink.core.calibration.CalibrationSession.Hint.OPEN_BETWEEN), NoActions, Strings.TR, initialPage = Page.CALIBRATION)
+    }
+    shot("calib-blink-open-between", h = 1900) {
+        EyeBlinkApp(Sample.calibration(CalibrationStage.RUNNING, Phase.DELIBERATE, com.eyeblink.core.calibration.CalibrationSession.Hint.OPEN_BETWEEN), NoActions, en, initialPage = Page.CALIBRATION)
+    }
     shot("eyetest-intro", h = 1500) { EyeBlinkApp(Sample.eyeTest(running = false), NoActions, en, initialPage = Page.EYE_TEST) }
     shot("eyetest-live", h = 2300) { EyeBlinkApp(Sample.eyeTest(running = true), NoActions, en, initialPage = Page.EYE_TEST) }
     shot("eyetest-live-tr", h = 2300) { EyeBlinkApp(Sample.eyeTest(running = true), NoActions, Strings.TR, initialPage = Page.EYE_TEST) }

@@ -32,8 +32,11 @@ class CalibrationSession(
 ) {
     enum class Phase { VIDEO, READING, DELIBERATE, COMPLETE }
 
-    /** What the person could do to make the deliberate test count, when it has not been counting. */
-    enum class Hint { NONE, CLOSE_MORE, EASED }
+    /**
+     * What the person could do to make the deliberate test count, when it has not been counting. [OPEN_BETWEEN]: the eyes have
+     * been held shut for longer than any blink lasts - what a person does when nothing counts, and what never does.
+     */
+    enum class Hint { NONE, CLOSE_MORE, EASED, OPEN_BETWEEN }
 
     var phase: Phase = Phase.VIDEO
         private set
@@ -77,6 +80,7 @@ class CalibrationSession(
     val hint: Hint
         get() {
             if (phase != Phase.DELIBERATE) return Hint.NONE
+            if (detector.isShut) return Hint.OPEN_BETWEEN
             val eased = easedAtMs
             if (eased != null && lastSampleAtMs - eased < HINT_HOLD_MS) return Hint.EASED
             if (trackedSinceCountMs >= CLOSE_MORE_AFTER_MS && peakSinceCount < detector.settings.start) return Hint.CLOSE_MORE

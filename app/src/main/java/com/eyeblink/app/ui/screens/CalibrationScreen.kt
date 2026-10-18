@@ -242,6 +242,10 @@ private fun Running(c: CalibrationUi, actions: UiActions) {
                     s.t("I made this a little more forgiving for your eyes. Keep going.", "Bunu gözlerin için biraz daha esnek yaptım. Devam et."),
                     Ink.Caption, color = P.inkSoft, align = TextAlign.Center, modifier = Modifier.fillMaxWidth(),
                 )
+                Hint.OPEN_BETWEEN -> EbText(
+                    s.t("A blink is quick: close your eyes and open them again straight away. Holding them shut does not count.", "Göz kırpma hızlıdır: gözlerini kapatıp hemen aç. Kapalı tutmak sayılmaz."),
+                    Ink.Caption, color = P.inkSoft, align = TextAlign.Center, modifier = Modifier.fillMaxWidth(),
+                )
                 Hint.NONE -> Unit
             }
         }

@@ -170,6 +170,21 @@ class CalibrationSessionTest {
         assertEquals(1, s.instructed.size)
     }
 
+    @Test
+    fun `holding the eyes shut is told to stop, because it never counts`() {
+        val s = CalibrationSession(videoMs = 1_000, readingMs = 1_000, deliberateBlinksRequired = 3)
+        s.start(0); s.skipPhase(0); s.skipPhase(0)
+        var t = 0L
+        while (t < 1_500) { s.process(sample(t, 0.60f)); t += 33 }
+        while (t < 3_000) { s.process(sample(t, 0.05f)); t += 33 }
+        assertTrue("a second and a half is a long blink", s.hint != CalibrationSession.Hint.OPEN_BETWEEN)
+        while (t < 6_000) { s.process(sample(t, 0.05f)); t += 33 }
+        assertEquals(CalibrationSession.Hint.OPEN_BETWEEN, s.hint)
+        while (t < 6_500) { s.process(sample(t, 0.60f)); t += 33 }
+        assertTrue("and it goes when they open", s.hint != CalibrationSession.Hint.OPEN_BETWEEN)
+        assertEquals(0, s.instructed.size)
+    }
+
     // --- baseline ---------------------------------------------------------
 
     @Test
