@@ -31,7 +31,7 @@ class EngineEdgeCasesTest {
     // --- 1. a lowered gaze is not shut eyes -----------------------------------------------------------------------------
 
     /** Lids at 0.40 until 5 s and at [lowered] after, a full blink every two seconds; the blinks reported from 8 s on, and the frames that counted. */
-    private fun gazeDown(thresholds: BlinkThresholds, lowered: Float, withScore: Boolean, stepMs: Long = 66): Triple<Int, Int, Double> {
+    private fun gazeDown(thresholds: BlinkThresholds, lowered: Float, withScore: Boolean, stepMs: Long = 66, loweredScore: Float = 0.06f): Triple<Int, Int, Double> {
         val random = java.util.Random(11)
         val p = TrackingPipeline(thresholds)
         val found = mutableListOf<BlinkObservation>()
@@ -43,7 +43,7 @@ class EngineEdgeCasesTest {
             val base = if (t < 5_000) 0.40f else lowered
             val blink = blinkTimes.any { t >= it && t < it + 3 * stepMs }
             val v = jitter(random, if (blink) base * 0.1f else base)
-            val score = if (withScore) (if (blink) 0.92f else 0.06f) else null
+            val score = if (withScore) (if (blink) 0.92f else if (t >= 5_000) loweredScore else 0.06f) else null
             val ev = p.onFrame(frame(t, v, score))
             ev.blink?.let { found += it }
             frames++
@@ -664,5 +664,49 @@ class EngineEdgeCasesTest {
             if (credited < frames * 0.1) held++
         }
         assertTrue("$held of 30 twenty-second rests were held", held >= 28)
+    }
+
+    // --- 17. a gaze lowered a long way is not eyes shut, whatever the score does a little ------------------------------
+
+    @Test
+    fun `a gaze lowered by half is the new open level, with the score barely moved or missing`() {
+        // 0.40 -> 0.20 is a closure of 0.5: far more than a phone takes, still less than shut eyes of nearly any kind.
+        for ((withScore, loweredScore) in listOf(false to 0.06f, true to 0.06f, true to 0.25f)) {
+            val (hit, expected, counted) = gazeDown(BlinkThresholds(), lowered = 0.20f, withScore = withScore, loweredScore = loweredScore)
+            assertTrue("score=$withScore ($loweredScore): found $hit of $expected", hit >= expected * 0.8)
+            assertTrue("score=$withScore ($loweredScore): only $counted of the frames counted", counted > 0.9)
+        }
+    }
+
+    // --- 18. quick deliberate blinks are counted at once -------------------------------------------------------------------
+
+    /** Seconds the deliberate step takes with a blink every 2.5 s that is over in [closeMs] + [openMs], or null when it never finishes. */
+    private fun quickDeliberate(eye: EyeProfile, closeMs: Long, openMs: Long, fps: Int, seed: Long): Double? {
+        val sim = EyeSimulator(eye, fps, seed, withBlinkScore = true)
+        (0 until 40).forEach { sim.blink(2_000L + it * 2_500L, depth = 1f, closeMs = closeMs, holdMs = 0, openMs = openMs) }
+        val s = CalibrationSession(videoMs = 1_000, readingMs = 1_000, deliberateBlinksRequired = 5)
+        s.start(0); s.skipPhase(0); s.skipPhase(0)
+        for (smp in sim.samples(0, 120_000)) {
+            s.process(smp)
+            if (s.phase == CalibrationSession.Phase.COMPLETE) return smp.timestampMs / 1000.0
+        }
+        return null
+    }
+
+    @Test
+    fun `a deliberate blink as quick as one that happens by itself is counted at the speed the step is looked at with`() {
+        val barely = EyeProfile("barely moving", openEar = 0.14f, closedEar = 0.10f, noise = 0.04f)
+        for (eye in listOf(EyeProfile.TYPICAL, EyeProfile.MONOLID, barely)) for ((close, open) in listOf(40L to 80L, 60L to 110L)) for (seed in 1L..3L) {
+            val secs = quickDeliberate(eye, close, open, fps = 30, seed = seed)
+            assertTrue("${eye.name}, a blink of ${close + open} ms, seed $seed: finished after $secs s", secs != null && secs < 16.0)
+        }
+    }
+
+    @Test
+    fun `and at half that speed a quick blink that goes deep is counted too`() {
+        for (seed in 1L..3L) {
+            val secs = quickDeliberate(EyeProfile.TYPICAL, 40, 80, fps = 15, seed = seed)
+            assertTrue("seed $seed: finished after $secs s", secs != null && secs < 35.0)
+        }
     }
 }

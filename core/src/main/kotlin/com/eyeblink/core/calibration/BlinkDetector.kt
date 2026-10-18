@@ -22,6 +22,12 @@ data class DetectorSettings(
     val maxDurationMs: Long = BlinkDetector.DEFAULT_MAX_DURATION_MS,
     /** A closure seen in only one frame must be at least this deep, or it is taken for a landmark glitch. */
     val singleFrameDepth: Float = BlinkDetector.DEFAULT_SINGLE_FRAME_DEPTH,
+    /**
+     * A closure at or past [start] in fewer pictures than this has to be as deep as a closure seen in one picture only. The spike
+     * of a noisy tracker is past the threshold in one and stays a hair above it; a blink, closed, held for a moment and opened,
+     * is past it in several - even the quickest at 30 pictures a second in two - and at fewer pictures a second it goes deep.
+     */
+    val minArmedFrames: Int = 1,
     /** Without a known open level, how long the detector looks before it judges anything. */
     val warmupMs: Long = BlinkDetector.DEFAULT_WARMUP_MS,
     /**
@@ -326,6 +332,7 @@ class BlinkDetector(settings: DetectorSettings = DetectorSettings()) {
 
     private fun finish(endMs: Long, since: Long): BlinkObservation? {
         val frames = closedFrames
+        val armed = armedFrames
         val reached = peak
         val lowest = lowestOpenness
         val confidence = confidenceAtClose
@@ -333,6 +340,7 @@ class BlinkDetector(settings: DetectorSettings = DetectorSettings()) {
 
         val duration = endMs - since
         if (duration < settings.minDurationMs || duration > settings.maxDurationMs) return null
+        if (armed < settings.minArmedFrames && reached < DEFAULT_SINGLE_FRAME_DEPTH) return null
         if (frames <= 1 && reached < settings.singleFrameDepth) return null
 
         return BlinkObservation(
@@ -376,34 +384,40 @@ class BlinkDetector(settings: DetectorSettings = DetectorSettings()) {
         return sorted[count / 2]
     }
 
-    /** Whether the lids, by their median over the last frames, are down by about half of the open level (and by more than a blink's worth). */
-    private fun lidsAreDeep(): Boolean {
-        if (recentCount < EVIDENCE_MIN_FRAMES) return false
+    /** The median closure of the lids over the last frames, or -1 when there are too few of them to say. */
+    private fun lidsMedian(): Float {
+        if (recentCount < EVIDENCE_MIN_FRAMES) return -1f
         val oldest = (recentHead - recentCount + EVIDENCE_CAPACITY) % EVIDENCE_CAPACITY
         for (i in 0 until recentCount) sorted[i] = recentLids[(oldest + i) % EVIDENCE_CAPACITY]
-        return middle(recentCount) >= max(holdStart + DEEP_MARGIN, DEEP_FLOOR)
+        return middle(recentCount)
     }
 
+    /** Whether the lids are down by about half of the open level (and by more than a blink's worth). */
+    private fun lidsAreDeep(): Boolean = lidsMedian() >= max(holdStart + DEEP_MARGIN, DEEP_FLOOR)
+
     /**
-     * Whether the eyes look shut right now, judged by the last frames of the closure: [EVIDENCE_LIDS] when the lids are down by
-     * half of the open level (and by more than a blink's worth) - which a gaze lowered at a phone or a squint does not reach - and
-     * the face model, if it says anything, does not put the eyes at their calm level; [EVIDENCE_AGREED] when it also puts them
-     * half way up its range. How high the score of this person's shut eyes goes does not matter, and neither does a score alone:
-     * it is not known what that is for eyes whose lids hardly move, or for a gaze lowered at a phone.
+     * Whether the eyes look shut right now, judged by the last frames of the closure: [EVIDENCE_AGREED] when the lids are down by
+     * half of the open level (which a gaze lowered at a phone or a squint does not reach) and the face model puts the eyes half
+     * way up its range; [EVIDENCE_LIDS] when the lids are down by more than that gaze can take them (a lowered gaze is not the
+     * eyes shut) and the face model, if it says anything, does not put the eyes at their calm level. How high the score of this
+     * person's shut eyes goes does not matter, and neither does a score alone: it is not known what that is for eyes whose lids
+     * hardly move, or for a gaze lowered at a phone.
      */
     private fun shutEvidence(): Int {
-        if (!lidsAreDeep()) return EVIDENCE_NONE
+        val lids = lidsMedian()
+        if (lids < max(holdStart + DEEP_MARGIN, DEEP_FLOOR)) return EVIDENCE_NONE
         val oldest = (recentHead - recentCount + EVIDENCE_CAPACITY) % EVIDENCE_CAPACITY
         var scored = 0
         for (i in 0 until recentCount) {
             val v = recentShare[(oldest + i) % EVIDENCE_CAPACITY]
             if (!v.isNaN()) sorted[scored++] = v
         }
-        if (scored * 2 < recentCount) return EVIDENCE_LIDS
+        val onLidsAlone = if (lids >= max(holdStart + DEEP_MARGIN, SHUT_FLOOR)) EVIDENCE_LIDS else EVIDENCE_NONE
+        if (scored * 2 < recentCount) return onLidsAlone
         val share = middle(scored)
         return when {
             share >= AGREE_SHARE -> EVIDENCE_AGREED
-            share >= CONTRADICT_SHARE -> EVIDENCE_LIDS
+            share >= CONTRADICT_SHARE -> onLidsAlone
             else -> EVIDENCE_NONE
         }
     }
@@ -561,6 +575,12 @@ class BlinkDetector(settings: DetectorSettings = DetectorSettings()) {
          */
         private const val DEEP_MARGIN = 0.10f
         private const val DEEP_FLOOR = 0.46f
+
+        /**
+         * Lids on their own - no score, or one that reads low - hold the eyes shut only when they are down by more than that: a
+         * gaze lowered a long way at a phone takes them to half of the open level, shut eyes of nearly every kind go further.
+         */
+        private const val SHUT_FLOOR = 0.55f
 
         /**
          * How far up the face model's score (as a share of this face's own range) has to be to agree with lids that look shut, and

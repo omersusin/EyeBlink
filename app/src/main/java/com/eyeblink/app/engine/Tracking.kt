@@ -127,6 +127,8 @@ class TrackingController(
         val source = faces ?: return
         if (source.running) source.stop()
         cameraActive = false
+        // The next burst's first frame is not a second of camera time: nothing was looking for the whole time in between.
+        lastFrameMs = 0L
         flushLearning(force = true)
         flushUsage(now)
         pipeline.rate.onTrackingLost()

@@ -360,7 +360,7 @@ class CalibrationSession(
             start = start,
             end = start * 0.5f,
             full = BlinkDetector.DEFAULT_FULL,
-            minDurationMs = DELIBERATE_MIN_DURATION_MS,
+            minArmedFrames = DELIBERATE_MIN_FRAMES,
             maxDurationMs = DELIBERATE_MAX_DURATION_MS,
             singleFrameDepth = start + 0.12f,
             useBlinkScore = true,
@@ -401,10 +401,12 @@ class CalibrationSession(
         const val DELIBERATE_MAX_DURATION_MS = 3_000L
 
         /**
-         * ...and for at least this long: a deliberate blink is closed, held a moment and opened, three pictures at the 30 a second the
-         * step is looked at with, while the spikes of a noisy tracker last one or two. Without it noise alone completes the step.
+         * ...and in at least this many pictures at or past the threshold: a deliberate blink is closed, held a moment and opened,
+         * so it is there in several of the 30 a second the step is looked at with (the quickest in two), while the spike of a
+         * noisy tracker is there in one. Without it noise alone completes the step; measured in milliseconds the same rule
+         * would turn away the quick blinks of people who blink on purpose as they blink by themselves.
          */
-        const val DELIBERATE_MIN_DURATION_MS = 100L
+        const val DELIBERATE_MIN_FRAMES = 2
 
         /** Eyes that look shut stay shut for this long in the deliberate step, whatever tells so: nobody holds them for a blink. */
         private const val DELIBERATE_SHUT_FORGET_MS = 600_000L
