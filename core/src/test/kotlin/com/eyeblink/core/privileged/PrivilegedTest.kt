@@ -479,6 +479,24 @@ class PrivilegedPlaybackBackendTest {
         assertTrue(shell.commands.none { it.startsWith("cmd media_session dispatch") || it.startsWith("input") })
     }
 
+    private fun withoutButtonLine(dump: String) = dump.lines().filterNot { it.startsWith("Media button session") }.joinToString("\n")
+
+    @Test
+    fun `a dump that does not name the media button holder is enough when nothing else is playing`() = runTest {
+        val (b, shell) = backend(withoutButtonLine(Fixtures.YOUTUBE_PLAYING_SPOTIFY_PAUSED))
+        assertTrue(b.pause("com.google.android.youtube"))
+        assertEquals("cmd media_session dispatch pause", shell.commands.last())
+    }
+
+    @Test
+    fun `and it is not when another app is playing, because the key could land there`() = runTest {
+        val bothPlaying = withoutButtonLine(Fixtures.YOUTUBE_PLAYING_SPOTIFY_PAUSED).replace("state=PlaybackState {state=2,", "state=PlaybackState {state=3,")
+        val (b, shell) = backend(bothPlaying)
+        assertFalse(b.pause("com.google.android.youtube"))
+        assertTrue(shell.commands.none { it.startsWith("cmd media_session dispatch") || it.startsWith("input") })
+        assertTrue(b.lastProblem.orEmpty(), b.lastProblem.orEmpty().contains("another app is playing"))
+    }
+
     @Test
     fun `keys are never sent for an app that has no session`() = runTest {
         val (b, shell) = backend(Fixtures.YOUTUBE_PLAYING_SPOTIFY_PAUSED)

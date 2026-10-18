@@ -20,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.eyeblink.app.ui.i18n.Strings
+import com.eyeblink.app.ui.i18n.reason
 import com.eyeblink.app.ui.kit.Badge
 import com.eyeblink.app.ui.kit.ButtonKind
 import com.eyeblink.app.ui.kit.P
@@ -98,7 +99,7 @@ fun PowerScreen(state: UiState, actions: UiActions, onBack: () -> Unit) {
             if (p.rootAvailable == true && mode != OperatingMode.ROOT) NotSelected()
             if (mode == OperatingMode.ROOT && p.rootAvailable == true && !p.status.available) {
                 EbText(
-                    s.t("Root is granted but the shell did not start: ${p.status.detail ?: "no answer"}.", "Root verildi ama kabuk başlamadı: ${p.status.detail ?: "yanıt yok"}."),
+                    s.t("Root is granted but the shell did not start: ${p.status.detail ?: "no answer"}.", "Root verildi ama kabuk başlamadı: ${s.reason(p.status.detail) ?: "yanıt yok"}."),
                     Ink.Caption, color = P.sun.text,
                 )
             }
@@ -111,7 +112,7 @@ fun PowerScreen(state: UiState, actions: UiActions, onBack: () -> Unit) {
             Card(Modifier.reveal(5).fillMaxWidth(), tint = P.sky) {
                 EbText(s.t("Set it up for me", "Benim için kur"), Ink.Headline)
                 Spacer(Modifier.height(6.dp))
-                EbText(s.t("Using ${p.status.detail ?: "elevated access"}, EyeBlink can grant itself what you would otherwise tap through in Settings. Pick what you want.", "${p.status.detail ?: "Yükseltilmiş erişim"} ile EyeBlink, Ayarlar'da tek tek vereceğin izinleri kendine verebilir. İstediklerini seç."), Ink.Caption)
+                EbText(s.t("Using ${p.status.detail ?: "elevated access"}, EyeBlink can grant itself what you would otherwise tap through in Settings. Pick what you want.", "${s.reason(p.status.detail) ?: "Yükseltilmiş erişim"} ile EyeBlink, Ayarlar'da tek tek vereceğin izinleri kendine verebilir. İstediklerini seç."), Ink.Caption)
                 Spacer(Modifier.height(10.dp))
                 SetupStepId.entries.forEach { id ->
                     val result = p.setup.firstOrNull { it.id == id }

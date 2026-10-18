@@ -386,6 +386,9 @@ class Engine(val app: Application, ports: EnginePorts) {
     fun calibrationCameraDenied() = post { calibrator.cameraDenied(); publish() }
     fun skipCalibrationPhase() = post { calibrator.skipPhase() }
     fun cancelCalibration() = post { calibrator.cancel() }
+
+    /** The system is short of memory. A calibration or a test owns the camera and is left to finish; background tracking gives it up. */
+    fun onLowMemory() = post { if (!calibrator.running && !eyeTester.running) tracking.onLowMemory() }
     fun saveCalibration() = post { calibrator.save(); publish() }
     fun resetCalibration() = post { calibrator.reset(); publish() }
 

@@ -36,6 +36,7 @@ import com.eyeblink.app.ui.kit.EbText
 import com.eyeblink.app.ui.kit.Flow
 import com.eyeblink.app.ui.kit.Card
 import com.eyeblink.app.ui.kit.Hairline
+import com.eyeblink.app.ui.kit.Horizon
 import com.eyeblink.app.ui.kit.Hue
 import com.eyeblink.app.ui.kit.IconBadge
 import com.eyeblink.app.ui.kit.Icon
@@ -57,6 +58,7 @@ import com.eyeblink.core.calibration.CalibrationSession.Phase
 import com.eyeblink.core.calibration.ContextProfile
 import com.eyeblink.core.calibration.Provenance
 import com.eyeblink.core.calibration.QualityIssue
+import com.eyeblink.core.model.CalibrationSettings
 import kotlin.math.roundToInt
 
 @Composable
@@ -100,6 +102,17 @@ private fun Intro(state: UiState, actions: UiActions, onPage: (Page) -> Unit) {
         StepCard(Icon.Book, P.sun, s.t("Read", "Oku"), s.t("A short passage, because reading changes how often we blink.", "Kısa bir metin; çünkü okumak göz kırpma sıklığını değiştirir."), "${state.settings.calibration.readingSec} ${s.t("s", "sn")}")
         StepCard(Icon.Eye, P.coral, s.t("Blink on purpose", "Bilerek kırp"), s.t("A few full, deliberate blinks so it learns what a closed eye looks like on you.", "Kapalı gözün sende nasıl göründüğünü öğrenmesi için birkaç tam, bilinçli kırpma."), "${state.settings.calibration.deliberateBlinks}×")
     }
+    Card(Modifier.reveal(3).fillMaxWidth()) {
+        val cal = state.settings.calibration
+        fun change(f: (CalibrationSettings) -> CalibrationSettings) = actions.update { it.copy(calibration = f(it.calibration)).validated() }
+        EbText(s.t("How long it takes", "Ne kadar sürer"), Ink.BodyStrong)
+        Spacer(Modifier.height(4.dp))
+        EbText(s.t("Shorter is quicker, longer measures your natural blinking better. You can skip a step while it runs.", "Kısa olan daha çabuk biter, uzun olan doğal kırpmanı daha iyi ölçer. Bir adımı sürerken atlayabilirsin."), Ink.Caption, color = P.inkFaint)
+        Spacer(Modifier.height(8.dp))
+        LengthRow(s.t("Watch", "İzle"), "${cal.videoSec} ${s.t("s", "sn")}", cal.videoSec.toFloat(), 15f..300f, 57, { v -> change { it.copy(videoSec = v.roundToInt()) } }, s.t("Watch length", "İzleme süresi"))
+        LengthRow(s.t("Read", "Oku"), "${cal.readingSec} ${s.t("s", "sn")}", cal.readingSec.toFloat(), 15f..300f, 57, { v -> change { it.copy(readingSec = v.roundToInt()) } }, s.t("Reading length", "Okuma süresi"))
+        LengthRow(s.t("Blink on purpose", "Bilerek kırp"), "${cal.deliberateBlinks}×", cal.deliberateBlinks.toFloat(), 3f..12f, 9, { v -> change { it.copy(deliberateBlinks = v.roundToInt()) } }, s.t("Number of deliberate blinks", "Bilinçli kırpma sayısı"))
+    }
     Card(Modifier.reveal(3).fillMaxWidth(), tint = P.sky) {
         Row(verticalAlignment = Alignment.Top) {
             IconBadge(Icon.Shield, P.sky, size = 40.dp)
@@ -135,6 +148,21 @@ private fun Intro(state: UiState, actions: UiActions, onPage: (Page) -> Unit) {
             PillButton(s.t("Reset my profile", "Profilimi sıfırla"), { actions.resetCalibration() }, kind = ButtonKind.Ghost, icon = Icon.Trash, modifier = Modifier.fillMaxWidth(), compact = true)
         }
     }
+}
+
+/** A title with its value on the right and a slider under it. */
+@Composable
+private fun LengthRow(title: String, shown: String, value: Float, range: ClosedFloatingPointRange<Float>, steps: Int, onChange: (Float) -> Unit, description: String) {
+    val s = S
+    Row(Modifier.fillMaxWidth()) {
+        EbText(title, Ink.Body, modifier = Modifier.weight(1f))
+        EbText(shown, Ink.NumSmall, color = P.sun.text, caps = false)
+    }
+    Horizon(
+        value, onChange, range = range, steps = steps,
+        format = { v -> if (range.endInclusive > 100f) "${v.roundToInt()} ${s.t("s", "sn")}" else "${v.roundToInt()}×" },
+        description = description, accent = P.sun,
+    )
 }
 
 /** Something went wrong before the session could begin: what, and what to do about it. */
@@ -371,7 +399,8 @@ private fun Result(state: UiState, actions: UiActions, onPage: (Page) -> Unit) {
         PillButton(s.t("Save my profile", "Profilimi kaydet"), { actions.saveCalibration() }, icon = Icon.Check, modifier = Modifier.fillMaxWidth())
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             PillButton(s.t("Retry", "Tekrar dene"), { actions.startCalibration() }, kind = ButtonKind.Soft, compact = true, icon = Icon.Refresh, modifier = Modifier.weight(1f))
-            PillButton(s.t("Discard", "Çöpe at"), { actions.resetCalibration() }, kind = ButtonKind.Ghost, compact = true, modifier = Modifier.weight(1f))
+            // Discard this attempt - not the profile that was saved before it.
+            PillButton(s.t("Discard", "Çöpe at"), { actions.cancelCalibration() }, kind = ButtonKind.Ghost, compact = true, modifier = Modifier.weight(1f))
         }
     }
 }

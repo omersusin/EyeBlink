@@ -111,7 +111,11 @@ class TrackingController(
         )
         val want = plan.runCamera && !(advice.cameraOff && advice.reason != PerfReason.LOW_BATTERY)
         if (want && !source.running) startCamera(now, (plan.fps * advice.fpsFactor).roundToInt().coerceAtLeast(DutyCycle.MIN_FPS))
-        else if (!want && source.running) stopCamera(now)
+        else if (!want && source.running) {
+            // The end of a burst is not the end of what is being learned: a burst is shorter than the 20 s a learner needs, so the
+            // window goes on in the next one (the gap between two bursts is not an interval between two blinks).
+            stopCamera(now, keepLearning = s.camera.tracking == TrackingMode.BURST && eligible)
+        }
         cameraActive = source.running
     }
 
@@ -123,15 +127,23 @@ class TrackingController(
         cameraActive = source.running
     }
 
-    fun stopCamera(now: Long = nowMs()) {
+    fun stopCamera(now: Long = nowMs(), keepLearning: Boolean = false) {
         val source = faces ?: return
         if (source.running) source.stop()
         cameraActive = false
         // The next burst's first frame is not a second of camera time: nothing was looking for the whole time in between.
         lastFrameMs = 0L
-        flushLearning(force = true)
+        flushLearning(force = !keepLearning)
         flushUsage(now)
         pipeline.rate.onTrackingLost()
+    }
+
+    /** The system is short of memory: the camera rests for a while (the timer takes over) and the face model is let go. */
+    fun onLowMemory(now: Long = nowMs()) {
+        val source = faces ?: return
+        if (source.running) stopCamera(now)
+        failedUntilMs = now + RETRY_AFTER_FAILURE_MS
+        source.releaseModel()
     }
 
     private fun onCameraError(@Suppress("UNUSED_PARAMETER") message: String) {

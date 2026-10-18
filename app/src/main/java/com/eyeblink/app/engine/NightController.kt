@@ -56,6 +56,28 @@ class NightController(
     private var weTurnedNightLightOn = false
     private var lastTickMs = 0L
 
+    // What this controller has changed outlives the process: after a restart the next one can still put it back.
+    private val memory = app.getSharedPreferences("eyeblink.night.restore", android.content.Context.MODE_PRIVATE)
+    private var persisted = Triple(false, null as Int?, null as Int?)
+
+    init {
+        weTurnedNightLightOn = memory.getBoolean(KEPT_NIGHT_LIGHT, false)
+        originalPercent = memory.getInt(KEPT_ORIGINAL, -1).takeIf { it >= 0 }
+        lastWrittenPercent = memory.getInt(KEPT_WRITTEN, -1).takeIf { it >= 0 }
+        persisted = Triple(weTurnedNightLightOn, originalPercent, lastWrittenPercent)
+    }
+
+    private fun persist() {
+        val now = Triple(weTurnedNightLightOn, originalPercent, lastWrittenPercent)
+        if (now == persisted) return
+        persisted = now
+        memory.edit()
+            .putBoolean(KEPT_NIGHT_LIGHT, now.first)
+            .putInt(KEPT_ORIGINAL, now.second ?: -1)
+            .putInt(KEPT_WRITTEN, now.third ?: -1)
+            .apply()
+    }
+
     /** Starts or stops the background loop to match the settings. */
     fun sync() {
         val s = settings()
@@ -65,7 +87,8 @@ class NightController(
             job?.cancel()
             job = null
             light.stop()
-            if (!s.enabled) restore()
+            // Switched off, or stopped by the emergency stop: either way nothing this controller changed stays changed.
+            restore()
             publish(null, null)
         }
     }
@@ -100,6 +123,7 @@ class NightController(
         var moving = false
         if (Access.writeSettings(app) && autoBrightnessOff()) moving = driveBrightness(s, target, now, dt)
         if (Access.secureSettings(app)) driveNightLight(s, target)
+        persist()
         publish(target, lux)
         return moving
     }
@@ -171,6 +195,13 @@ class NightController(
             if (target.active && target.nightLight == true) {
                 val k = (target.warmthKelvin ?: s.warmthKelvin).coerceIn(kelvinMin, kelvinMax)
                 if (!on) {
+                    if (weTurnedNightLightOn) {
+                        // It was on because of us and now it is off: somebody switched it off. They are in charge for a while,
+                        // as with the brightness - not switched back on within five seconds.
+                        manualUntilMs = nowMs() + s.manualOverrideBackoffMin * 60_000L
+                        weTurnedNightLightOn = false
+                        return
+                    }
                     Settings.Secure.putInt(resolver, NIGHT_ACTIVATED, 1)
                     weTurnedNightLightOn = true
                 }
@@ -197,6 +228,7 @@ class NightController(
         originalPercent = null
         lastWrittenPercent = null
         ramping = null
+        persist()
     }
 
     fun publish(target: NightTarget?, lux: Float?) {
@@ -224,5 +256,8 @@ class NightController(
     private companion object {
         const val NIGHT_ACTIVATED = "night_display_activated"
         const val NIGHT_TEMPERATURE = "night_display_color_temperature"
+        const val KEPT_NIGHT_LIGHT = "night_light_ours"
+        const val KEPT_ORIGINAL = "brightness_before"
+        const val KEPT_WRITTEN = "brightness_written"
     }
 }

@@ -131,6 +131,10 @@ class CameraFaceSource(private val app: Application) : FaceSource {
         main.post { unbind(); keepModelAwhile() }
     }
 
+    override fun releaseModel() {
+        main.post { if (!active) closeModel() }
+    }
+
     /** Keeps the model for a short while: bursts come back every minute or so. Must run on the main thread. */
     private fun keepModelAwhile() {
         val r = Runnable { closeModel() }

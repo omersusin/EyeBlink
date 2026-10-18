@@ -10,9 +10,11 @@ import com.eyeblink.core.playback.Strategy
  * `dumpsys media_session`, deliver explicit PAUSE/PLAY keys with `cmd media_session dispatch`.
  *
  * Media keys go to whichever session currently holds the media button, not to a named app. So
- * a command is sent only when the dump says the *target's* session is that session; otherwise
- * `pause`/`resume` report "not delivered" and the coordinator treats it as a failure instead
- * of risking another app's playback. [lastProblem] says which of those it was.
+ * a command is sent only when the dump says the *target's* session is that session - or, where
+ * the dump does not name the holder (the wording changes between Android versions), when no other
+ * app is playing, since the key goes to the session that played last. Otherwise `pause`/`resume`
+ * report "not delivered" and the coordinator treats it as a failure instead of risking another
+ * app's playback. [lastProblem] says which of those it was.
  */
 class PrivilegedPlaybackBackend(
     private val shell: ShellExecutor,
@@ -59,6 +61,10 @@ class PrivilegedPlaybackBackend(
         // Never send keys to a session that is not the target's: they would land on someone else.
         if (dump.mediaButtonPackage != null && dump.mediaButtonPackage != target) {
             problem = "media keys currently go to a different app than the one in front, so a key would not reach this one"
+            return false
+        }
+        if (dump.mediaButtonPackage == null && dump.sessions.any { it.packageName != target && it.state == PlayState.PLAYING }) {
+            problem = "the phone does not say which app receives media keys and another app is playing, so a key could reach that one instead"
             return false
         }
         var lastError = ""

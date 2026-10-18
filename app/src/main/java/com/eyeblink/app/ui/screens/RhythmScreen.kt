@@ -173,9 +173,14 @@ fun RhythmScreen(state: UiState, actions: UiActions, onPage: (Page) -> Unit, mod
         // ── Camera ──────────────────────────────────────────────
         Card(Modifier.reveal(4).fillMaxWidth()) {
             SectionHeader(s.t("Camera", "Kamera"), null, trailing = {
+                val assisted = state.runtime.triggerMode == TriggerMode.CAMERA_ASSISTED
                 Badge(
-                    if (state.runtime.triggerMode == TriggerMode.CAMERA_ASSISTED) s.t("observing", "gözlemliyor") else s.t("timer only", "yalnızca zamanlayıcı"),
-                    if (state.runtime.triggerMode == TriggerMode.CAMERA_ASSISTED) Tone.Sky else Tone.Quiet,
+                    when {
+                        assisted && state.runtime.cameraActive -> s.t("observing", "gözlemliyor")
+                        assisted -> s.t("between looks", "bakışlar arasında")
+                        else -> s.t("timer only", "yalnızca zamanlayıcı")
+                    },
+                    if (assisted) Tone.Sky else Tone.Quiet,
                 )
             })
             Spacer(Modifier.height(12.dp))
@@ -191,6 +196,27 @@ fun RhythmScreen(state: UiState, actions: UiActions, onPage: (Page) -> Unit, mod
                 },
                 Ink.Caption,
             )
+            if (st.camera.tracking == TrackingMode.BURST) {
+                Spacer(Modifier.height(12.dp))
+                Row(Modifier.fillMaxWidth()) {
+                    EbText(s.t("Look for", "Bakış süresi"), Ink.BodyStrong, modifier = Modifier.weight(1f))
+                    EbText(fmtSeconds(st.camera.burstSec, s), Ink.NumSmall, color = P.sun.text, caps = false)
+                }
+                Horizon(
+                    st.camera.burstSec.toFloat(), { v -> setS { it.copy(camera = it.camera.copy(burstSec = v.roundToInt().coerceAtMost(it.camera.periodSec - 5))) } },
+                    range = 4f..60f, steps = 56, format = { fmtSeconds(it.roundToInt(), s) },
+                    description = s.t("How long each camera look lasts", "Her kamera bakışının süresi"), accent = P.sun,
+                )
+                Row(Modifier.fillMaxWidth()) {
+                    EbText(s.t("Once every", "Her"), Ink.BodyStrong, modifier = Modifier.weight(1f))
+                    EbText(fmtSeconds(st.camera.periodSec, s), Ink.NumSmall, color = P.sun.text, caps = false)
+                }
+                Horizon(
+                    st.camera.periodSec.toFloat(), { v -> setS { it.copy(camera = it.camera.copy(periodSec = v.roundToInt().coerceAtLeast(it.camera.burstSec + 5))) } },
+                    range = 15f..600f, steps = 39, format = { fmtSeconds(it.roundToInt(), s) },
+                    description = s.t("How often the camera looks", "Kameranın bakma sıklığı"), accent = P.sun,
+                )
+            }
             Spacer(Modifier.height(12.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 PillButton(
@@ -213,6 +239,31 @@ fun RhythmScreen(state: UiState, actions: UiActions, onPage: (Page) -> Unit, mod
                 ),
                 Ink.Caption, color = P.inkFaint,
             )
+            Spacer(Modifier.height(16.dp))
+            EbText(s.t("Battery", "Pil"), Ink.Eyebrow, caps = false)
+            Spacer(Modifier.height(4.dp))
+            Row(Modifier.fillMaxWidth()) {
+                EbText(s.t("Save battery below", "Pil tasarrufu eşiği"), Ink.BodyStrong, modifier = Modifier.weight(1f))
+                EbText("${st.battery.saverBelowPercent}%", Ink.NumSmall, color = P.sun.text, caps = false)
+            }
+            Horizon(
+                st.battery.saverBelowPercent.toFloat(), { v -> setS { it.copy(battery = it.battery.copy(saverBelowPercent = v.roundToInt())) } },
+                range = 5f..60f, steps = 11, format = { "${it.roundToInt()}%" },
+                description = s.t("Battery level below which the camera rests", "Kameranın dinlendiği pil seviyesi"), accent = P.sun,
+            )
+            SettingRow(
+                s.t("Camera rests while saving", "Tasarrufta kamera dinlenir"),
+                subtitle = s.t("Below that level, or when the phone's own battery saver is on, EyeBlink goes back to its timer.", "Bu seviyenin altında ya da telefonun kendi pil tasarrufu açıkken EyeBlink zamanlayıcıya döner."),
+            ) {
+                LidSwitch(st.battery.cameraOffOnSaver, { v -> setS { it.copy(battery = it.battery.copy(cameraOffOnSaver = v)) } }, description = s.t("Camera rests while saving", "Tasarrufta kamera dinlenir"))
+            }
+            Hairline()
+            SettingRow(
+                s.t("Back off when the phone is hot", "Telefon ısınınca geri çekil"),
+                subtitle = s.t("Fewer pictures a second, then none, as the heat rises.", "Isı arttıkça saniyede daha az kare, sonra hiç."),
+            ) {
+                LidSwitch(st.battery.thermalBackoff, { v -> setS { it.copy(battery = it.battery.copy(thermalBackoff = v)) } }, description = s.t("Back off when hot", "Isınınca geri çekil"))
+            }
             Spacer(Modifier.height(10.dp))
             EbText(s.t("Frames are analysed on this phone and thrown away. No video is saved and nothing is uploaded. A visible indicator shows whenever the camera is on.", "Kareler bu telefonda analiz edilip atılır. Video kaydedilmez, hiçbir şey yüklenmez. Kamera açıkken görünür bir gösterge belirir."), Ink.Caption, color = P.inkFaint)
         }

@@ -63,9 +63,9 @@ When it can't, it says so instead of guessing.
 - **Two kinds of break.** *Micro Blink* is the half-second lid. *Smart Rest* is a longer, skippable pause - a pure-black Blackout or a Distance Focus
   countdown (look 6 m away for 20 s) - ended by a tap, or one real blink when the camera is on.
 - **Videos wait for you - when it is safe.** EyeBlink pauses only after reading that something is playing, *verifies* the pause, and resumes only if nothing
-  changed meanwhile. It never resumes what you paused yourself, never touches a video it cannot read, and tests each app on your phone (again after each app update) before relying on it.
-- **Polite.** It waits out swipes, typing, calls, navigation and video transitions, keeps cool-downs and an hourly cap, and stays away from calls, payments, sign-in and system screens.
-- **Smart night mode.** Optional, gradual warmth and brightness, driven by the clock and the room's light, which steps back the moment you change something yourself.
+  changed meanwhile. It never resumes what you paused yourself, never touches a video it cannot read, and tests each app on your phone before relying on it (strategies that hook into the app are tested again after an app update; the media-session ones are not).
+- **Polite.** It waits out swipes, a keyboard on the screen, calls, navigation and video transitions, keeps cool-downs and an hourly cap, and stays away from calls, password fields and a list of system, security, dialer and wallet apps. (It does not recognise a payment or sign-in screen inside an ordinary app, and it does not read notifications other than navigation.)
+- **Smart night mode.** Optional: Night Light warmth (set in one step) and screen brightness (eased in), driven by the clock and the room's light. It steps back for a while the moment you change either yourself, and puts back what it changed - also after an emergency stop or a restart.
 - **Simple or advanced.** Sensible automatic behaviour by default; one switch exposes every knob.
 - **Two themes, two languages.** Bright *Daylight* and deep-indigo *Moonlit* (Auto / Light / Dark). English and Turkish, chosen from a chip that opens a list.
 
@@ -144,7 +144,7 @@ Signing secrets, if you have them, are read from `keystore.properties` (git-igno
 - **No screen reading.** The accessibility service does not request window content. It sees which app is in front, whether a field is a password field, and event *types* - never text.
 - **The camera is analysed in memory.** Frames become a few numbers (how far each eyelid is open against its own usual level, quality) and are discarded. A visible indicator shows whenever the camera is on, and the Quick Settings tile suspends everything - camera included - from anywhere.
 - **Everything is local and deletable.** Settings, calibration numbers, daily counters and per-app test results live in one private file; each can be cleared in the app.
-- **Fails closed.** If the service dies, whatever it drew disappears. It never covers calls, the lock screen, payments, sign-in or system settings.
+- **Fails closed.** If the service dies, whatever it drew disappears. It does not cover calls, the lock screen, password fields, system settings or the wallet and dialer apps on its list.
 
 ## Where things are
 

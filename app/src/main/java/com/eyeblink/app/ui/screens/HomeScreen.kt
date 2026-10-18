@@ -210,8 +210,13 @@ fun HomeScreen(
             }
             Spacer(Modifier.height(12.dp))
             EbText(
-                if (rt.triggerMode == TriggerMode.CAMERA_ASSISTED) s.t("Blinks are being observed by the camera. Everything stays on this phone.", "Göz kırpmaların kamerayla gözlemleniyor. Her şey bu telefonda kalıyor.")
-                else s.t("EyeBlink is on a timer. It can't tell whether you actually blinked.", "EyeBlink bir zamanlayıcıyla çalışıyor. Gerçekten göz kırpıp kırpmadığını bilemez."),
+                when {
+                    rt.triggerMode == TriggerMode.CAMERA_ASSISTED && rt.cameraActive ->
+                        s.t("Blinks are being observed by the camera. Everything stays on this phone.", "Göz kırpmaların kamerayla gözlemleniyor. Her şey bu telefonda kalıyor.")
+                    rt.triggerMode == TriggerMode.CAMERA_ASSISTED ->
+                        s.t("The camera looks in short bursts. Between them EyeBlink goes by what the last look showed - it can't see your blinks right now. Everything stays on this phone.", "Kamera kısa aralıklarla bakıyor. Aralarda EyeBlink son bakışta gördüğüne göre çalışıyor, şu an göz kırpmalarını göremez. Her şey bu telefonda kalıyor.")
+                    else -> s.t("EyeBlink is on a timer. It can't tell whether you actually blinked.", "EyeBlink bir zamanlayıcıyla çalışıyor. Gerçekten göz kırpıp kırpmadığını bilemez.")
+                },
                 Ink.Caption, color = p.inkFaint,
             )
         }

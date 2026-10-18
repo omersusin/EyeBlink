@@ -112,6 +112,23 @@ Eyes differ by a factor of two - a wide eye reads about 0.35 when open, a narrow
 
 `EyeShapesTest` runs this whole path on simulated wide, typical, narrow, monolid, heavy-lidded, asymmetric and barely-moving eyes at 15 and 30 frames per second, with tracker noise, glitch frames, dropped frames and a slow change of gaze; `BlinkDetectorTest` pins the rules above one by one. All of it is simulation: the numbers say that the logic holds together, not how MediaPipe behaves on a particular face.
 
+### The components, and where they live
+
+| Component | Where |
+|---|---|
+| Core: configuration, scheduling, lifecycle | `core/model/Settings.kt`, `core/engine/BreakScheduler`, `IntervalPlanner`, `TriggerPolicy`; app `engine/Engine.kt` |
+| Blink animation engine | `core/anim/BlinkTimeline`, `EyelidGeometry`; app `overlay/BlinkView`, `AndroidOverlay`, `OverlayWindows` |
+| Eye tracking engine | app `camera/CameraFaceSource`, `engine/Tracking.kt`; core `calibration/TrackingPipeline`, `BlinkDetector`, `OpenBaseline`, `EyeGeometry` |
+| Calibration engine | core `calibration/CalibrationSession`, `BlinkThresholds`, `AdaptiveLearner`, `BlinkStatistics`; app `engine/Tracking.kt` (`Calibrator`, `EyeTester`) |
+| Context engine | core `engine/ContextSnapshot`, `InterruptionGate`, `calibration/ContextProfile`; app `platform/Signals`, `engine/Foreground`, `platform/DeviceState` |
+| Playback controller | core `playback/*`, `engine/BreakDirector`, `privileged/PrivilegedPlayback`; app `playback/*Backend`, `engine/CompatController` |
+| Accessibility adapter | app `access/*`, `platform/Access` |
+| LSPosed adapter | the `lsposed/` module; app `playback/LsposedBackend` |
+| Night display controller | core `night/NightPlanner`; app `engine/NightController` |
+| Privacy and safety manager | not one class but a set of duties: `InterruptionGate` and `NeverInterrupt` (what is never interrupted), suspend and emergency stop (`Engine.emergencyStop`, the Quick Settings tile), the clean-up of `BreakDirector` (it runs in `NonCancellable`), the manifest without `INTERNET` and its CI guard, `PrivacyScreen` (forget, clear) |
+
+What is not there, so that nobody looks for it: notifications other than an ongoing navigation one are not read, so an incoming call is known from the audio mode and nothing else; a finger held still on the screen is not seen after half a second; there is no accessibility *node* action for playback (`Strategy.A11Y_NODE` has no backend; the one accessibility action is an optional tap at a fixed point, off by default); the screen is not captured (MediaProjection is only investigated); the Android layer has no unit tests of its own - CI builds, lints and starts it on an emulator, and `:core` carries the tests.
+
 ### Overlay
 
 `OverlayWindows` attaches views as `TYPE_ACCESSIBILITY_OVERLAY` when the accessibility service is connected, otherwise

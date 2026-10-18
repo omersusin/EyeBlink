@@ -27,6 +27,9 @@ interface FaceSource {
 
     /** Closes the camera. Idempotent. */
     fun stop()
+
+    /** The system is short of memory: let go of the face model if the camera is not using it. Idempotent. */
+    fun releaseModel() = Unit
 }
 
 /** The pieces that live behind libraries only the real app has (Compose windows, CameraX, Shizuku). */

@@ -16,6 +16,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.eyeblink.app.ui.i18n.fmtDecimal
+import com.eyeblink.app.ui.i18n.reason
 import com.eyeblink.app.ui.kit.Badge
 import com.eyeblink.app.ui.kit.ButtonKind
 import com.eyeblink.app.ui.kit.Chip
@@ -82,7 +83,7 @@ fun DiagnosticsScreen(state: UiState, actions: UiActions, onBack: () -> Unit) {
             )
             Health(
                 if (d.overlayKind.isNotEmpty()) true else null, s.t("Overlay", "Bindirme"),
-                d.overlayKind.ifEmpty { s.t("none yet", "henüz yok") },
+                (s.reason(d.overlayKind) ?: d.overlayKind).ifEmpty { s.t("none yet", "henüz yok") },
             )
             Health(
                 if (camera == TrackingMode.OFF) null else rt.cameraActive, s.t("Camera", "Kamera"),
@@ -128,7 +129,7 @@ fun DiagnosticsScreen(state: UiState, actions: UiActions, onBack: () -> Unit) {
                 "Root / Shizuku",
                 when {
                     privilegedReady -> s.t("can read and pause media", "medyayı okuyup duraklatabilir")
-                    privilegedWanted -> s.t("not working: ${power.status.detail ?: "no answer"}", "çalışmıyor: ${power.status.detail ?: "yanıt yok"}")
+                    privilegedWanted -> s.t("not working: ${power.status.detail ?: "no answer"}", "çalışmıyor: ${s.reason(power.status.detail) ?: "yanıt yok"}")
                     power.rootAvailable == true || power.shizukuGranted -> s.t("granted, not selected (Power modes)", "verildi, seçili değil (Güç modları)")
                     else -> s.t("not selected", "seçili değil")
                 },
