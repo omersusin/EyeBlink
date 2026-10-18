@@ -176,7 +176,7 @@ EyeBlink is released under the **[PolyForm Noncommercial License 1.0.0](LICENSE)
 | read it, change it, build your own version and share that | show advertising in it, or ship it inside a commercial product or service |
 | use it for study, research, a hobby project, a school or university, a charity or a public body | use it to make money in any other way |
 
-Whoever passes it on has to pass on the [LICENSE](LICENSE) and the [NOTICE](NOTICE) with it. The author may license it to someone else on other terms; to ask for that, open an issue.
+Whoever passes it on has to pass on the [LICENSE](LICENSE) and the [NOTICE](NOTICE) with it. Every right the licence does not grant stays with the author.
 This is a *source-available* licence, not an OSI "open source" one - that is the point of it.
 
 Two honest limits. A licence covers the *code, design and texts* of EyeBlink; it cannot stop anyone from having the same *idea* (an app that blinks for you and pauses your
