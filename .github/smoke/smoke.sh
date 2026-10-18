@@ -301,6 +301,48 @@ else
 fi
 health "after calibration"
 
+# The page that shows what the camera engine sees of the eyes. It starts the same camera and face model as the
+# calibration, through a session of its own, and has to let go of them again.
+step "Blink test"
+adb logcat -c
+if tools tap More --bottommost --timeout 15 && tools tap Calibration --scroll --timeout 15; then
+  sleep 2
+  if tools tap "Try your blinks" --scroll --timeout 10; then
+    sleep 2
+    snap 17-blink-test-intro
+    if tools tap Begin --timeout 10; then
+      sleep 14
+      snap 18-blink-test
+      if adb logcat -d -s EyeBlink:I 2>/dev/null | tr -d '\r' | grep "eye test: the first camera picture"; then
+        echo "the blink test is receiving pictures"
+      else
+        warn "no picture came from the camera during the blink test"
+        camera_report
+      fi
+      if tools has "$OUT/18-blink-test.xml" "Blinks seen"; then
+        echo "the blink test page is running"
+        tools tap Stop --timeout 8 && sleep 2
+        snap 19-blink-test-stopped
+        tools has "$OUT/19-blink-test-stopped.xml" "Begin" || warn "the blink test did not go back to its start after Stop"
+      else
+        warn "the blink test page did not stay running"
+        tools texts "$OUT/18-blink-test.xml" | head -20
+      fi
+    else
+      warn "could not press Begin on the blink test page"
+    fi
+    adb shell input keyevent KEYCODE_BACK
+    sleep 2
+  else
+    warn "could not open the blink test page"
+  fi
+  adb shell input keyevent KEYCODE_BACK
+  sleep 2
+else
+  warn "could not reach the calibration page for the blink test"
+fi
+health "after the blink test"
+
 step "Language and theme"
 if tools tap English --scroll --timeout 20; then
   sleep 2
