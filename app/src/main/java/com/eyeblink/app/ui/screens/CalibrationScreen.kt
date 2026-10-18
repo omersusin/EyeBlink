@@ -12,7 +12,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -45,6 +48,7 @@ import com.eyeblink.app.ui.kit.Tone
 import com.eyeblink.app.ui.kit.reveal
 import com.eyeblink.app.ui.state.CalibrationStage
 import com.eyeblink.app.ui.state.CalibrationUi
+import com.eyeblink.app.ui.state.Page
 import com.eyeblink.app.ui.state.PermissionKind
 import com.eyeblink.app.ui.state.UiActions
 import com.eyeblink.app.ui.state.UiState
@@ -56,9 +60,12 @@ import com.eyeblink.core.calibration.QualityIssue
 import kotlin.math.roundToInt
 
 @Composable
-fun CalibrationScreen(state: UiState, actions: UiActions, onBack: () -> Unit) {
+fun CalibrationScreen(state: UiState, actions: UiActions, onBack: () -> Unit, onPage: (Page) -> Unit = {}) {
     val s = S
     val c = state.calibration
+    // A session that is still running when the page goes away (the system's back, say) must not keep the camera on.
+    val stage by rememberUpdatedState(c.stage)
+    DisposableEffect(Unit) { onDispose { if (stage == CalibrationStage.RUNNING) actions.cancelCalibration() } }
     PageColumn(s.t("Calibration", "Kalibrasyon"), s.t("Meet your blink", "Kırpmanla tanış"), onBack = {
         // A session in progress is dropped on the way out, and so is a result with nothing in it to keep; a result that can
         // still be saved stays until it is.
@@ -67,15 +74,15 @@ fun CalibrationScreen(state: UiState, actions: UiActions, onBack: () -> Unit) {
         onBack()
     }) {
         when (c.stage) {
-            CalibrationStage.INTRO -> Intro(state, actions)
+            CalibrationStage.INTRO -> Intro(state, actions, onPage)
             CalibrationStage.RUNNING -> Running(c, actions)
-            CalibrationStage.RESULT -> Result(state, actions)
+            CalibrationStage.RESULT -> Result(state, actions, onPage)
         }
     }
 }
 
 @Composable
-private fun Intro(state: UiState, actions: UiActions) {
+private fun Intro(state: UiState, actions: UiActions, onPage: (Page) -> Unit) {
     val s = S
     val c = state.calibration
     EbText(
@@ -117,6 +124,7 @@ private fun Intro(state: UiState, actions: UiActions) {
     }
     Column(Modifier.reveal(5), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         PillButton(s.t("Begin", "Başla"), { actions.startCalibration() }, icon = Icon.Eye, modifier = Modifier.fillMaxWidth())
+        PillButton(s.t("Try your blinks", "Kırpmalarını dene"), { onPage(Page.EYE_TEST) }, kind = ButtonKind.Soft, icon = Icon.Eye, modifier = Modifier.fillMaxWidth(), compact = true)
         if (state.personal.isCalibrated) {
             PillButton(s.t("Reset my profile", "Profilimi sıfırla"), { actions.resetCalibration() }, kind = ButtonKind.Ghost, icon = Icon.Trash, modifier = Modifier.fillMaxWidth(), compact = true)
         }
@@ -125,7 +133,7 @@ private fun Intro(state: UiState, actions: UiActions) {
 
 /** Something went wrong before the session could begin: what, and what to do about it. */
 @Composable
-private fun ProblemCard(title: String, body: String, modifier: Modifier = Modifier, hint: String? = null) {
+internal fun ProblemCard(title: String, body: String, modifier: Modifier = Modifier, hint: String? = null) {
     Card(modifier.fillMaxWidth(), tint = P.coral) {
         Row(verticalAlignment = Alignment.Top) {
             IconBadge(Icon.Warning, P.coral, size = 40.dp)
@@ -252,7 +260,7 @@ private fun Running(c: CalibrationUi, actions: UiActions) {
 
 /** A small eye that mirrors what the camera sees: open when your eye is open, closed when it blinks. */
 @Composable
-private fun LiveEye(openness: Float?) {
+internal fun LiveEye(openness: Float?) {
     val p = P
     val colors = remember(p) { EyeColors.of(p) }
     Canvas(Modifier.fillMaxWidth().height(120.dp)) {
@@ -267,7 +275,7 @@ private fun LiveEye(openness: Float?) {
     }
 }
 
-private fun qualityTip(i: QualityIssue, s: Strings) = when (i) {
+internal fun qualityTip(i: QualityIssue, s: Strings) = when (i) {
     QualityIssue.NO_FACE -> s.t("I can't see you - face the screen", "Seni göremiyorum - ekrana dön")
     QualityIssue.TOO_DARK -> s.t("Too dark - find more light", "Çok karanlık - biraz ışık bul")
     QualityIssue.FACE_TOO_SMALL -> s.t("A little closer, please", "Biraz daha yaklaş")
@@ -282,7 +290,7 @@ private fun passage(s: Strings) = s.t(
 )
 
 @Composable
-private fun Result(state: UiState, actions: UiActions) {
+private fun Result(state: UiState, actions: UiActions, onPage: (Page) -> Unit) {
     val s = S
     val r = state.calibration.result
     if (r == null || !r.hasEnoughSpontaneous) {
@@ -323,6 +331,11 @@ private fun Result(state: UiState, actions: UiActions) {
         DetailRow(s.t("Natural blinks seen", "Görülen doğal kırpma"), "${r.spontaneousCount}")
         Hairline()
         DetailRow(s.t("Camera confidence", "Kamera güveni"), "${(r.meanConfidence * 100).roundToInt()}%")
+        Hairline()
+        r.fullDepth?.let { depth ->
+            Hairline()
+            DetailRow(s.t("How far your eyelids close", "Göz kapaklarının kapanma oranı"), "${(depth * 100).roundToInt()}%")
+        }
         Hairline()
         DetailRow(s.t("Detector fitted to you", "Sana göre ayarlanan algılayıcı"), if (r.profile.thresholds.fitted) s.t("yes", "evet") else s.t("defaults", "varsayılan"))
     }

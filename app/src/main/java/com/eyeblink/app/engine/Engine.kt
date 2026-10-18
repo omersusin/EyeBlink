@@ -155,6 +155,10 @@ class Engine(val app: Application, ports: EnginePorts) {
         app, scope, ports.faces, { settings }, post = ::post, onSave = { setPersonal(it) }, onChange = { post { publish() } },
     )
 
+    private val eyeTester = EyeTester(
+        app, scope, ports.faces, { settings }, { personal }, post = ::post, onChange = { post { publish() } },
+    )
+
     private val night = NightController(app, scope, { settings.night }, light, onChange = { post { publish() } })
 
     private val scheduler = BreakScheduler()
@@ -353,7 +357,10 @@ class Engine(val app: Application, ports: EnginePorts) {
             if (next.camera.tracking == com.eyeblink.core.model.TrackingMode.OFF) tracking.stopCamera()
             service?.get()?.refresh()
         }
-        if (old.camera.sensitivity != next.camera.sensitivity) tracking.applyThresholds(personal.thresholds)
+        if (old.camera.sensitivity != next.camera.sensitivity) {
+            tracking.applyThresholds(personal.thresholds)
+            eyeTester.refresh()
+        }
         syncService()
         notifyState()
         publish()
@@ -368,7 +375,10 @@ class Engine(val app: Application, ports: EnginePorts) {
 
     fun testCompat(pkg: String) = post { compat.test(pkg) }
 
-    fun startCalibration() = post { tracking.stopCamera(); calibrator.start(); syncService(); publish() }
+    fun startCalibration() = post { eyeTester.stop(); tracking.stopCamera(); calibrator.start(); syncService(); publish() }
+    fun startEyeTest() = post { if (calibrator.running) calibrator.cancel(); tracking.stopCamera(); eyeTester.start(); syncService(); publish() }
+    fun stopEyeTest() = post { eyeTester.stop(); syncService(); publish() }
+    fun eyeTestCameraDenied() = post { eyeTester.cameraDenied(); publish() }
     fun calibrationCameraDenied() = post { calibrator.cameraDenied(); publish() }
     fun skipCalibrationPhase() = post { calibrator.skipPhase() }
     fun cancelCalibration() = post { calibrator.cancel() }
@@ -379,6 +389,7 @@ class Engine(val app: Application, ports: EnginePorts) {
         personal = p
         stores.saveProfile(p)
         tracking.applyThresholds(p.thresholds)
+        eyeTester.refresh()
         publish()
     }
 
@@ -431,11 +442,11 @@ class Engine(val app: Application, ports: EnginePorts) {
     }
 
     /** Whether the service should be alive: the engine is on, night mode is on, or a calibration is running. */
-    fun wantsService(): Boolean = running || settings.night.enabled || calibrator.running
+    fun wantsService(): Boolean = running || settings.night.enabled || calibrator.running || eyeTester.running
 
     /** Whether the service should carry the camera type: only if camera tracking is both wanted and permitted. */
     fun wantsCamera(): Boolean =
-        (settings.camera.tracking != com.eyeblink.core.model.TrackingMode.OFF || calibrator.running) && Access.camera(app)
+        (settings.camera.tracking != com.eyeblink.core.model.TrackingMode.OFF || calibrator.running || eyeTester.running) && Access.camera(app)
 
     private fun syncService() {
         if (wantsService()) {
@@ -472,7 +483,7 @@ class Engine(val app: Application, ports: EnginePorts) {
             // While the calibration runs it owns the camera. On its next tick the tracker would find a camera that "should
             // not be running" (tracking off, or nobody eligible) and stop it, and the calibration would count down without
             // ever seeing a picture.
-            if (!calibrator.running) tracking.tick(now, eligible)
+            if (!calibrator.running && !eyeTester.running) tracking.tick(now, eligible)
             sampleBattery(now, ctx)
 
             val step = if (suspended || !windows.available()) {
@@ -689,7 +700,7 @@ class Engine(val app: Application, ports: EnginePorts) {
 
     fun notificationNote(): RunningNote = RunningNote(
         running = running, suspended = suspended, snoozed = scheduler.snoozedUntilMs > nowMs(),
-        cameraOn = tracking.cameraActive || calibrator.running,
+        cameraOn = tracking.cameraActive || calibrator.running || eyeTester.running,
         nightOnly = !running && settings.night.enabled,
     )
 
@@ -729,6 +740,7 @@ class Engine(val app: Application, ports: EnginePorts) {
             apps = apps,
             compat = compatUi,
             calibration = calibrator.ui,
+            eyeTest = eyeTester.ui,
             personal = personal,
             stats = statsUi(),
             night = night.ui,

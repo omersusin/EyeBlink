@@ -95,6 +95,18 @@ object Sample {
         )
     }
 
+    /** The "try your blinks" page: not yet begun, or running with a few blinks counted. */
+    fun eyeTest(running: Boolean): UiState {
+        val base = state()
+        return base.copy(
+            eyeTest = com.eyeblink.app.ui.state.EyeTestUi(
+                running = running, hasCameraPermission = true, openness = if (running) 0.62f else null, countsAt = 0.31f,
+                blinks = if (running) 7 else 0, lastDepth = if (running) 0.58f else null, lastDurationMs = 150, lastComplete = running,
+                fitted = true,
+            ),
+        )
+    }
+
     fun state(lang: Language = Language.EN, running: Boolean = true, micro: Long? = 38_000, notReady: Boolean = false): UiState {
         val perms = if (notReady) emptySet() else setOf(PermissionKind.ACCESSIBILITY, PermissionKind.NOTIFICATION_LISTENER, PermissionKind.NOTIFICATIONS, PermissionKind.OVERLAY)
         val baseline = BlinkBaseline(9_200, 140, 0.88f, 64)

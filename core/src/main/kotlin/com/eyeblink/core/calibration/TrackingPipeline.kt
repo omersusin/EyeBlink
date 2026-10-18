@@ -37,6 +37,9 @@ class TrackingPipeline(thresholds: BlinkThresholds = BlinkThresholds(), sensitiv
     /** How closed the eyes were on the last frame, as a share of their own open level; for diagnostics. */
     val closure: Float get() = detector.closure
 
+    /** The closure at which the detector currently starts counting a blink, in the same terms as [closure]. */
+    val startDepth: Float get() = detector.settings.start
+
     val rate = BlinkRateTracker()
 
     private var lastTrackableMs: Long? = null

@@ -232,7 +232,8 @@ class CalibrationSession(
 
         val open = openLevel()
         val closed = closedLevel()
-        val thresholds = BlinkThresholds.fromCalibration(open, fullDepth(open))
+        val depth = fullDepth(open)
+        val thresholds = BlinkThresholds.fromCalibration(open, depth)
 
         val phaseStats = Phase.entries.filter { it == Phase.VIDEO || it == Phase.READING }.associateWith { p ->
             val list = if (p == Phase.VIDEO) videoBlinks else readingBlinks
@@ -260,6 +261,7 @@ class CalibrationSession(
             trackedMs = trackedTotal,
             openLevel = open,
             closedLevel = closed,
+            fullDepth = depth,
         )
     }
 
@@ -412,6 +414,8 @@ data class CalibrationResult(
     val trackedMs: Long = 0L,
     val openLevel: Float? = null,
     val closedLevel: Float? = null,
+    /** How far the deliberate blinks closed the eyes, as a share of their own open level (the middle of them), if measured. */
+    val fullDepth: Float? = null,
 ) {
     /**
      * Phases A and B are what establish a baseline. Without enough of them the

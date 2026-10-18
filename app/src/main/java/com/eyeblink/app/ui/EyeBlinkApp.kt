@@ -31,6 +31,7 @@ import com.eyeblink.app.ui.kit.S
 import com.eyeblink.app.ui.screens.AboutScreen
 import com.eyeblink.app.ui.screens.CalibrationScreen
 import com.eyeblink.app.ui.screens.DiagnosticsScreen
+import com.eyeblink.app.ui.screens.EyeTestScreen
 import com.eyeblink.app.ui.screens.HomeScreen
 import com.eyeblink.app.ui.screens.LanguageSheet
 import com.eyeblink.app.ui.screens.AppPickerSheet
@@ -125,7 +126,8 @@ private fun MainShell(
                     else -> Placeholder(dest.name)
                 }
                 is Page -> when (dest) {
-                    Page.CALIBRATION -> CalibrationScreen(state, actions, onBack = { page = null })
+                    Page.CALIBRATION -> CalibrationScreen(state, actions, onBack = { page = null }, onPage = { page = it })
+                    Page.EYE_TEST -> EyeTestScreen(state, actions, onBack = { page = null })
                     Page.NIGHT -> NightScreen(state, actions, onBack = { page = null }, onPage = { page = it })
                     Page.POWER -> PowerScreen(state, actions, onBack = { page = null })
                     Page.DIAGNOSTICS -> DiagnosticsScreen(state, actions, onBack = { page = null })

@@ -7,6 +7,7 @@ import com.eyeblink.app.platform.DeviceState
 import com.eyeblink.app.platform.nowMs
 import com.eyeblink.app.ui.state.CalibrationStage
 import com.eyeblink.app.ui.state.CalibrationUi
+import com.eyeblink.app.ui.state.EyeTestUi
 import com.eyeblink.core.calibration.AdaptiveLearner
 import com.eyeblink.core.calibration.BlinkObservation
 import com.eyeblink.core.calibration.BlinkThresholds
@@ -371,6 +372,132 @@ class Calibrator(
         const val TAG = "EyeBlink"
         /** A blink is over in a few frames; at 15 fps a quick one is two. Calibration is short, so it can afford to look closely. */
         const val CALIBRATION_FPS = 30
+        const val NO_FRAMES_MS = 20_000L
+    }
+}
+
+/**
+ * "Try your blinks": the same pipeline that watches during the day, with the thresholds that are in force, shown live.
+ * It keeps nothing - no picture, no number - and exists so that a person can see that the engine sees their own eyes
+ * and tune the sensitivity by watching the counter. While it runs it owns the camera, like the calibration does.
+ */
+class EyeTester(
+    private val app: Application,
+    private val scope: CoroutineScope,
+    private val faces: FaceSource?,
+    private val settings: () -> EyeBlinkSettings,
+    private val profile: () -> PersonalProfile,
+    private val post: (() -> Unit) -> Unit,
+    private val onChange: () -> Unit,
+) {
+    @Volatile var ui: EyeTestUi = EyeTestUi()
+        private set
+
+    private var pipeline: TrackingPipeline? = null
+    private var tick: Job? = null
+    private var framesSeen = 0
+    private var lastFrameAtMs = 0L
+    private var blinks = 0
+
+    /** Background tracking must not touch the camera while this is true. */
+    val running: Boolean get() = pipeline != null
+
+    fun start() {
+        val source = faces
+        val permitted = Access.camera(app)
+        if (source == null || !source.ready || !permitted) {
+            val why = when {
+                source == null -> "this build has no camera support"
+                !source.ready -> source.lastError ?: "the face model file is missing from the app"
+                else -> null
+            }
+            ui = EyeTestUi(hasCameraPermission = permitted, error = why)
+            onChange()
+            return
+        }
+        source.stop()
+        pipeline = newPipeline()
+        blinks = 0
+        framesSeen = 0
+        lastFrameAtMs = nowMs()
+        val started = source.start(TEST_FPS, { frame, _ -> post { onFrame(frame) } }, { message -> post { abort(message) } })
+        if (!started) {
+            pipeline = null
+            ui = EyeTestUi(hasCameraPermission = true, error = source.lastError ?: "the camera could not be started")
+            onChange()
+            return
+        }
+        ui = EyeTestUi(running = true, hasCameraPermission = true, fitted = profile().thresholds.fitted)
+        tick?.cancel()
+        tick = scope.launch {
+            while (isActive) {
+                delay(250)
+                if (nowMs() - lastFrameAtMs > NO_FRAMES_MS) { post { abort("no pictures arrived from the camera for ${NO_FRAMES_MS / 1_000} seconds") }; break }
+                onChange()
+            }
+        }
+        onChange()
+    }
+
+    fun stop() {
+        if (pipeline == null) {
+            // Nothing was running; at most there is an old message on the page to clear.
+            if (ui.error != null || ui.cameraDenied) { ui = EyeTestUi(hasCameraPermission = Access.camera(app)); onChange() }
+            return
+        }
+        tick?.cancel()
+        faces?.stop()
+        pipeline = null
+        ui = EyeTestUi(hasCameraPermission = Access.camera(app))
+        onChange()
+    }
+
+    fun cameraDenied() {
+        if (pipeline != null) return
+        ui = EyeTestUi(hasCameraPermission = false, cameraDenied = true)
+        onChange()
+    }
+
+    /** The thresholds or the sensitivity changed while the test runs: judge the next frames by the new ones. */
+    fun refresh() {
+        if (pipeline == null) return
+        pipeline = newPipeline()
+        ui = ui.copy(fitted = profile().thresholds.fitted)
+    }
+
+    private fun newPipeline() = TrackingPipeline(profile().thresholds, settings().camera.sensitivity.factor)
+
+    private fun onFrame(frame: FaceFrame) {
+        val p = pipeline ?: return
+        lastFrameAtMs = nowMs()
+        if (++framesSeen == 1) Log.i(TAG, "eye test: the first camera picture arrived, face seen: ${frame.sample != null}")
+        val blink = p.onFrame(frame).blink
+        if (blink != null) blinks++
+        val sample = frame.sample
+        ui = ui.copy(
+            openness = if (sample != null && sample.isTrackable) 1f - p.closure else null,
+            countsAt = p.startDepth,
+            blinks = blinks,
+            lastDepth = blink?.depth ?: ui.lastDepth,
+            lastDurationMs = blink?.durationMs ?: ui.lastDurationMs,
+            lastComplete = blink?.complete ?: ui.lastComplete,
+            quality = frame.quality,
+        )
+    }
+
+    private fun abort(message: String) {
+        if (pipeline == null) return
+        Log.w(TAG, "eye test stopped: $message")
+        tick?.cancel()
+        faces?.stop()
+        pipeline = null
+        ui = EyeTestUi(hasCameraPermission = Access.camera(app), error = message)
+        onChange()
+    }
+
+    private companion object {
+        const val TAG = "EyeBlink"
+        const val TEST_FPS = 30
         const val NO_FRAMES_MS = 20_000L
     }
 }

@@ -25,7 +25,7 @@ import com.eyeblink.core.stats.DayStats
 enum class Tab { TODAY, BLINK, RHYTHM, APPS, MORE }
 
 /** Pages reached from More. */
-enum class Page { CALIBRATION, NIGHT, POWER, DIAGNOSTICS, STATS, PRIVACY, ABOUT }
+enum class Page { CALIBRATION, EYE_TEST, NIGHT, POWER, DIAGNOSTICS, STATS, PRIVACY, ABOUT }
 
 enum class PermissionKind {
     OVERLAY, ACCESSIBILITY, NOTIFICATION_LISTENER, USAGE_ACCESS, CAMERA, NOTIFICATIONS, WRITE_SETTINGS, BATTERY_OPTIMIZATION,
@@ -97,6 +97,27 @@ data class CalibrationUi(
     val cameraDenied: Boolean = false,
 )
 
+/** The "try your blinks" page: what the camera engine sees of the eyes right now. Nothing here is kept. */
+data class EyeTestUi(
+    val running: Boolean = false,
+    val hasCameraPermission: Boolean = false,
+    val cameraDenied: Boolean = false,
+    /** Why the camera or the face model could not start, when it could not. */
+    val error: String? = null,
+    /** How open the eyes are, 0..1 where 1 is this person's own open eye, or null when no face is tracked. */
+    val openness: Float? = null,
+    /** How far the eyes must close (0..1, shut = 1) to count as a blink with the thresholds in force. */
+    val countsAt: Float = 0f,
+    val blinks: Int = 0,
+    /** The last blink seen: how deep it went (0..1), how long it took, and whether it counted as a full one. */
+    val lastDepth: Float? = null,
+    val lastDurationMs: Long = 0L,
+    val lastComplete: Boolean = false,
+    val quality: QualityReport? = null,
+    /** Whether the thresholds were fitted to this person by a calibration. */
+    val fitted: Boolean = false,
+)
+
 data class PowerUi(
     val shizukuInstalled: Boolean = false,
     val shizukuRunning: Boolean = false,
@@ -154,6 +175,7 @@ data class UiState(
     val apps: List<AppChoiceUi> = emptyList(),
     val compat: Map<String, CompatUi> = emptyMap(),
     val calibration: CalibrationUi = CalibrationUi(),
+    val eyeTest: EyeTestUi = EyeTestUi(),
     val personal: PersonalProfile = PersonalProfile(),
     val stats: StatsUi = StatsUi(),
     val night: NightUi = NightUi(),
@@ -180,6 +202,9 @@ interface UiActions {
     fun removeApp(packageName: String)
     fun testCompat(packageName: String)
     fun openApp(packageName: String)
+
+    fun startEyeTest()
+    fun stopEyeTest()
 
     fun startCalibration()
     fun skipCalibrationPhase()
@@ -211,6 +236,8 @@ object NoActions : UiActions {
     override fun removeApp(packageName: String) = Unit
     override fun testCompat(packageName: String) = Unit
     override fun openApp(packageName: String) = Unit
+    override fun startEyeTest() = Unit
+    override fun stopEyeTest() = Unit
     override fun startCalibration() = Unit
     override fun skipCalibrationPhase() = Unit
     override fun cancelCalibration() = Unit

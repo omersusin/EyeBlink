@@ -37,6 +37,11 @@ class AndroidActions(private val activity: MainActivity) : UiActions {
         activity.packageManager.getLaunchIntentForPackage(packageName)?.let { activity.startActivity(it) }
     }
 
+    override fun startEyeTest() = activity.requestCamera { granted ->
+        if (granted) engine.startEyeTest() else engine.eyeTestCameraDenied()
+    }
+    override fun stopEyeTest() = engine.stopEyeTest()
+
     override fun startCalibration() = activity.requestCamera { granted ->
         if (granted) engine.startCalibration() else engine.calibrationCameraDenied()
     }

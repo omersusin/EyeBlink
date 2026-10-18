@@ -197,6 +197,7 @@ fun RhythmScreen(state: UiState, actions: UiActions, onPage: (Page) -> Unit, mod
                     if (state.personal.isCalibrated) s.t("Recalibrate", "Yeniden kalibre et") else s.t("Calibrate", "Kalibre et"),
                     { onPage(Page.CALIBRATION) }, kind = ButtonKind.Soft, icon = Icon.Eye, compact = true,
                 )
+                PillButton(s.t("Test blinks", "Kırpma testi"), { onPage(Page.EYE_TEST) }, kind = ButtonKind.Ghost, icon = Icon.Eye, compact = true)
             }
             Spacer(Modifier.height(16.dp))
             EbText(s.t("Eye sensitivity", "Göz hassasiyeti"), Ink.Eyebrow, caps = false)

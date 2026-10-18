@@ -75,6 +75,9 @@ fun main(args: Array<String>) {
     shot("calib-blink-eased-tr", h = 1900) {
         EyeBlinkApp(Sample.calibration(CalibrationStage.RUNNING, Phase.DELIBERATE, com.eyeblink.core.calibration.CalibrationSession.Hint.EASED), NoActions, Strings.TR, initialPage = Page.CALIBRATION)
     }
+    shot("eyetest-intro", h = 1500) { EyeBlinkApp(Sample.eyeTest(running = false), NoActions, en, initialPage = Page.EYE_TEST) }
+    shot("eyetest-live", h = 2300) { EyeBlinkApp(Sample.eyeTest(running = true), NoActions, en, initialPage = Page.EYE_TEST) }
+    shot("eyetest-live-tr", h = 2300) { EyeBlinkApp(Sample.eyeTest(running = true), NoActions, Strings.TR, initialPage = Page.EYE_TEST) }
     shot("calib-result", h = 2300) { EyeBlinkApp(Sample.calibration(CalibrationStage.RESULT), NoActions, en, initialPage = Page.CALIBRATION) }
     shot("calib-error", h = 2300) {
         val broken = Sample.calibration(CalibrationStage.INTRO)
