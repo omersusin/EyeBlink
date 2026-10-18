@@ -100,6 +100,34 @@ class BlinkThresholdsTest {
     }
 
     @Test
+    fun `eyes that close completely get the default start, not a higher one`() {
+        // A start above the default would ask a typical blink to be deeper than a typical blink is: 40 % blinks would go unseen.
+        for (depth in listOf(0.72f, 0.85f, 0.95f, 1f)) {
+            assertEquals("depth $depth", BlinkDetector.DEFAULT_START, BlinkThresholds.fromCalibration(0.6f, depth).start, 1e-4f)
+        }
+    }
+
+    @Test
+    fun `the start stays out of the tracker's noise, unless the blinks themselves are that shallow`() {
+        assertEquals(0.25f, BlinkThresholds.fromCalibration(0.6f, 0.50f).start, 1e-4f)
+        assertEquals(0.24f, BlinkThresholds.fromCalibration(0.6f, 0.40f).start, 1e-4f)
+        assertEquals("shallower blinks than that cannot be seen from higher up", 0.21f, BlinkThresholds.fromCalibration(0.6f, 0.35f).start, 1e-4f)
+        assertEquals(0.18f, BlinkThresholds.fromCalibration(0.6f, 0.30f).start, 1e-4f)
+        assertEquals(0.18f, BlinkThresholds.fromCalibration(0.6f, BlinkThresholds.MIN_USABLE_DEPTH).start, 1e-4f)
+    }
+
+    @Test
+    fun `whatever the depth, a fit is a set of thresholds the detector accepts as they are`() {
+        var depth = BlinkThresholds.MIN_USABLE_DEPTH
+        while (depth <= 1f) {
+            val t = BlinkThresholds.fromCalibration(0.5f, depth)
+            assertEquals("depth $depth", t, t.sanitised())
+            assertTrue("depth $depth: end < start < full", t.end < t.start && t.start < t.full)
+            depth += 0.01f
+        }
+    }
+
+    @Test
     fun `nan input is not trusted`() {
         assertFalse(BlinkThresholds.fromCalibration(0.5f, Float.NaN).fitted)
         assertEquals(0f, BlinkThresholds.fromCalibration(Float.NaN, 0.6f).openLevel, 0f)

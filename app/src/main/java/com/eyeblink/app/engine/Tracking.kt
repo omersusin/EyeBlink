@@ -288,7 +288,7 @@ class Calibrator(
         if (++framesSeen == 1) Log.i(TAG, "calibration: the first camera picture arrived, face seen: ${frame.sample != null}")
         val sample = frame.sample
         // The session decides what counts as a blink in each phase (see CalibrationSession.process).
-        if (sample != null && s.process(sample) != null) blinks++
+        if (sample == null) s.onTrackingLost() else if (s.process(sample) != null) blinks++
         ui = ui.copy(
             // How open the eyes are *for this person*: 1 is their own open eye, whatever it looks like.
             liveOpenness = if (sample != null && sample.isTrackable) 1f - s.closure else null,

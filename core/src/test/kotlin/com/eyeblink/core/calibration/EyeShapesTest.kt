@@ -24,9 +24,16 @@ class EyeShapesTest {
             expected.count { e -> atMs.any { kotlin.math.abs(it - e) <= toleranceMs } }
     }
 
-    private fun natural(eye: EyeProfile, fps: Int, thresholds: BlinkThresholds = BlinkThresholds(), sensitivity: Float = 1f, seed: Long = 7): Pair<Counted, List<Long>> {
+    private fun natural(
+        eye: EyeProfile,
+        fps: Int,
+        thresholds: BlinkThresholds = BlinkThresholds(),
+        sensitivity: Float = 1f,
+        seed: Long = 7,
+        blinkScore: Boolean = false,
+    ): Pair<Counted, List<Long>> {
         val times = (0 until 15).map { 3_000L + it * 3_700L + (it % 4) * 230L }
-        val sim = EyeSimulator(eye, fps, seed)
+        val sim = EyeSimulator(eye, fps, seed, withBlinkScore = blinkScore)
         times.forEachIndexed { i, t -> sim.blink(t, depth = if (i % 5 == 4) 0.55f else 1f) }
         // Looking down at the phone for six seconds, which is not a blink.
         sim.lower(20_000, durationMs = 6_000, share = 0.2f)
@@ -204,6 +211,67 @@ class EyeShapesTest {
         val found = mutableListOf<BlinkObservation>()
         for (s in sim.samples(0, 3_500)) pipeline.onFrame(FaceFrame(s.timestampMs, s, good, s.illuminance)).blink?.let { found += it }
         assertTrue("the blink 0.2 s into the session is already seen: ${found.map { it.startMs }}", found.any { it.startMs < 700 })
+    }
+
+    @Test
+    fun `an eye whose lid barely moves is found by a tracker that listens to the score it was fitted with`() {
+        // Open 0.14, shut 0.10: a full blink moves the eyelid reading by 29 % and no more. What tells this eye's blinks
+        // apart is the face model's score, and the test was passed on it; the tracker has to look at it as well.
+        val eye = EyeProfile("barely moving", openEar = 0.14f, closedEar = 0.10f, noise = 0.04f)
+        val fitted = calibrate(eye, blinkScore = true).session.result().profile.thresholds
+        assertTrue(fitted.fitted)
+        assertTrue("the tracker uses what the fit used", fitted.settings().useBlinkScore)
+        val (counted, expected) = natural(eye, fps = 30, thresholds = fitted, blinkScore = true)
+        assertTrue("found ${counted.found(expected)} of ${expected.size} with $fitted", counted.found(expected) >= expected.size * 0.8)
+        assertTrue("${counted.blinks.size} reported for ${expected.size}", counted.blinks.size <= expected.size + 2)
+    }
+
+    @Test
+    fun `a fit made with the score does not turn a still face into blinks`() {
+        for (eye in EyeProfile.ALL) {
+            val fitted = calibrate(eye, blinkScore = true).session.result().profile.thresholds
+            val sim = EyeSimulator(eye, fps = 30, seed = 77, withBlinkScore = true)
+            val pipeline = TrackingPipeline(fitted)
+            var blinks = 0
+            for (s in sim.samples(0, 90_000)) if (pipeline.onFrame(FaceFrame(s.timestampMs, s, good, s.illuminance)).blink != null) blinks++
+            assertTrue("${eye.name}: $blinks phantom blinks in 90 s with $fitted", blinks <= 1)
+        }
+    }
+
+    // --- eyes that are shut, faces that go away ---------------------------------------------------------------------------
+
+    @Test
+    fun `eyes shut for a long time cause no blinks on any kind of eye, and the first blink after they open is seen`() {
+        for (eye in EyeProfile.ALL) {
+            val sim = EyeSimulator(eye, fps = 30, seed = 21)
+            sim.blink(3_000)
+            sim.blink(8_000, holdMs = 25_000)          // shut from 8 s to 33 s
+            sim.blink(36_000).blink(38_500)
+            val pipeline = TrackingPipeline()
+            val found = mutableListOf<BlinkObservation>()
+            for (s in sim.samples(0, 42_000)) pipeline.onFrame(FaceFrame(s.timestampMs, s, good, s.illuminance)).blink?.let { found += it }
+            val starts = found.map { it.startMs }
+            assertEquals("${eye.name}: blinks while the eyes were shut: $starts", 0, found.count { it.startMs in 9_500L..32_500L })
+            assertTrue("${eye.name}: the blink 3 s after they opened is seen: $starts", found.any { it.startMs in 35_500L..36_500L })
+            assertTrue("${eye.name}: and the next one: $starts", found.any { it.startMs in 38_000L..39_000L })
+        }
+    }
+
+    @Test
+    fun `shutting the eyes during the deliberate test is not a deliberate blink`() {
+        for (eye in EyeProfile.ALL) {
+            val session = CalibrationSession(videoMs = 60_000, readingMs = 60_000, deliberateBlinksRequired = 5)
+            val sim = EyeSimulator(eye, fps = 30, seed = 31).blink(2_500).blink(6_200).blink(11_000, holdMs = 24_000)
+            session.start(0)
+            var phase = 0
+            for (s in sim.samples(0, 35_000)) {
+                if (phase == 0 && s.timestampMs >= 8_000) { session.skipPhase(s.timestampMs); phase = 1 }
+                if (phase == 1 && s.timestampMs >= 10_000) { session.skipPhase(s.timestampMs); phase = 2 }
+                session.process(s)
+            }
+            assertEquals("${eye.name}: eyes shut for 24 s counted as ${session.instructed.size} deliberate blinks", 0, session.instructed.size)
+            assertEquals(CalibrationSession.Phase.DELIBERATE, session.phase)
+        }
     }
 
     @Test

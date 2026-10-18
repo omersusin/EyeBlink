@@ -45,6 +45,12 @@ class OpenBaseline(
         cachedFresh = false
     }
 
+    /** True once the readings of the last window are enough to make a level of their own, so the [seed] is no longer needed. */
+    fun hasLevel(nowMs: Long): Boolean {
+        evict(nowMs)
+        return size >= MIN_SAMPLES
+    }
+
     /**
      * The open level at [nowMs]: the percentile of the readings of the last window, the [seed] while
      * there are too few of them, or null when neither exists yet.

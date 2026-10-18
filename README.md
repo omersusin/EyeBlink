@@ -90,7 +90,7 @@ This is an honest list. "Tested" means unit tests that run in CI; "built" means 
 
 | Part | State |
 |---|---|
-| Animation timeline, eyelid geometry, scheduling, interruption gates, rest state machine | **Tested** (518 JVM tests in `:core`) |
+| Animation timeline, eyelid geometry, scheduling, interruption gates, rest state machine | **Tested** (more than 560 JVM tests in `:core`) |
 | Playback safety protocol (pause, verify, remember, decide, resume, retry), per-app compatibility policy, and a whole break on a modelled phone with root whose shell and players answer slowly | **Tested** |
 | Calibration maths, tracking pipeline, adaptive learning, night planner, usage and battery ledgers | **Tested** |
 | Shell command building, quoting and `dumpsys media_session` parsing; settings codec | **Tested** |
@@ -150,7 +150,7 @@ Signing secrets, if you have them, are read from `keystore.properties` (git-igno
 
 | | |
 |---|---|
-| [`core/`](core) | the brain: pure Kotlin, 450 tests |
+| [`core/`](core) | the brain: pure Kotlin, more than 560 tests |
 | [`app/`](app) | the Android app and its Compose UI |
 | [`lsposed/`](lsposed) | the optional LSPosed module |
 | [`tools/designlab/`](tools/designlab) | the desktop renderer behind the screenshots |

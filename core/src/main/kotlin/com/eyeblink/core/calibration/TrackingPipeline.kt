@@ -32,6 +32,7 @@ data class FrameEvents(
 class TrackingPipeline(thresholds: BlinkThresholds = BlinkThresholds(), sensitivity: Float = 1f) {
 
     private var detector: BlinkDetector = thresholds.newDetector(sensitivity)
+    private var thresholds: BlinkThresholds = thresholds
     private var sensitivity: Float = sensitivity
 
     /** How closed the eyes were on the last frame, as a share of their own open level; for diagnostics. */
@@ -52,12 +53,19 @@ class TrackingPipeline(thresholds: BlinkThresholds = BlinkThresholds(), sensitiv
     private var windowLuma = 0.0
 
     /**
-     * Switches to freshly calibrated thresholds (and, if given, a new sensitivity); an eye that is mid-blink is
-     * forgotten, and what "open" looks like is learned again from the next frames.
+     * Switches to freshly calibrated thresholds, or to a new sensitivity. It judges the next blink by them. What the eyes'
+     * open level is stays learned - it is a fact about the eyes, not about the thresholds - and only a closure that is in
+     * progress is forgotten. Asking for what is already in force does nothing at all: the engine hands over the
+     * profile every time the learner accepts a window, and none of those is a reason to start over.
      */
     fun setThresholds(t: BlinkThresholds, sensitivity: Float = this.sensitivity) {
+        if (t == thresholds && sensitivity == this.sensitivity) return
+        thresholds = t
         this.sensitivity = sensitivity
-        detector = t.newDetector(sensitivity)
+        val sane = t.sanitised()
+        detector.configure(sane.settings(sensitivity))
+        detector.reset()
+        if (sane.openLevel > 0f) detector.seed(sane.openLevel)
     }
 
     fun onFrame(frame: FaceFrame): FrameEvents {
@@ -73,6 +81,16 @@ class TrackingPipeline(thresholds: BlinkThresholds = BlinkThresholds(), sensitiv
             detector.reset()
             rate.onTrackingLost()
         }
+
+        val blink = detector.onSample(s)
+        if (detector.isShut) {
+            // Eyes that stay shut for longer than a blink lasts are resting. That is neither staring nor blinking, so it is no
+            // evidence of either, and the minute is not credited to a blink rate it says nothing about.
+            rate.onTrackingLost()
+            lastTrackableMs = null
+            return FrameEvents(null, trackable = false)
+        }
+
         lastTrackableMs = frame.timestampMs
         lastQualityScore = s.confidence
 
@@ -86,7 +104,6 @@ class TrackingPipeline(thresholds: BlinkThresholds = BlinkThresholds(), sensitiv
             }
         }
 
-        val blink = detector.onSample(s)
         if (blink != null) {
             rate.onBlink(blink)
             if (blink.isLearnable) windowBlinks += blink

@@ -184,11 +184,25 @@ class CalibrationSession(
      */
     fun process(sample: EyeOpennessSample): BlinkObservation? {
         onSample(sample)
-        if (!sample.isTrackable) return null
+        if (!sample.isTrackable) {
+            // A closure that was in progress when the picture went bad cannot be told from a face that went away.
+            detector.reset()
+            return null
+        }
+        if (sample.timestampMs - lastSampleAtMs > MAX_SAMPLE_GAP_MS) detector.reset()
         val blink = detector.onSample(sample)
         if (phase == Phase.DELIBERATE) trackDeliberate(sample, blink)
         lastSampleAtMs = sample.timestampMs
         return if (blink != null && onBlink(blink)) blink else null
+    }
+
+    /**
+     * No face in the picture at all. The time is not credited, and a closure that was in progress is dropped: with the face
+     * gone, a long "blink" is only the gap between the last frame before it and the first one after.
+     */
+    fun onTrackingLost() {
+        detector.reset()
+        tallies.getValue(phase).lastSampleMs = null
     }
 
     /**

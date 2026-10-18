@@ -22,7 +22,10 @@ data class DetectorSettings(
     val singleFrameDepth: Float = BlinkDetector.DEFAULT_SINGLE_FRAME_DEPTH,
     /** Without a known open level, how long the detector looks before it judges anything. */
     val warmupMs: Long = BlinkDetector.DEFAULT_WARMUP_MS,
-    /** Also listen to the face model's own blink score; for the deliberate test, where missing a blink costs most. */
+    /**
+     * Also listen to the face model's own blink score. It is the second opinion that does not depend on the shape of the eye,
+     * so it is what lets a lid that barely moves be seen at all. Thresholds that were fitted with it must be used with it.
+     */
     val useBlinkScore: Boolean = false,
 ) {
     /** The same detector, more ([factor] < 1) or less ([factor] > 1) willing to call a closure a blink. */
@@ -52,6 +55,16 @@ data class DetectorSettings(
  * one that drops from 0.40 to 0.18 both close by more than half of their own level, and both are blinks;
  * a threshold on the raw number would have to choose between them.
  *
+ * Three things keep "the person's own open level" honest:
+ *
+ *  - A closure is judged against the level of the moment it began and against nothing that is learned while the eyes
+ *    are shut, so a long closure cannot redefine shut as open and then fill the minute with phantom blinks.
+ *  - Eyes that are shut longer than any blink lasts stay shut: no blink is reported when they open, and the level of the
+ *    open eye is still the one from before. Only a closure that is not deep (a squint, a lowered gaze) is taken to be a
+ *    new open level and learned again.
+ *  - A level that is only a [seed] from an earlier session is a guess; every reading is learned until the readings can
+ *    speak for themselves, and a closure that began under the guess is forgotten when they do.
+ *
  * Holds no Android or MediaPipe types on purpose - the detection rules are testable without a camera.
  */
 class BlinkDetector(settings: DetectorSettings = DetectorSettings()) {
@@ -66,9 +79,17 @@ class BlinkDetector(settings: DetectorSettings = DetectorSettings()) {
     private var firstMs: Long? = null
     private var seeded = false
 
+    // The closure in progress. It is measured from the open level of the moment it began.
     private var closedAtMs: Long? = null
+    private var holdL = 0f
+    private var holdR = 0f
+    private var holdCalm = DEFAULT_CALM_SCORE
+    private var underSeed = false
     private var closedFrames = 0
     private var peak = 0f
+    private var deepAtMs = 0L
+    private var settledSinceMs: Long? = null
+    private var shut = false
     private var lowestOpenness = 1f
     private var confidenceAtClose = 0f
 
@@ -78,6 +99,12 @@ class BlinkDetector(settings: DetectorSettings = DetectorSettings()) {
 
     /** True while a closure is in progress. */
     val isClosed: Boolean get() = closedAtMs != null
+
+    /**
+     * True while the eyes have been shut for longer than a blink lasts (and are still shut tight). That is rest, not
+     * staring, and it says nothing about how often this person blinks.
+     */
+    val isShut: Boolean get() = shut
 
     /** Changes how closures are judged without forgetting what open looks like. */
     fun configure(next: DetectorSettings) {
@@ -105,8 +132,14 @@ class BlinkDetector(settings: DetectorSettings = DetectorSettings()) {
         val first = firstMs ?: t.also { firstMs = it }
         val l = sample.leftEyeOpenness
         val r = sample.rightEyeOpenness
-        val baseL = left.level(t)
-        val baseR = right.level(t)
+
+        // The readings speak for themselves once they are enough to make a level; before that the seed stands in for one.
+        val ownLevel = left.hasLevel(t) && right.hasLevel(t)
+        if (underSeed && ownLevel) clearClosure()
+
+        val since = closedAtMs
+        val baseL = if (since != null) holdL else left.level(t)
+        val baseR = if (since != null) holdR else right.level(t)
 
         if (baseL == null || baseR == null || (!seeded && t - first < settings.warmupMs)) {
             // Still finding out what open looks like for this person.
@@ -115,17 +148,26 @@ class BlinkDetector(settings: DetectorSettings = DetectorSettings()) {
             return null
         }
 
-        val c = closureOf(t, l, baseL, r, baseR, sample.blinkScore)
+        val calm = if (since != null) holdCalm else (score.level(t) ?: DEFAULT_CALM_SCORE)
+        val share = scoreShare(sample.blinkScore, calm)
+        val c = closureOf(l, baseL, r, baseR, share)
         closure = c
-        val since = closedAtMs
 
         if (since == null) {
             if (c >= settings.start) {
+                holdL = baseL
+                holdR = baseR
+                holdCalm = calm
+                underSeed = !ownLevel
                 closedAtMs = t
                 closedFrames = 1
                 peak = c
+                deepAtMs = t
+                settledSinceMs = null
                 lowestOpenness = sample.openness
                 confidenceAtClose = sample.confidence
+                // The seed may be wrong, and a closure that nothing can end would hide every blink after it.
+                if (underSeed) learnOpen(t, l, r, sample.blinkScore)
             } else {
                 learnOpen(t, l, r, sample.blinkScore)
             }
@@ -137,9 +179,30 @@ class BlinkDetector(settings: DetectorSettings = DetectorSettings()) {
             closedFrames++
             peak = max(peak, c)
             lowestOpenness = min(lowestOpenness, sample.openness)
-            // If it has gone on longer than a blink can, the eyes are simply closed (or the tracker is lost): forget what
-            // "open" was, and learn it again from whatever comes next.
-            if (t - since > settings.maxDurationMs) dropOut(t, l, r, sample.blinkScore)
+            if (underSeed) learnOpen(t, l, r, sample.blinkScore)
+            if (isDeep(c, share)) deepAtMs = t
+
+            if (c >= settings.start) {
+                settledSinceMs = null
+            } else {
+                // Between the two thresholds: not shut any more, not open either. If the lids stay here, this person does
+                // not open as far as before (heavy lids, a lowered gaze, glare): the blink is over and this is the new open.
+                val settledAt = settledSinceMs ?: t.also { settledSinceMs = it }
+                if (t - settledAt >= SETTLE_MS) {
+                    val blink = finish(settledAt, since)
+                    relearn(t, l, r)
+                    return blink
+                }
+            }
+
+            val shutFor = t - since
+            if (shutFor > settings.maxDurationMs) {
+                // Longer than a blink can be. Eyes that are shut tight stay as they are - the level of open is still the one
+                // from before they closed, so that opening them again is not mistaken for anything. Anything shallower is a
+                // squint or a lowered gaze that has lasted: forget what open was, and learn it again from the next readings.
+                val stillShut = t - deepAtMs <= settings.maxDurationMs && shutFor <= SHUT_FORGET_MS
+                if (stillShut) shut = true else dropOut(t, l, r, sample.blinkScore)
+            }
             return null
         }
 
@@ -163,14 +226,14 @@ class BlinkDetector(settings: DetectorSettings = DetectorSettings()) {
         seeded = false
     }
 
-    private fun finish(t: Long, since: Long): BlinkObservation? {
+    private fun finish(endMs: Long, since: Long): BlinkObservation? {
         val frames = closedFrames
         val reached = peak
         val lowest = lowestOpenness
         val confidence = confidenceAtClose
         clearClosure()
 
-        val duration = t - since
+        val duration = endMs - since
         if (duration < settings.minDurationMs || duration > settings.maxDurationMs) return null
         if (frames <= 1 && reached < settings.singleFrameDepth) return null
 
@@ -184,15 +247,23 @@ class BlinkDetector(settings: DetectorSettings = DetectorSettings()) {
         )
     }
 
-    private fun closureOf(t: Long, l: Float, baseL: Float, r: Float, baseR: Float, blinkScore: Float?): Float {
-        var c = (relative(l, baseL) + relative(r, baseR)) / 2f
-        if (settings.useBlinkScore && blinkScore != null) {
-            // The model's own opinion, measured against how this face looks when it is not blinking.
-            val calm = score.level(t) ?: DEFAULT_CALM_SCORE
-            val closed = ((blinkScore - calm) / (1f - calm).coerceAtLeast(MIN_SCORE_RANGE)).coerceIn(0f, 1f)
-            c = max(c, closed * BLINK_SCORE_WEIGHT)
-        }
-        return c
+    /** The model's own opinion that the eyes are shut (0..1), measured against how this face looks when it is not blinking. */
+    private fun scoreShare(blinkScore: Float?, calm: Float): Float? =
+        blinkScore?.takeIf { it.isFinite() }?.let { ((it - calm) / (1f - calm).coerceAtLeast(MIN_SCORE_RANGE)).coerceIn(0f, 1f) }
+
+    private fun closureOf(l: Float, baseL: Float, r: Float, baseR: Float, share: Float?): Float {
+        val c = (relative(l, baseL) + relative(r, baseR)) / 2f
+        return if (settings.useBlinkScore && share != null) max(c, share * BLINK_SCORE_WEIGHT) else c
+    }
+
+    /**
+     * Whether a closure of depth [c] is as good as shut: the lids are [DEEP_MARGIN] past the start of a blink and at least
+     * [DEEP_FLOOR] down (but never asked to go further than this person's full blinks do), or the face model is sure of it,
+     * which is what tells shut eyes from narrow ones when the lid hardly moves.
+     */
+    private fun isDeep(c: Float, share: Float?): Boolean {
+        val lids = min(settings.full, max(settings.start + DEEP_MARGIN, DEEP_FLOOR))
+        return c >= lids || (share != null && share >= SHUT_SHARE)
     }
 
     private fun relative(value: Float, base: Float): Float =
@@ -202,6 +273,17 @@ class BlinkDetector(settings: DetectorSettings = DetectorSettings()) {
         left.add(t, l)
         right.add(t, r)
         if (blinkScore != null) score.add(t, blinkScore)
+    }
+
+    /** The eyes settled lower than they were: that is where open is now. Nobody needs to wait for the warm-up to find out. */
+    private fun relearn(t: Long, l: Float, r: Float) {
+        left.clear()
+        right.clear()
+        left.add(t, l)
+        right.add(t, r)
+        seeded = false
+        firstMs = t - settings.warmupMs
+        closure = 0f
     }
 
     private fun dropOut(t: Long, l: Float, r: Float, blinkScore: Float?) {
@@ -217,8 +299,12 @@ class BlinkDetector(settings: DetectorSettings = DetectorSettings()) {
 
     private fun clearClosure() {
         closedAtMs = null
+        underSeed = false
         closedFrames = 0
         peak = 0f
+        deepAtMs = 0L
+        settledSinceMs = null
+        shut = false
         lowestOpenness = 1f
         confidenceAtClose = 0f
     }
@@ -236,6 +322,22 @@ class BlinkDetector(settings: DetectorSettings = DetectorSettings()) {
         const val DEFAULT_MAX_DURATION_MS = 900L
         const val DEFAULT_SINGLE_FRAME_DEPTH = 0.60f
         const val DEFAULT_WARMUP_MS = 700L
+
+        /**
+         * Lids that are back under [DetectorSettings.start] but have not got under [DetectorSettings.end] after this long are
+         * not on their way up: the reopening of a blink passes through that band in well under a tenth of a second.
+         */
+        const val SETTLE_MS = 250L
+
+        /** Eyes shut for this long are taken to have changed for good (or the tracker has), and open is learned anew. */
+        const val SHUT_FORGET_MS = 30_000L
+
+        /** How far past the start of a blink, and how deep at least, a closure is to count as shut (see [isDeep]). */
+        private const val DEEP_MARGIN = 0.10f
+        private const val DEEP_FLOOR = 0.40f
+
+        /** How sure the face model's score has to be that the eyes are shut. */
+        private const val SHUT_SHARE = 0.75f
 
         /** The model's blink score is high only while the eyes are shut; its calm level is the low end of what it says. */
         private const val SCORE_PERCENTILE = 0.20f

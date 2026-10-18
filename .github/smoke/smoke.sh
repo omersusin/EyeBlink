@@ -331,11 +331,11 @@ if tools tap More --bottommost --timeout 15 && tools tap Calibration --scroll --
     else
       warn "could not press Begin on the blink test page"
     fi
-    adb shell input keyevent KEYCODE_BACK
-    sleep 2
   else
     warn "could not open the blink test page"
   fi
+  # The blink test takes the place of the calibration page rather than sitting on top of it, so one press of Back leaves
+  # whichever of the two is open and lands on the More tab, where the next steps expect to be.
   adb shell input keyevent KEYCODE_BACK
   sleep 2
 else

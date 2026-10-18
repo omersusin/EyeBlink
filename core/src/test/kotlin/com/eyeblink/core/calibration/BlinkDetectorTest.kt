@@ -333,4 +333,142 @@ class BlinkDetectorTest {
         d.onSample(s(2_000, 0.44f, 0.80f)); d.onSample(s(2_066, 0.44f, 0.85f))
         assertNull(d.onSample(s(2_132, 0.50f, 0.05f)))
     }
+
+    // --- eyes that stay shut, lids that settle lower, a seed that is wrong -------------------------------------------
+
+    /** [openness] at 15 frames per second from [from] to [to] with a little jitter; returns the blinks reported meanwhile. */
+    private fun hold(from: Long, to: Long, openness: Float, jitter: Float = 0.01f, seed: Long = 5): List<BlinkObservation> {
+        val random = java.util.Random(seed)
+        val found = mutableListOf<BlinkObservation>()
+        var t = from
+        while (t < to) {
+            val v = (openness + (random.nextGaussian() * jitter).toFloat()).coerceIn(0f, 1f)
+            detector.onSample(sample(t, v))?.let { found += it }
+            t += 66
+        }
+        return found
+    }
+
+    @Test
+    fun `eyes shut for a long time make no blinks, neither while shut nor when they open`() {
+        warmUp()
+        val shut = hold(2_000, 27_000, 0.05f)
+        assertTrue("the jitter of a shut eye is not a string of blinks: ${shut.size}", shut.isEmpty())
+        assertTrue(detector.isShut)
+        assertTrue("opening the eyes after that is not a blink", hold(27_000, 28_000, 0.80f, jitter = 0.005f).isEmpty())
+        assertFalse(detector.isShut)
+        assertNotNull("blinks are seen again within a second", blinkCycle(28_300, 28_450))
+    }
+
+    @Test
+    fun `eyes shut for just over a blink are shut, a squint is not`() {
+        warmUp()
+        hold(2_000, 3_300, 0.05f)
+        assertTrue("shut tight for 1.3 s", detector.isShut)
+        assertTrue(detector.isClosed)
+
+        // A squint: 0.50 of an 0.80 eye, a closure of 0.375 - a blink's worth, but not nearly shut.
+        val squint = BlinkDetector().also { d -> var t = 0L; while (t < 1_200) { d.onSample(sample(t, 0.80f)); t += 66 } }
+        var t = 2_000L
+        while (t < 3_300) { squint.onSample(sample(t, 0.50f)); t += 66 }
+        assertFalse("a squint is not shut", squint.isShut)
+        assertFalse("and after a second it is the new open, not a closure that never ends", squint.isClosed)
+    }
+
+    @Test
+    fun `eyes that stay shut for half a minute are taken to have changed for good`() {
+        warmUp()
+        hold(2_000, 33_000, 0.05f)
+        assertFalse(detector.isShut)
+        hold(33_000, 36_000, 0.40f)
+        assertNotNull("the open level of the eyes is learned anew", blinkCycle(36_100, 36_250, dipTo = 0.05f, open = 0.40f))
+    }
+
+    @Test
+    fun `a deep closure that turns into a squint is learned again after a moment`() {
+        warmUp()
+        hold(2_000, 5_000, 0.05f)
+        assertTrue(detector.isShut)
+        // They open again only part of the way - a squint against the light - and stay there.
+        hold(5_000, 8_000, 0.50f)
+        assertFalse(detector.isClosed)
+        assertNotNull(blinkCycle(8_100, 8_250, dipTo = 0.05f, open = 0.50f))
+    }
+
+    @Test
+    fun `lids that settle lower after a blink end it, and that is where open is now`() {
+        warmUp()
+        detector.onSample(sample(2_000, 0.05f))
+        detector.onSample(sample(2_066, 0.05f))
+        // They come back only to 0.62 of an 0.80 eye: a closure of 0.22, between end (0.17) and start (0.35).
+        var found: BlinkObservation? = null
+        var t = 2_132L
+        while (t < 3_500) { detector.onSample(sample(t, 0.62f))?.let { if (found == null) found = it }; t += 66 }
+        assertNotNull("the blink is reported although the lids never came all the way back", found)
+        assertEquals(2_000L, found!!.startMs)
+        assertEquals("it ended when the lids stopped coming back", 132L, found.durationMs)
+        assertTrue(found.complete)
+        assertFalse(detector.isClosed)
+        assertNotNull("the next blink is judged against the new open level", blinkCycle(4_000, 4_150, dipTo = 0.05f, open = 0.62f))
+    }
+
+    @Test
+    fun `a reopening that takes its time is still just a blink`() {
+        warmUp()
+        detector.onSample(sample(2_000, 0.05f))
+        detector.onSample(sample(2_066, 0.05f))
+        // Up through the band between end and start over 0.2 s: slower than most, quicker than "settled".
+        detector.onSample(sample(2_132, 0.55f))
+        detector.onSample(sample(2_198, 0.58f))
+        detector.onSample(sample(2_264, 0.62f))
+        val b = detector.onSample(sample(2_330, 0.80f))
+        assertNotNull(b)
+        assertEquals(330L, b!!.durationMs)
+    }
+
+    @Test
+    fun `a seed that is too high does not hide the blinks of this session`() {
+        // The eye reads 0.50 now and read 0.80 when the seed was taken: by the seed it looks half shut from the first frame.
+        val d = BlinkDetector().apply { seed(0.80f) }
+        val reported = mutableListOf<BlinkObservation>()
+        var t = 0L
+        while (t < 1_300) { d.onSample(sample(t, 0.50f))?.let { reported += it }; t += 66 }
+        assertTrue("those frames are not a blink", reported.isEmpty())
+        assertFalse("and the detector is not stuck in a closure it can never end", d.isClosed)
+        d.onSample(sample(1_300, 0.08f)); d.onSample(sample(1_366, 0.08f))
+        assertNotNull("a blink 1.3 s into the session is seen", d.onSample(sample(1_432, 0.50f)))
+    }
+
+    @Test
+    fun `a blink while the seed still stands in for the level is a blink`() {
+        val d = BlinkDetector().apply { seed(0.80f) }
+        d.onSample(sample(0, 0.80f)); d.onSample(sample(66, 0.80f))
+        d.onSample(sample(132, 0.05f)); d.onSample(sample(198, 0.05f))
+        assertNotNull(d.onSample(sample(264, 0.80f)))
+    }
+
+    @Test
+    fun `an eye that is open less than the seed says is judged by what it does`() {
+        val d = BlinkDetector().apply { seed(0.80f) }
+        var t = 0L
+        while (t < 3_000) { d.onSample(sample(t, 0.50f)); t += 66 }
+        assertEquals("open is open, whatever the seed said", 0f, d.closure, 0.05f)
+    }
+
+    @Test
+    fun `a blink score that is not a number is no opinion at all`() {
+        val d = BlinkDetector(DetectorSettings(useBlinkScore = true))
+        fun s(t: Long, open: Float) = EyeOpennessSample(t, open, open, 0.9f, 200f, blinkScore = Float.NaN)
+        var t = 0L
+        while (t < 1_200) { d.onSample(s(t, 0.50f)); t += 66 }
+        d.onSample(s(2_000, 0.10f)); d.onSample(s(2_066, 0.10f))
+        assertFalse("the closure is a number", d.closure.isNaN())
+        assertNotNull("and the eyelids alone still see the blink", d.onSample(s(2_132, 0.50f)))
+    }
+
+    @Test
+    fun `thresholds fitted with the blink score make the detector use the score`() {
+        assertTrue(BlinkThresholds(0.30f, 0.13f, 0.55f, fitted = true).settings().useBlinkScore)
+        assertFalse(BlinkThresholds().settings().useBlinkScore)
+    }
 }

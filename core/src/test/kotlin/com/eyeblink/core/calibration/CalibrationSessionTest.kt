@@ -2,6 +2,7 @@ package com.eyeblink.core.calibration
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -120,6 +121,52 @@ class CalibrationSessionTest {
         session.cancel()
         assertEquals(CalibrationSession.Phase.COMPLETE, session.phase)
         assertFalse(session.onBlink(blink(100)))
+    }
+
+    // --- a face that goes away in the middle of a blink -----------------------------------------------------------
+
+    private fun sample(t: Long, open: Float, illuminance: Float = 120f) = EyeOpennessSample(t, open, open, 0.9f, illuminance)
+
+    /** A session in its deliberate phase that has seen 1.5 s of an eye open at 0.60, and then two frames of it closing. */
+    private fun midBlink(): CalibrationSession {
+        val s = CalibrationSession(videoMs = 1_000, readingMs = 1_000, deliberateBlinksRequired = 3)
+        s.start(0)
+        s.skipPhase(0); s.skipPhase(0)
+        assertEquals(CalibrationSession.Phase.DELIBERATE, s.phase)
+        var t = 0L
+        while (t < 1_500) { s.process(sample(t, 0.60f)); t += 33 }
+        s.process(sample(1_500, 0.20f))
+        s.process(sample(1_533, 0.18f))
+        return s
+    }
+
+    @Test
+    fun `a blink is counted when the eye opens again`() {
+        val s = midBlink()
+        assertNotNull(s.process(sample(1_600, 0.60f)))
+    }
+
+    @Test
+    fun `a gap in the pictures does not turn the time it lasted into a long blink`() {
+        val s = midBlink()
+        assertNull("1.6 s without a picture, then an open eye", s.process(sample(3_100, 0.60f)))
+        assertEquals(0, s.instructed.size)
+    }
+
+    @Test
+    fun `a face that is lost does not either`() {
+        val s = midBlink()
+        s.onTrackingLost()
+        assertNull(s.process(sample(1_700, 0.60f)))
+        assertEquals(0, s.instructed.size)
+    }
+
+    @Test
+    fun `nor does a picture that is too dark to trust`() {
+        val s = midBlink()
+        assertNull(s.process(sample(1_566, 0.18f, illuminance = 1f)))
+        assertNull("the eye is open when the light comes back", s.process(sample(1_700, 0.60f)))
+        assertEquals(0, s.instructed.size)
     }
 
     // --- baseline ---------------------------------------------------------

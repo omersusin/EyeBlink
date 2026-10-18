@@ -118,6 +118,58 @@ class TrackingPipelineTest {
     }
 
     @Test
+    fun `asking for the thresholds already in force changes nothing, not even a blink in progress`() {
+        val p = TrackingPipeline()
+        p.openFrames(0, 1_500)
+        p.onFrame(frame(1_500, 0.0f)); p.onFrame(frame(1_566, 0.0f))
+        // The engine hands the profile over each time the learner accepts a window. That is no reason to start over.
+        p.setThresholds(BlinkThresholds())
+        p.onFrame(frame(1_632, 0.0f))
+        assertNotNull(p.onFrame(frame(1_698, 0.9f)).blink)
+    }
+
+    @Test
+    fun `new thresholds keep what the eyes' open level is`() {
+        val p = TrackingPipeline()
+        var t = 0L
+        while (t < 3_000) { p.onFrame(frame(t, 0.50f)); t += 66 }
+        // Thresholds from a calibration made with the eyes more open than they are now come with a seed that is wrong.
+        p.setThresholds(BlinkThresholds(start = 0.30f, end = 0.13f, full = 0.55f, fitted = true, openLevel = 0.90f))
+        p.onFrame(frame(3_066, 0.50f))
+        p.onFrame(frame(3_132, 0.05f)); p.onFrame(frame(3_198, 0.05f))
+        assertNotNull("the blink right after is seen against the level that was learned", p.onFrame(frame(3_264, 0.50f)).blink)
+    }
+
+    @Test
+    fun `a new sensitivity applies without forgetting what open looks like`() {
+        val p = TrackingPipeline()
+        p.openFrames(0, 1_500)
+        p.setThresholds(BlinkThresholds(), sensitivity = 0.6f)
+        assertEquals(BlinkDetector.DEFAULT_START * 0.6f, p.startDepth, 0.001f)
+        // No warm-up is needed: the first blink after the change is seen.
+        assertNotNull(p.blinkAt(1_600))
+    }
+
+    @Test
+    fun `eyes that stay shut are no evidence of staring, and no blinks`() {
+        val p = TrackingPipeline()
+        p.openFrames(0, 2_000)
+        var t = 2_000L
+        val blinks = mutableListOf<BlinkObservation>()
+        var last: FrameEvents? = null
+        while (t < 12_000) { last = p.onFrame(frame(t, 0.04f)); last.blink?.let { blinks += it }; t += 66 }
+        assertTrue("shut for ten seconds is not a string of blinks", blinks.isEmpty())
+        assertFalse("and it is not evidence either", last!!.trackable)
+        assertNull("the camera is not 'looking at' a face whose eyes are shut", p.confidenceAt(12_000))
+        val before = p.rate.observed(12_000).trackedMs
+        assertTrue("the time with the eyes shut is not credited to the rate: $before", before < 3_500)
+
+        val reopened = p.onFrame(frame(12_066, 0.9f))
+        assertTrue("evidence again when they open", reopened.trackable)
+        assertNull(reopened.blink)
+    }
+
+    @Test
     fun `a narrow open eye is as good as a wide one`() {
         val p = TrackingPipeline()
         var t = 0L
