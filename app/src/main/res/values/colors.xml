@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The sky-blue tile behind the logo, and the window that shows before the first frame is drawn. -->
+    <color name="ic_launcher_background">#FF3AA4FF</color>
+    <color name="window_bg">#FFF3F8FF</color>
+</resources>

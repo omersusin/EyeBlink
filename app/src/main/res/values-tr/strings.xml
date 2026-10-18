@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="channel_running">EyeBlink çalışıyor</string>
+    <string name="channel_test">Oynatma testleri</string>
+    <string name="a11y_summary">EyeBlink\'in göz kırpmasını her uygulamanın üzerine çizmesini ve hangi uygulamada olduğunu görmesini sağlar.</string>
+    <string name="a11y_description">EyeBlink bunu ekranında kısa bir göz kırpması göstermek ve hangi uygulamada olduğunu bilmek için kullanır. Ekranında ne olduğunu, ne yazdığını veya bildirimlerini okumaz.</string>
+    <string name="listener_label">EyeBlink medya denetimi</string>
+</resources>

@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>EyeBlink banner</title>
+<!--
+  The README banner, 1920 x 1080 (16:9). Rendered with Chromium; see docs/brand/render.mjs.
+  It wears the app's own look: a pale sky, flat colour, everything raised standing on a darker lip,
+  Bricolage Grotesque for the loud words and Figtree for the rest. The two phones are real
+  screenshots from the design lab (docs/screens), Daylight in front and Moonlit behind.
+-->
+<style>
+  @font-face { font-family: "Bricolage Grotesque"; src: url("../../app/src/main/res/font/bricolage_grotesque_bold.ttf"); font-weight: 700; }
+  @font-face { font-family: "Bricolage Grotesque"; src: url("../../app/src/main/res/font/bricolage_grotesque_extrabold.ttf"); font-weight: 800; }
+  @font-face { font-family: "Figtree"; src: url("../../app/src/main/res/font/figtree_regular.ttf"); font-weight: 400; }
+  @font-face { font-family: "Figtree"; src: url("../../app/src/main/res/font/figtree_medium.ttf"); font-weight: 500; }
+  @font-face { font-family: "Figtree"; src: url("../../app/src/main/res/font/figtree_semibold.ttf"); font-weight: 600; }
+  @font-face { font-family: "Figtree"; src: url("../../app/src/main/res/font/figtree_bold.ttf"); font-weight: 700; }
+
+  :root {
+    --sky:#3AA4FF; --sky-lip:#1C83DE; --sky-text:#0B5EB3; --sky-soft:#DDF0FF; --sky-soft-lip:#B7DAF5;
+    --sun:#FFC62E; --sun-lip:#E3A10C;
+    --ink:#16254A; --ink-soft:#4A5A7E; --white:#fff; --line:#DAE6F4; --card-lip:#CCDDF0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1920px; height: 1080px; overflow: hidden; }
+  body { position: relative; background: var(--sky-soft); font-family: "Figtree", system-ui, sans-serif; color: var(--ink); -webkit-font-smoothing: antialiased; }
+
+  /* the sky */
+  .sun { position: absolute; right: -120px; top: -150px; width: 560px; height: 560px; }
+  .cloud { position: absolute; }
+  .bank { position: absolute; left: 0; right: 0; bottom: 0; height: 190px; }
+
+  .left { position: absolute; left: 128px; top: 92px; width: 900px; }
+  .brand { display: flex; align-items: center; gap: 26px; }
+  .brand img { width: 96px; height: 96px; display: block; }
+  .brand span { font-family: "Bricolage Grotesque", sans-serif; font-weight: 800; font-size: 78px; letter-spacing: -2.4px; }
+  .brand span i { font-style: normal; color: var(--sky-text); }
+
+  h1 { margin-top: 48px; font-family: "Bricolage Grotesque", sans-serif; font-weight: 800; font-size: 112px; line-height: 1.0; letter-spacing: -3.6px; }
+  /* a highlighter swipe under the second line, the way a person would underline it */
+  h1 em { font-style: normal; position: relative; white-space: nowrap; }
+  h1 em::before { content: ""; position: absolute; left: -10px; right: -14px; bottom: 4px; height: 38%; background: var(--sun); border-radius: 14px 40px 18px 34px; transform: rotate(-1.2deg); z-index: -1; }
+  h1 em { z-index: 0; }
+
+  .lede { margin-top: 36px; width: 820px; font-size: 34px; line-height: 1.42; color: var(--ink-soft); font-weight: 500; }
+  .lede b { color: var(--ink); font-weight: 700; }
+
+  .chips { margin-top: 40px; display: flex; flex-wrap: wrap; gap: 18px 16px; width: 900px; }
+  .chip { font-weight: 700; font-size: 24px; padding: 13px 26px 14px; border-radius: 40px; background: var(--white); color: var(--ink);
+    border: 2px solid var(--line); box-shadow: 0 5px 0 var(--card-lip); }
+  .chip.on { background: var(--sun); border-color: var(--sun); box-shadow: 0 5px 0 var(--sun-lip); }
+
+  .note { position: absolute; left: 132px; bottom: 40px; font-weight: 600; font-size: 22px; color: var(--ink-soft); }
+
+  /* the phones: a navy bezel standing on its own lip */
+  .phone { position: absolute; border-radius: 70px; padding: 12px; background: var(--ink); box-shadow: 0 12px 0 #0B1330, 0 60px 90px rgba(22,37,74,.28); }
+  .phone img { display: block; width: 100%; height: 100%; border-radius: 58px; object-fit: cover; object-position: top; }
+  .p-dark  { width: 460px; height: 980px; left: 1380px; top: 66px; transform: rotate(5.5deg); z-index: 2; }
+  .p-light { width: 486px; height: 1036px; left: 1052px; top: 112px; transform: rotate(-4deg); z-index: 3; }
+
+  /* a stamp, because it is true and it is the thing people ask about first */
+  .stamp { position: absolute; left: 1004px; top: 744px; width: 250px; height: 250px; z-index: 5; transform: rotate(-11deg); }
+  .stamp div { position: absolute; inset: 0; border-radius: 50%; background: var(--sun); box-shadow: 0 9px 0 var(--sun-lip); display: grid; place-items: center; text-align: center;
+    font-family: "Bricolage Grotesque", sans-serif; font-weight: 800; font-size: 31px; line-height: 1.06; letter-spacing: -.3px; }
+  .stamp div::after { content: ""; position: absolute; inset: 14px; border-radius: 50%; border: 3px dashed rgba(22,37,74,.55); }
+  .stamp small { display: block; font-family: "Figtree", sans-serif; font-weight: 700; font-size: 19px; letter-spacing: .5px; margin-top: 6px; }
+</style>
+</head>
+<body>
+  <!-- sun, peeking in from the corner -->
+  <svg class="sun" viewBox="0 0 560 560" aria-hidden="true">
+    <g stroke="#FFC62E" stroke-width="22" stroke-linecap="round">
+      <line x1="280" y1="370" x2="280" y2="440"/><line x1="206" y1="352" x2="168" y2="414"/><line x1="146" y1="300" x2="82" y2="326"/>
+      <line x1="126" y1="228" x2="52" y2="226"/><line x1="152" y1="164" x2="90" y2="124"/><line x1="206" y1="116" x2="178" y2="50"/>
+      <line x1="364" y1="352" x2="402" y2="414"/><line x1="424" y1="300" x2="488" y2="326"/>
+    </g>
+    <circle cx="300" cy="258" r="150" fill="#E3A10C" transform="translate(0 12)"/>
+    <circle cx="300" cy="258" r="150" fill="#FFC62E"/>
+  </svg>
+
+  <!-- clouds -->
+  <svg class="cloud" style="left:1090px; top:70px; width:260px" viewBox="0 0 260 120" aria-hidden="true">
+    <g fill="#B7DAF5" transform="translate(0 8)"><circle cx="64" cy="68" r="36"/><circle cx="116" cy="50" r="48"/><circle cx="178" cy="66" r="38"/><rect x="28" y="62" width="186" height="42" rx="21"/></g>
+    <g fill="#fff"><circle cx="64" cy="68" r="36"/><circle cx="116" cy="50" r="48"/><circle cx="178" cy="66" r="38"/><rect x="28" y="62" width="186" height="42" rx="21"/></g>
+  </svg>
+  <svg class="cloud" style="left:1730px; top:560px; width:200px" viewBox="0 0 260 120" aria-hidden="true">
+    <g fill="#B7DAF5" transform="translate(0 8)"><circle cx="64" cy="68" r="36"/><circle cx="116" cy="50" r="48"/><circle cx="178" cy="66" r="38"/><rect x="28" y="62" width="186" height="42" rx="21"/></g>
+    <g fill="#fff"><circle cx="64" cy="68" r="36"/><circle cx="116" cy="50" r="48"/><circle cx="178" cy="66" r="38"/><rect x="28" y="62" width="186" height="42" rx="21"/></g>
+  </svg>
+  <svg class="cloud" style="left:700px; top:36px; width:150px; opacity:.9" viewBox="0 0 260 120" aria-hidden="true">
+    <g fill="#B7DAF5" transform="translate(0 8)"><circle cx="64" cy="68" r="36"/><circle cx="116" cy="50" r="48"/><circle cx="178" cy="66" r="38"/><rect x="28" y="62" width="186" height="42" rx="21"/></g>
+    <g fill="#fff"><circle cx="64" cy="68" r="36"/><circle cx="116" cy="50" r="48"/><circle cx="178" cy="66" r="38"/><rect x="28" y="62" width="186" height="42" rx="21"/></g>
+  </svg>
+
+  <!-- a bank of cloud along the bottom -->
+  <svg class="bank" viewBox="0 0 1920 190" preserveAspectRatio="none" aria-hidden="true">
+    <g fill="#B7DAF5" transform="translate(0 10)">
+      <circle cx="120" cy="150" r="110"/><circle cx="330" cy="170" r="96"/><circle cx="560" cy="150" r="120"/><circle cx="800" cy="176" r="90"/>
+      <circle cx="1020" cy="156" r="112"/><circle cx="1260" cy="176" r="92"/><circle cx="1480" cy="150" r="118"/><circle cx="1720" cy="170" r="98"/><circle cx="1900" cy="150" r="110"/>
+      <rect x="0" y="150" width="1920" height="60"/>
+    </g>
+    <g fill="#fff">
+      <circle cx="120" cy="150" r="110"/><circle cx="330" cy="170" r="96"/><circle cx="560" cy="150" r="120"/><circle cx="800" cy="176" r="90"/>
+      <circle cx="1020" cy="156" r="112"/><circle cx="1260" cy="176" r="92"/><circle cx="1480" cy="150" r="118"/><circle cx="1720" cy="170" r="98"/><circle cx="1900" cy="150" r="110"/>
+      <rect x="0" y="150" width="1920" height="60"/>
+    </g>
+  </svg>
+
+  <div class="left">
+    <div class="brand"><img src="logo.svg" alt=""><span>Eye<i>Blink</i></span></div>
+    <h1>Give your eyes<br><em>the pause back.</em></h1>
+    <p class="lede">A soft half-second eyelid over your screen, a proper 20-20-20 rest when it matters, and a video that <b>waits for you</b> - only when it can prove it paused.</p>
+    <div class="chips">
+      <span class="chip on">Camera-assisted or camera-free</span><span class="chip">Rootless · Shizuku · Root</span>
+      <span class="chip">LSPosed module</span><span class="chip">English · Türkçe</span>
+    </div>
+  </div>
+
+  <div class="note">Kotlin · Jetpack Compose · MediaPipe · not a line of Material</div>
+
+  <div class="phone p-dark"><img src="../screens/home-dark.png" alt=""></div>
+  <div class="phone p-light"><img src="../screens/home.png" alt=""></div>
+  <div class="stamp"><div><span>No<br>Internet<br>permission<small>on purpose</small></span></div></div>
+</body>
+</html>

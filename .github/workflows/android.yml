@@ -2,18 +2,23 @@ name: Android CI
 
 on:
   push:
-    branches: [main]
+    branches: ['**']
+    # Pictures and prose do not need a half-hour build.
+    paths-ignore: ['docs/**', '**.md']
   pull_request:
     branches: [main]
+    paths-ignore: ['docs/**', '**.md']
   workflow_dispatch:
 
 # Least privilege. No repository write is needed to build an APK.
 permissions:
   contents: read
 
+# A newer push replaces a run that is still waiting, but never kills one that has started: somebody may be
+# about to download its APK.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -67,25 +72,54 @@ jobs:
           printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/eyeblink-release.jks"
           echo "KEYSTORE_FILE=$RUNNER_TEMP/eyeblink-release.jks" >> "$GITHUB_ENV"
 
+      # The platform-free brain: scheduling, the playback safety protocol, parsers, calibration math.
+      - name: Core tests
+        run: ./gradlew :core:test --stacktrace
+
       - name: Lint
-        run: ./gradlew lintDebug --stacktrace
+        run: ./gradlew :app:lintDebug :lsposed:lintDebug --continue --stacktrace
 
-      - name: Unit tests
-        run: ./gradlew testDebugUnitTest --stacktrace
+      # Lint prints only its first failure on the console; the full report is what is needed to fix them all.
+      - name: Show lint reports
+        if: failure()
+        run: |
+          shopt -s nullglob
+          for f in app/build/reports/lint-results-debug.txt lsposed/build/reports/lint-results-debug.txt \
+                   app/build/intermediates/lint_intermediate_text_report/debug/lintReportDebug/lint-results-debug.txt; do
+            echo "=== $f ==="; sed -n 1,220p "$f"
+          done
 
-      - name: Assemble debug APK
-        run: ./gradlew assembleDebug --stacktrace
+      - name: Assemble debug APKs
+        run: ./gradlew :app:assembleDebug :lsposed:assembleDebug --stacktrace
+
+      # The privacy page promises that EyeBlink cannot reach the network. The manifest removes the
+      # permission even if a library asks for it; this proves it on what was actually built.
+      - name: Guard - no network permission
+        run: |
+          shopt -s nullglob
+          for APK in app/build/outputs/apk/debug/*.apk app/build/outputs/apk/release/*.apk; do
+            if "$ANDROID_HOME"/build-tools/35.0.0/aapt2 dump permissions "$APK" | grep -qi "android.permission.INTERNET"; then
+              echo "::error::$APK declares INTERNET"; exit 1
+            fi
+          done
+          echo "no APK declares INTERNET"
+
+      # Renders the real UI (the same Compose sources as the app) headlessly, so every change can be
+      # looked at. Non-blocking: a rendering hiccup must never hide a real build result.
+      - name: Render UI screenshots
+        continue-on-error: true
+        run: ./gradlew :tools:designlab:run --args="$GITHUB_WORKSPACE/build/shots" --stacktrace
 
 # R8 + resource shrinking are enabled on release (see app/build.gradle.kts).
       # Signed only when the secrets above were present; otherwise Gradle emits
       # an unsigned release APK rather than failing.
-      - name: Assemble release APK
-        run: ./gradlew assembleRelease --stacktrace
+      - name: Assemble release APKs
+        run: ./gradlew :app:assembleRelease :lsposed:assembleRelease --stacktrace
 
       # App Bundle: what Play actually consumes. Play serves per-device, so the
       # bundle carries all ABIs while each install downloads only one slice.
       - name: Assemble release App Bundle
-        run: ./gradlew bundleRelease --stacktrace
+        run: ./gradlew :app:bundleRelease --stacktrace
 
       # apksigner is the source of truth. Do NOT look for META-INF/*.RSA:
       # at minSdk 26 AGP emits v2/v3 signatures only, which write an APK
@@ -126,9 +160,119 @@ jobs:
             app/build/outputs/apk/release/*.apk
             app/build/outputs/apk/release/*.idsig
             app/build/outputs/bundle/release/*.aab
+            lsposed/build/outputs/apk/debug/*.apk
+            lsposed/build/outputs/apk/release/*.apk
           if-no-files-found: error
+          retention-days: 30
+
+      # Small downloads for a phone. Nearly every phone is arm64-v8a, and the zip above carries every variant.
+      - name: Upload the arm64 release APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: eyeblink-release-arm64
+          path: app/build/outputs/apk/release/*arm64-v8a*.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      # Not minified, so a crash log reads like the source. Installs next to the release build (com.eyeblink.app.debug).
+      - name: Upload the arm64 debug APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: eyeblink-debug-arm64
+          path: app/build/outputs/apk/debug/*arm64-v8a*.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload UI screenshots
+        uses: actions/upload-artifact@v7
+        with:
+          name: eyeblink-ui
+          path: build/shots/*.png
+          if-no-files-found: ignore
           retention-days: 30
 
       - name: Remove signing key
         if: always()
         run: rm -f "$RUNNER_TEMP/eyeblink-release.jks"
+
+  # CI used to compile the app and never start it, which is how a crash in Application.onCreate reached a phone.
+  # This job installs a build on an emulator, walks through the app (onboarding, a rest and skipping it, a blink, every tab
+  # and page, the Blink Studio, the app picker, the calibration camera allowed and refused, the language list, the theme),
+  # lets the engine run with the accessibility service on, and fails if the app dies or an engine task throws.
+  # It runs twice: the debug build, and the minified build, which is the release build as R8 leaves it - the one that
+  # breaks when something is shrunk or renamed that native code or reflection needs.
+  # Screenshots, UI dumps and logs are kept in the "eyeblink-smoke-<variant>" artifacts. It builds its own APK, so it never
+  # sees the signing secrets.
+  smoke:
+    name: Start it on an emulator (${{ matrix.variant }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: debug
+            task: assembleDebug
+          - variant: minified
+            task: assembleMinified
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Install SDK packages
+        run: sdkmanager --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Build the ${{ matrix.variant }} APK
+        run: ./gradlew :app:${{ matrix.task }} --stacktrace
+
+      # The emulator needs hardware acceleration, which the runner only allows once /dev/kvm is open to everyone.
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      # Lets the log say what colours a screenshot is made of, which is all a reader of a log can see of one.
+      - name: Install Pillow
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq python3-pil
+
+      # Animations stay on: the app has to survive its own motion, and it switches to a still version when the phone
+      # turns animations off. The screen is a Pixel 6's, so layouts are the size a person sees.
+      - name: Walk through the app
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          SMOKE_VARIANT: ${{ matrix.variant }}
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          ram-size: 3072M
+          disable-animations: false
+          # The runner's own options, plus a front camera: the calibration page opens it, and without one nothing but an
+          # error could ever be seen there. (There is no back camera to ask for, so none is started.)
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-front emulated -camera-back none
+          script: bash .github/smoke/smoke.sh
+
+      - name: Upload what it saw
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: eyeblink-smoke-${{ matrix.variant }}
+          path: build/smoke
+          if-no-files-found: ignore
+          retention-days: 14

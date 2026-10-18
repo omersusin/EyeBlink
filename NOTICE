@@ -1,0 +1,32 @@
+EyeBlink
+Required Notice: Copyright 2026 omersusin (https://github.com/omersusin/EyeBlink)
+
+EyeBlink is licensed under the PolyForm Noncommercial License 1.0.0 (the file LICENSE, and
+https://polyformproject.org/licenses/noncommercial/1.0.0). In short: you may use it, change it and share it for any
+noncommercial purpose. You may not sell it, put it behind a paywall, show advertising in it, or use it in a commercial
+product or service. Anyone who passes the software on has to pass on this notice and the licence with it.
+
+The licence covers EyeBlink's own code, its design (the Daylight and Moonlit look, the mascot eye, the logo and the
+launcher icon) and its texts. It does not cover the components below, which stay under their own licences.
+
+Third-party components
+----------------------
+
+Apache License 2.0 (full text: licenses/Apache-2.0.txt)
+  - MediaPipe Tasks Vision and the Face Landmarker model - Copyright The MediaPipe Authors
+    (the model's own notice: app/src/main/assets/MODEL_LICENSE.txt)
+  - AndroidX: core, activity, lifecycle, savedstate, CameraX, Compose - Copyright The Android Open Source Project
+  - Kotlin standard library, kotlinx.coroutines, kotlinx.serialization - Copyright JetBrains s.r.o. and Kotlin contributors
+  - Libraries that MediaPipe itself depends on (Flogger, Guava, AutoValue annotations and others) under Apache 2.0,
+    and Protocol Buffers (BSD 3-Clause), each under its own licence and copyright
+
+MIT License (full text: licenses/MIT-Shizuku-API.txt)
+  - Shizuku API and provider (dev.rikka.shizuku) - Copyright (c) 2021 RikkaW
+
+SIL Open Font License 1.1 (full text: app/src/main/assets/FONT_LICENSES.txt)
+  - Bricolage Grotesque - Copyright 2022 The Bricolage Grotesque Project Authors
+  - Figtree - Copyright 2022 The Figtree Project Authors
+  - DM Mono - Copyright 2020 The DM Mono Project Authors
+
+The LSPosed module compiles against small stubs of the Xposed API (the xposed-api directory, written for this project);
+it does not contain or ship the Xposed framework.

@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="EyeBlink">
+  <title>EyeBlink</title>
+  <rect x="0" y="18" width="512" height="494" rx="150" fill="#1C83DE"/>
+  <rect x="0" y="0" width="512" height="494" rx="150" fill="#3AA4FF"/>
+  <path transform="translate(0 11.37)" d="M63.68,247 C105.99,88.21 406.01,88.21 448.32,247 C406.01,373.09 105.99,373.09 63.68,247 Z" fill="#1C83DE"/>
+  <path d="M63.68,247 C105.99,88.21 406.01,88.21 448.32,247 C406.01,373.09 105.99,373.09 63.68,247 Z" fill="#FFC62E"/>
+  <path d="M77.93,247 C117.1,124.85 394.9,124.85 434.07,247 C394.9,350.36 117.1,350.36 77.93,247 Z" fill="#FFFFFF"/>
+  <clipPath id="aperture"><path d="M77.93,247 C117.1,124.85 394.9,124.85 434.07,247 C394.9,350.36 117.1,350.36 77.93,247 Z"/></clipPath>
+  <g clip-path="url(#aperture)">
+    <rect x="77.93" y="124.85" width="356.15" height="56.8" fill="#B7DAF5" fill-opacity="0.55"/>
+    <circle cx="256" cy="247" r="70.47" fill="#3AA4FF"/>
+    <circle cx="256" cy="247" r="66.24" fill="none" stroke="#1C83DE" stroke-width="8.46"/>
+    <circle cx="256" cy="247" r="32.42" fill="#16254A"/>
+    <circle cx="234.86" cy="223.04" r="14.09" fill="#FFFFFF"/>
+    <circle cx="275.73" cy="268.14" r="5.99" fill="#FFFFFF" fill-opacity="0.8"/>
+  </g>
+  <path d="M77.93,247 C117.1,124.85 394.9,124.85 434.07,247" fill="none" stroke="#E3A10C" stroke-width="5.3" stroke-linecap="round"/>
+  <g stroke="#16254A" stroke-width="6.44" stroke-linecap="round"><line x1="104.25" y1="205.56" x2="79.73" y2="180.28"/><line x1="171.06" y1="167.93" x2="158.73" y2="129.15"/><line x1="256" y1="155.39" x2="256" y2="112.65"/><line x1="340.94" y1="167.93" x2="353.27" y2="129.15"/><line x1="407.75" y1="205.56" x2="432.27" y2="180.28"/></g>
+</svg>
