@@ -229,4 +229,51 @@ class CompatPolicyTest {
         assertTrue(Strategy.entries.filter { it.experimental }.all { it.verification == Verification.AUDIO_ACTIVITY })
         assertEquals(Strategy.entries.sortedBy { it.rank }, Strategy.entries)
     }
+    @Test
+    fun `a new build forgives what an old one gave up on and keeps what worked`() {
+        // The phone this was found on: a test that failed once (so a break never tried that way again), a way that worked
+        // and then failed three times running (switched off) - and an app whose video no break ever tried to pause.
+        var r = CompatPolicy.record(CompatRecord("com.app", 100), Strategy.MEDIA_SESSION, false, false, 100, 1_000, fromTest = true, versionCode = 100)
+        r = CompatPolicy.record(r, Strategy.PRIVILEGED_SESSION, true, true, 100, 2_000, fromTest = false, versionCode = 100)
+        repeat(3) { r = failedAttempt(r, Strategy.PRIVILEGED_SESSION) }
+        assertTrue("nothing may be tried on it", CompatPolicy.candidates(r, sessionBased, settings).isEmpty())
+        assertEquals(CompatStatus.FAILING, CompatPolicy.status(r, sessionBased, settings))
+
+        val f = CompatPolicy.forgiven(r)!!
+        assertNull("a way that never worked is forgotten altogether", f.stats[Strategy.MEDIA_SESSION])
+        assertEquals("one that worked is kept, its failed run forgotten", 0, f.stats.getValue(Strategy.PRIVILEGED_SESSION).consecutiveFails)
+        assertEquals(1, f.stats.getValue(Strategy.PRIVILEGED_SESSION).pauseOk)
+        assertEquals(
+            "the proven way first, and the one that was written off may be tried again",
+            listOf(Strategy.PRIVILEGED_SESSION, Strategy.MEDIA_SESSION), CompatPolicy.candidates(f, sessionBased, settings),
+        )
+        assertEquals(CompatStatus.VERIFIED, CompatPolicy.status(f, sessionBased, settings))
+    }
+
+    @Test
+    fun `an app with nothing but failures is untested again after the new build forgives it`() {
+        val failedTest = CompatPolicy.record(CompatRecord("com.app", 100), Strategy.PRIVILEGED_SESSION, false, false, 100, 1_000, fromTest = true, versionCode = 100)
+        val onlyRoot = setOf(Strategy.PRIVILEGED_SESSION)
+        assertEquals(CompatStatus.FAILING, CompatPolicy.status(failedTest, onlyRoot, settings))
+        assertNull("nothing is left of it", CompatPolicy.forgiven(failedTest))
+        assertEquals("and a failure forgiven is a way tried again", Strategy.PRIVILEGED_SESSION, CompatPolicy.best(CompatPolicy.forgiven(failedTest), onlyRoot, settings))
+        assertNull(CompatPolicy.forgiven(CompatRecord("com.app", 100)))
+        // and a success is not forgotten by being forgiven twice
+        val ok = record(Triple(Strategy.MEDIA_SESSION, true, true))
+        assertEquals(CompatPolicy.forgiven(ok), CompatPolicy.forgiven(CompatPolicy.forgiven(ok)!!))
+    }
+
+    @Test
+    fun `a record describes itself for a bug report with counts and verdicts only`() {
+        assertEquals("nothing remembered", CompatPolicy.describe(null))
+        assertEquals("nothing remembered", CompatPolicy.describe(CompatRecord("com.app", 100)))
+        val r = failedAttempt(record(Triple(Strategy.MEDIA_SESSION, true, true)), Strategy.PRIVILEGED_SESSION)
+        assertEquals(
+            "MEDIA_SESSION: pause 1/1, resume 1/1, test passed; PRIVILEGED_SESSION: pause 0/1, resume 0/1, 1 failed in a row",
+            CompatPolicy.describe(r),
+        )
+        val failedTest = CompatPolicy.record(CompatRecord("com.app", 100), Strategy.MEDIA_SESSION, false, false, 100, 1_000, fromTest = true, versionCode = 100)
+        assertEquals("MEDIA_SESSION: pause 0/1, resume 0/1, 1 failed in a row, test failed", CompatPolicy.describe(failedTest))
+        assertFalse("no package name", CompatPolicy.describe(r).contains("com.app"))
+    }
 }

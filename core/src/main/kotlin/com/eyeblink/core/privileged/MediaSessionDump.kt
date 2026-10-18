@@ -154,9 +154,10 @@ object MediaSessionDump {
      * names and session tags become placeholders, and titles, artists, intents, custom actions and error texts -
      * everything that can say what is being watched or listened to, or by which app - are dropped. The lines that
      * name a session are rewritten whole (a tag may contain spaces), not edited. It exists so that a dump format this
-     * parser does not understand can be fixed without anybody sending their media sessions around.
+     * parser does not understand can be fixed without anybody sending their media sessions around. A session of one of the
+     * [selected] packages is marked "[selected]", so that the report says which of the players are ones EyeBlink works with.
      */
-    fun outline(text: String, maxLines: Int = 60): String {
+    fun outline(text: String, maxLines: Int = 60, selected: Set<String> = emptySet()): String {
         val dump = parse(text)
         val aliases = LinkedHashMap<String, String>()
         // Placeholders that look like package names, so that the outline reads back with the same parser.
@@ -166,6 +167,10 @@ object MediaSessionDump {
         packages.forEach { alias(it) }
         fun aliasIn(line: String) = PACKAGE_SLASH.find(line)?.let { alias(it.groupValues[1]) }
         fun userId(line: String) = USER_ID_SUFFIX.find(line)?.value?.trim()?.let { " $it" } ?: ""
+        fun mark(line: String): String {
+            val pkg = PACKAGE_SLASH.find(line)?.groupValues?.get(1)
+            return if (pkg != null && pkg in selected) " [selected]" else ""
+        }
 
         val out = ArrayList<String>()
         for (raw in text.lineSequence()) {
@@ -173,8 +178,8 @@ object MediaSessionDump {
             val t = line.trimStart()
             val indent = line.substring(0, line.length - t.length)
             val kept: String = when {
-                BUTTON_LINE.containsMatchIn(line) -> "${indent}Media button session is ${aliasIn(line)?.let { "$it/tag" } ?: "null"}${userId(line)}"
-                HEADER_LINE.containsMatchIn(line) -> "${indent}tag ${aliasIn(line)?.let { "$it/tag" } ?: "tag"}${userId(line)}"
+                BUTTON_LINE.containsMatchIn(line) -> "${indent}Media button session is ${aliasIn(line)?.let { "$it/tag" } ?: "null"}${mark(line)}${userId(line)}"
+                HEADER_LINE.containsMatchIn(line) -> "${indent}tag ${aliasIn(line)?.let { "$it/tag" } ?: "tag"}${mark(line)}${userId(line)}"
                 t.startsWith("state=") -> indent + cutState(t)
                 t.startsWith("metadata:") -> "${indent}metadata: ${METADATA_SIZE.find(t)?.value ?: "…"}, description=…"
                 t.startsWith("queueTitle=") -> "${indent}queueTitle=…, size=${t.substringAfterLast("size=", "?")}"

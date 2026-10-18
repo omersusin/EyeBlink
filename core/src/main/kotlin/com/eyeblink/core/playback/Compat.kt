@@ -156,6 +156,30 @@ object CompatPolicy {
         return if (outdated) CompatStatus.RETEST_ADVISED else CompatStatus.FAILING
     }
 
+    /**
+     * What a new build of EyeBlink keeps of what the old one learned about an app. Successes stay. Failures are forgotten: a
+     * way that was switched off by a failed test or by a run of failed breaks - perhaps by a mistake the new build no longer
+     * makes - gets another chance, and what really happens fills the record again. Null when nothing is left, which makes the
+     * app untested again.
+     */
+    fun forgiven(record: CompatRecord): CompatRecord? {
+        val kept = record.stats.filterValues { it.everWorked }.mapValues { it.value.copy(consecutiveFails = 0) }
+        return if (kept.isEmpty()) null else record.copy(stats = kept)
+    }
+
+    /** What is remembered of an app, in one line for a bug report: counts and verdicts only, never a name. */
+    fun describe(record: CompatRecord?): String {
+        if (record == null || record.stats.isEmpty()) return "nothing remembered"
+        return record.stats.entries.sortedBy { it.key.rank }.joinToString("; ") { (strategy, stat) ->
+            buildString {
+                append(strategy.name).append(": pause ").append(stat.pauseOk).append('/').append(stat.pauseOk + stat.pauseFail)
+                append(", resume ").append(stat.resumeOk).append('/').append(stat.resumeOk + stat.resumeFail)
+                if (stat.consecutiveFails > 0) append(", ").append(stat.consecutiveFails).append(" failed in a row")
+                if (stat.lastTestedMs != 0L) append(if (stat.testPassed) ", test passed" else ", test failed")
+            }
+        }
+    }
+
     /** Fold one pause/resume attempt into the record. [fromTest] marks a deliberate test run. */
     fun record(
         record: CompatRecord,

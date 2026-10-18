@@ -68,6 +68,10 @@ class CompatController(
     private val onChange: () -> Unit,
 ) {
     private val records = HashMap(stores.loadCompat())
+
+    init {
+        forgiveWhatOlderBuildsLearned()
+    }
     private val lastResults = HashMap<String, List<StrategyTestResult>>()
 
     private val mediaSession = MediaSessionBackend(sessions)
@@ -249,8 +253,53 @@ class CompatController(
         return device.audioActive()
     }
 
-    /** What the privileged shell sees of the media sessions, shaped for a bug report and stripped of names and titles. */
-    suspend fun sessionOutline(): String? = if (power.status.can(Capability.MEDIA_CONTROL)) privileged.outline() else null
+    /**
+     * What the privileged shell sees of the media sessions, shaped for a bug report and stripped of names and titles. The
+     * sessions of the [selected] apps are marked, so that the report says which players are ones EyeBlink works with.
+     */
+    suspend fun sessionOutline(selected: Set<String> = emptySet()): String? =
+        if (power.status.can(Capability.MEDIA_CONTROL)) privileged.outline(selected) else null
+
+    /** One line about an app for a bug report: what is decided about pausing its video, and what is remembered. No names. */
+    fun summary(target: String): String {
+        val ui = ui(target)
+        return buildString {
+            append(ui.status.name)
+            ui.strategy?.let { append(", proven ").append(it.name) }
+            ui.trial?.let { append(", would try ").append(it.name) }
+            if (ui.noSession) append(", shows no player")
+            append("; ").append(CompatPolicy.describe(records[target]))
+        }
+    }
+
+    /**
+     * A new version of EyeBlink starts from what the pause records remember, but not from their failures. A way that a failed
+     * test or a run of failed breaks wrote off may have been written off by a mistake the new version no longer makes - it
+     * has happened, a break never even asked the player - and nothing else would ever give it another chance. Successes stay.
+     * This runs once for each version of EyeBlink.
+     */
+    private fun forgiveWhatOlderBuildsLearned() {
+        val own = ownVersion()
+        if (own == 0L || own == stores.compatBuild) return
+        stores.compatBuild = own
+        var changed = false
+        for (pkg in records.keys.toList()) {
+            val record = records.getValue(pkg)
+            val forgiven = CompatPolicy.forgiven(record)
+            if (forgiven == record) continue
+            changed = true
+            if (forgiven == null) records.remove(pkg) else records[pkg] = forgiven
+        }
+        if (changed) stores.saveCompat(records)
+    }
+
+    @Suppress("DEPRECATION")
+    private fun ownVersion(): Long = try {
+        val info = app.packageManager.getPackageInfo(app.packageName, 0)
+        if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else info.versionCode.toLong()
+    } catch (e: Exception) {
+        0L
+    }
 
     private fun fold(target: String, strategy: Strategy, pauseOk: Boolean, resumeOk: Boolean, latencyMs: Long, fromTest: Boolean) {
         val (code, name) = versionOf(target)

@@ -53,6 +53,29 @@ class UsageLedgerTest {
     }
 
     @Test
+    fun `why a video was not paused is counted by outcome - and a break the gate stopped is not counted`() {
+        var l = UsageLedger()
+        l = l.recordBreak("d", report(pause = PauseSummary.NO_SESSION))
+        l = l.recordBreak("d", report(pause = PauseSummary.NO_SESSION))
+        l = l.recordBreak("d", report(pause = PauseSummary.NOT_PLAYING))
+        l = l.recordBreak("d", report(pause = PauseSummary.NOT_ATTEMPTED))
+        l = l.recordBreak("d", report(pause = PauseSummary.PAUSED, resume = ResumeSummary.RESUMED))
+        l = l.recordBreak("d", report(outcome = BreakOutcome.ABORTED))
+        val d = l.day("d")
+        assertEquals(mapOf("NO_SESSION" to 2, "NOT_PLAYING" to 1, "NOT_ATTEMPTED" to 1, "PAUSED" to 1), d.pauseOutcomes)
+        assertEquals("the old counters are unchanged", 1, d.pausesVerified)
+        assertEquals(4, UsageLedger.merge(d, d).pauseOutcomes.getValue("NO_SESSION"))
+        assertEquals(mapOf("PAUSED" to 1), UsageLedger.merge(d.copy(pauseOutcomes = emptyMap()), DayStats(pauseOutcomes = mapOf("PAUSED" to 1))).pauseOutcomes)
+    }
+
+    @Test
+    fun `a ledger saved before outcomes were counted still loads`() {
+        val old = CoreJson.instance.decodeFromString<UsageLedger>("""{"days":{"d":{"microShown":39,"pausesVerified":0}}}""")
+        assertEquals(39, old.day("d").microShown)
+        assertTrue(old.day("d").pauseOutcomes.isEmpty())
+    }
+
+    @Test
     fun `deferrals are grouped by reason`() {
         var l = UsageLedger()
         l = l.recordDeferral("d", "TEXT_INPUT").recordDeferral("d", "TEXT_INPUT").recordDeferral("d", "IN_CALL")

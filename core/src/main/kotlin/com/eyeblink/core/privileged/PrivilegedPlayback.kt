@@ -83,11 +83,14 @@ class PrivilegedPlaybackBackend(
     /** The current media sessions, or null when the shell could not list them. */
     suspend fun sessions(): MediaDump? = readDump()
 
-    /** A copy of the raw dump that is safe to put in a bug report, or null when it could not be read. */
-    suspend fun outline(): String? {
+    /**
+     * A copy of the raw dump that is safe to put in a bug report, or null when it could not be read. Sessions of the
+     * [selected] packages are marked as such.
+     */
+    suspend fun outline(selected: Set<String> = emptySet()): String? {
         val r = shell.run(PrivilegedCommands.DUMP_MEDIA_SESSIONS, DUMP_TIMEOUT_MS)
         if (!r.ok || r.output.isBlank()) return null
-        return MediaSessionDump.outline(r.output)
+        return MediaSessionDump.outline(r.output, selected = selected)
     }
 
     private suspend fun readDump(maxAgeMs: Long = 0L): MediaDump? {

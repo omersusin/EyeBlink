@@ -26,6 +26,12 @@ data class DayStats(
     val observedBlinks: Int = 0,
     val observedTrackedMs: Long = 0L,
     val deferredByReason: Map<String, Int> = emptyMap(),
+    /**
+     * How the pause of each break that got as far as the player ended, by name (PAUSED, NOT_PLAYING, NO_SESSION, UNREADABLE,
+     * NOT_ATTEMPTED...). It says why a video was not paused, which the three counters above cannot: they count only the
+     * breaks where a command went out.
+     */
+    val pauseOutcomes: Map<String, Int> = emptyMap(),
 ) {
     val observedBlinksPerMinute: Float?
         get() = if (observedTrackedMs >= MIN_TRACKED_FOR_RATE_MS) observedBlinks * 60_000f / observedTrackedMs else null
@@ -53,6 +59,10 @@ data class UsageLedger(val days: Map<String, DayStats> = emptyMap()) {
             BreakOutcome.SKIPPED_BY_USER -> s = s.copy(restsSkipped = s.restsSkipped + 1)
             BreakOutcome.ABORTED -> s = s.copy(aborted = s.aborted + 1)
             BreakOutcome.FAILED -> s = s.copy(failed = s.failed + 1)
+        }
+        // A break the gate stopped never reached the player; it says nothing about pausing.
+        if (r.outcome != BreakOutcome.ABORTED) {
+            s = s.copy(pauseOutcomes = s.pauseOutcomes + (r.pause.name to (s.pauseOutcomes[r.pause.name] ?: 0) + 1))
         }
         s = when (r.pause) {
             PauseSummary.PAUSED -> s.copy(pausesVerified = s.pausesVerified + 1)
@@ -111,6 +121,9 @@ data class UsageLedger(val days: Map<String, DayStats> = emptyMap()) {
             observedTrackedMs = a.observedTrackedMs + b.observedTrackedMs,
             deferredByReason = (a.deferredByReason.keys + b.deferredByReason.keys).associateWith {
                 (a.deferredByReason[it] ?: 0) + (b.deferredByReason[it] ?: 0)
+            },
+            pauseOutcomes = (a.pauseOutcomes.keys + b.pauseOutcomes.keys).associateWith {
+                (a.pauseOutcomes[it] ?: 0) + (b.pauseOutcomes[it] ?: 0)
             },
         )
     }

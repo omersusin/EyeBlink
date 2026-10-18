@@ -130,6 +130,62 @@ MediaSessionDeviceConfig:
         "Media button session is MediaSessionRecord 9c8d7e com.spotify.music/spotify (userId=0)",
     )
 
+    /**
+     * The one dump here that comes from a real phone (Android 17): the outline that EyeBlink put into a bug report, which is made
+     * to read back with the same parser. The first block is the phone's own voice-call session, outside the user's record.
+     * The media button is held by an app that is stopped; the one that is paused is another. (Names are the report's placeholders.)
+     */
+    val ANDROID_17_REPORT_OUTLINE = """
+tag app1.pkg/tag (userId=0)
+  tag app1.pkg/tag (userId=0)
+    ownerPid=2109, ownerUid=1000, userId=0
+    package=app1.pkg
+    active=false
+    flags=65537
+    controllers: 0
+    state=null
+    audioAttrs=AudioAttributes: usage=USAGE_VOICE_COMMUNICATION content=CONTENT_TYPE_SPEECH flags=0x800(FLAG_MUTE_HAPTIC)  tags=… bundle=null
+    volumeType=LOCAL, controlType=ABSOLUTE, max=0, current=0, volumeControlId=null
+    metadata: …, description=…
+    queueTitle=…, size=0
+Record for full_user=0
+  Media button session is app2.pkg/tag (userId=0)
+  Sessions Stack - have 3 sessions:
+    tag app2.pkg/tag (userId=0)
+      ownerPid=6631, ownerUid=10211, userId=0
+      package=app2.pkg
+      active=false
+      flags=3
+      controllers: 1
+      state=PlaybackState {state=STOPPED(1), position=0, buffered position=0, speed=1.0, updated=18588016, actions=8192}
+      audioAttrs=AudioAttributes: usage=USAGE_MEDIA content=CONTENT_TYPE_UNKNOWN flags=0x800(FLAG_MUTE_HAPTIC)  tags=… bundle=null
+      volumeType=LOCAL, controlType=ABSOLUTE, max=0, current=0, volumeControlId=null
+      metadata: size=6, description=…
+      queueTitle=…, size=0
+    tag app3.pkg/tag (userId=0)
+      ownerPid=12912, ownerUid=10325, userId=0
+      package=app3.pkg
+      active=true
+      flags=7
+      controllers: 5
+      state=PlaybackState {state=PAUSED(2), position=177005, buffered position=171121, speed=0.0, updated=11779016, actions=7340029}
+      audioAttrs=AudioAttributes: usage=USAGE_MEDIA content=CONTENT_TYPE_UNKNOWN flags=0x800(FLAG_MUTE_HAPTIC)  tags=… bundle=null
+      volumeType=LOCAL, controlType=ABSOLUTE, max=0, current=0, volumeControlId=null
+      metadata: size=16, description=…
+      queueTitle=…, size=47
+    tag app4.pkg/tag (userId=0)
+      ownerPid=14938, ownerUid=10334, userId=0
+      package=app4.pkg
+      active=false
+      flags=0
+      controllers: 0
+      state=PlaybackState {state=STOPPED(1), position=0, buffered position=0, speed=0.0, updated=16783895, actions=0}
+      audioAttrs=AudioAttributes: usage=USAGE_MEDIA content=CONTENT_TYPE_UNKNOWN flags=0x800(FLAG_MUTE_HAPTIC)  tags=… bundle=null
+      volumeType=LOCAL, controlType=ABSOLUTE, max=0, current=0, volumeControlId=null
+      metadata: …, description=…
+      queueTitle=…, size=0
+""".trim()
+
     val FOCUS = """
   mCurrentFocus=Window{a1b2c3d u0 com.instagram.android/com.instagram.mainactivity.MainActivity}
   mFocusedApp=ActivityRecord{e4f5a6 u0 com.instagram.android/.mainactivity.MainActivity t42}
@@ -178,6 +234,35 @@ class MediaSessionDumpTest {
         assertEquals(listOf(PlayState.PLAYING, PlayState.PAUSED), reparsed.sessions.map { it.state })
         assertEquals(2, reparsed.sessions.size)
         assertEquals(reparsed.sessions[0].packageName, reparsed.mediaButtonPackage)
+    }
+
+    @Test
+    fun `the outline a real phone on android 17 sent in a bug report reads back - the voice call session, three players, a holder that is not the paused one`() {
+        val dump = MediaSessionDump.parse(Fixtures.ANDROID_17_REPORT_OUTLINE)
+        assertEquals(listOf("app1.pkg", "app2.pkg", "app3.pkg", "app4.pkg"), dump.sessions.map { it.packageName })
+        assertEquals(listOf(PlayState.UNKNOWN, PlayState.STOPPED, PlayState.PAUSED, PlayState.STOPPED), dump.sessions.map { it.state })
+        assertEquals("app2.pkg", dump.mediaButtonPackage)
+        val paused = dump.forPackage("app3.pkg")!!
+        assertTrue(paused.active)
+        assertEquals(177_005L, paused.positionMs)
+        assertFalse("a stopped session is not active", dump.forPackage("app2.pkg")!!.active)
+    }
+
+    @Test
+    fun `an outline marks the sessions of the selected apps, and a marked outline still parses the same`() {
+        val raw = Fixtures.ANDROID_15_FULL_DUMP
+        val marked = MediaSessionDump.outline(raw, selected = setOf("com.google.android.youtube"))
+        // the youtube session's header and the media button line name it: two lines, and no name anywhere
+        assertEquals(marked, 2, marked.lines().count { it.contains("[selected]") })
+        assertTrue(marked, marked.lines().any { it.trimStart().startsWith("Media button session is") && it.contains("[selected]") })
+        assertTrue(marked, marked.lines().any { it.trimStart().startsWith("tag ") && it.contains("[selected]") })
+        assertFalse(marked, marked.contains("youtube", ignoreCase = true))
+        val plain = MediaSessionDump.parse(MediaSessionDump.outline(raw))
+        val reparsed = MediaSessionDump.parse(marked)
+        assertEquals(plain.sessions.map { it.state }, reparsed.sessions.map { it.state })
+        assertEquals(plain.sessions.map { it.packageName }, reparsed.sessions.map { it.packageName })
+        assertEquals(plain.mediaButtonPackage, reparsed.mediaButtonPackage)
+        assertEquals("nothing is marked unless asked", 0, MediaSessionDump.outline(raw).lines().count { it.contains("[selected]") })
     }
 
     @Test
@@ -495,6 +580,38 @@ class PrivilegedPlaybackBackendTest {
         assertFalse(b.pause("com.google.android.youtube"))
         assertTrue(shell.commands.none { it.startsWith("cmd media_session dispatch") || it.startsWith("input") })
         assertTrue(b.lastProblem.orEmpty(), b.lastProblem.orEmpty().contains("another app is playing"))
+    }
+
+    @Test
+    fun `on the phone of a real report the paused app is not the one holding the media button, so no key goes out for it`() = runTest {
+        val (b, shell) = backend(Fixtures.ANDROID_17_REPORT_OUTLINE)
+        assertEquals(PlayState.PAUSED, b.snapshot("app3.pkg").state)
+        assertEquals(PlayState.STOPPED, b.snapshot("app2.pkg").state)
+        assertEquals("an app with no session at all reads as none", PlayState.NONE, b.snapshot("app9.pkg").state)
+        assertFalse(b.pause("app3.pkg"))
+        assertTrue(b.lastProblem.orEmpty(), b.lastProblem.orEmpty().contains("different app"))
+        assertTrue(shell.commands.none { it.startsWith("cmd media_session dispatch") || it.startsWith("input") })
+    }
+
+    @Test
+    fun `and once that app is playing and holds the button, the same shaped dump is enough to pause and resume it`() = runTest {
+        val playing = Fixtures.ANDROID_17_REPORT_OUTLINE
+            .replace("Media button session is app2.pkg/tag", "Media button session is app3.pkg/tag")
+            .replace("state=PAUSED(2), position=177005", "state=PLAYING(3), position=177005")
+        val (b, shell) = backend(playing)
+        assertEquals(PlayState.PLAYING, b.snapshot("app3.pkg").state)
+        assertTrue(b.pause("app3.pkg"))
+        assertEquals("cmd media_session dispatch pause", shell.commands.last())
+        assertTrue(b.resume("app3.pkg"))
+        assertEquals("cmd media_session dispatch play", shell.commands.last())
+    }
+
+    @Test
+    fun `the report outline marks the apps that were selected`() = runTest {
+        val (b, _) = backend(Fixtures.ANDROID_15_FULL_DUMP)
+        val outline = b.outline(selected = setOf("com.spotify.music"))!!
+        assertEquals(outline, 1, outline.lines().count { it.trimStart().startsWith("tag ") && it.contains("[selected]") })
+        assertFalse(outline.contains("spotify", ignoreCase = true))
     }
 
     @Test

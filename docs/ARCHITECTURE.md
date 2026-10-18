@@ -145,7 +145,10 @@ results into "verified", "failing", "untested" or "retest advised".
 A break uses a *proven* strategy when the app has one. When it has none, a break may *try* a strategy that reads the player's own state back
 (`Strategy.canTryUnproven`: media session, privileged media session - not the LSPosed hook, which works through the app's own internals): the coordinator pauses only what is positively playing,
 checks that the pause landed and resumes only what it paused, so a first attempt cannot do harm, and the outcome (`BreakReport.playbackVerdict()`) is
-folded into the app's record - the first successful break verifies the app, three failures in a row switch the strategy off. Strategies that can only
+folded into the app's record - the first successful break verifies the app, three failures in a row switch the strategy off (and a failed deliberate test keeps
+a break from trying it, until a test passes). A new *version of EyeBlink* gives the failures another chance, once (`CompatPolicy.forgiven`, run by `CompatController` when
+`Stores.compatBuild` differs from the installed version code): a strategy that has never worked on an app is forgotten, a streak of failures is cleared, successes stay -
+because a build can switch a way off by a mistake that the next build no longer makes, and nothing else would ever try it again. Strategies that can only
 see "is any audio playing" (media key, audio focus, tap) are never tried without a passed test. A break asks the candidates in order (proven ones by rank, then the
 ones worth trying, fewest failures first) and moves on to the next when one cannot see the player or cannot deliver its command - that costs the video nothing -
 but never after a command has gone out, and only to ways that read the player's own state (a blind precise way is no reason to reach for a media key, which would
@@ -158,7 +161,10 @@ state of the permissions and of the privileged shell on every use, never remembe
 The coordinator counts the time a look at the player costs (a `dumpsys` through `su` takes a few hundred milliseconds) as waiting time, waits up to 2.5 s for a
 pause or a resume to show up, and treats a pause that was only seen after the window, followed by a resume that worked, as a success: a slow phone is not a broken one.
 When nothing was paused the break says why - not playing, no media session for the app, player unreadable, command not delivered (for instance because the media keys
-currently belong to another app) - and *Diagnostics* shows it, together with a name-free outline of the phone's media-session list in the copied report.
+currently belong to another app) - and *Diagnostics* shows it, together with a name-free outline of the phone's media-session list in the copied report. The report
+also says, for each app the user chose (numbered, never named), what is decided about pausing it and what is remembered (`CompatPolicy.describe`), marks the sessions
+of those apps in the outline, and counts how the breaks of the week met the player (`DayStats.pauseOutcomes`: paused, not playing, no session, unreadable, not attempted):
+the three pause counters count only the breaks where a command went out, so a week of zeros in them cannot say whether the video was never playing, never visible or never asked.
 
 ### Power modes
 

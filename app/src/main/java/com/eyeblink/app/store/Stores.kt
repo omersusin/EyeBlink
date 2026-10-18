@@ -46,6 +46,11 @@ class Stores(ctx: Context) {
         get() = prefs.getInt(BOOT_COUNT, -1)
         set(v) { prefs.edit().putInt(BOOT_COUNT, v).apply() }
 
+    /** The version code of the EyeBlink that last went through what the pause records remember (see CompatController). */
+    var compatBuild: Long
+        get() = prefs.getLong(COMPAT_BUILD, 0L)
+        set(v) { prefs.edit().putLong(COMPAT_BUILD, v).apply() }
+
     private inline fun <reified T> read(key: String, default: () -> T): T =
         runCatching { prefs.getString(key, null)?.let { CoreJson.instance.decodeFromString<T>(it) } }.getOrNull() ?: default()
 
@@ -62,5 +67,6 @@ class Stores(ctx: Context) {
         const val COMPAT = "compat.v1"
         const val WAS_RUNNING = "was_running"
         const val BOOT_COUNT = "boot_count"
+        const val COMPAT_BUILD = "compat_build"
     }
 }

@@ -416,7 +416,7 @@ class Engine(val app: Application, ports: EnginePorts) {
         scope.launch {
             // What the privileged shell makes of the media sessions is the one thing a bug report cannot do without
             // when pausing misbehaves; it is read here, with names and titles stripped, and never kept.
-            val outline = withTimeoutOrNull(6_000L) { runCatching { compat.sessionOutline() }.getOrNull() }
+            val outline = withTimeoutOrNull(6_000L) { runCatching { compat.sessionOutline(settings.apps.map { it.packageName }.toSet()) }.getOrNull() }
             val text = report(outline)
             android.os.Handler(android.os.Looper.getMainLooper()).post {
                 app.systemService<ClipboardManager>().setPrimaryClip(ClipData.newPlainText("EyeBlink report", text))
@@ -811,16 +811,22 @@ class Engine(val app: Application, ports: EnginePorts) {
         return buildString {
             appendLine("EyeBlink ${d.appVersion}  Android API ${d.androidSdk}  ${d.device}")
             appendLine("mode=${settings.mode}  camera=${settings.camera.tracking}  rest=${settings.rest.style}")
-            appendLine("accessibility=${d.accessibilityConnected}  mediaSessions=${d.listenerConnected}  overlay=${d.overlayKind.ifEmpty { "none" }}")
+            appendLine("accessibility=${d.accessibilityConnected}  mediaSessions=${d.listenerConnected}  overlay=${d.overlayKind.ifEmpty { "none drawn yet" }}  canDraw=${windows.available()}")
             appendLine("permissions=${perms.joinToString { it.name }}")
             appendLine("power=${power.ui.status.kind}/${power.ui.status.available}  lsposedReplied=${lsposed.everReplied}")
             appendLine("selectedApps=${settings.apps.size}  playbackVerified=$verified")
             appendLine("pauseMethods=${compat.available(fresh = true).joinToString { it.name }}  powerDetail=${power.ui.status.detail ?: "-"}")
+            // The apps are numbered in the order of the list, never named; what is decided about each and what is remembered of it.
+            settings.apps.forEachIndexed { i, a -> appendLine("app${i + 1}: ${compat.summary(a.packageName)}") }
             lastBreak?.let { br ->
                 appendLine("lastBreak: kind=${br.kind} outcome=${br.outcome} strategy=${br.strategy ?: "-"} pause=${br.pause} resume=${br.resume} error=${br.error ?: "-"}")
             }
             appendLine("week: micro=${week.microShown} rests=${week.restsCompleted} skipped=${week.restsSkipped} aborted=${week.aborted} failed=${week.failed}")
             appendLine("pauses: verified=${week.pausesVerified} unverified=${week.pausesUnverified} failed=${week.pausesFailed}")
+            // Why a video was not paused: the counters above count only the breaks where a command went out.
+            if (week.pauseOutcomes.isNotEmpty()) {
+                appendLine("how breaks met the player (week): " + week.pauseOutcomes.entries.sortedByDescending { it.value }.joinToString("  ") { "${it.key}=${it.value}" })
+            }
             appendLine("resumes: ok=${week.resumesOk} refused=${week.resumesRefused} failed=${week.resumesFailed}")
             appendLine("camera: p50=${d.frameP50Ms}ms p95=${d.frameP95Ms}ms duty=${d.cameraDutyPercent}%  model=${faces?.ready}  lastError=${d.cameraError ?: "none"}")
             appendLine("battery=${d.batteryPercent}% charging=${d.charging} thermal=${d.thermal} powerSave=${d.powerSave}")
