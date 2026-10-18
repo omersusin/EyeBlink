@@ -61,6 +61,70 @@ Sessions Stack - have 1 sessions:
     metadata: size=1, description=null
 """.trimIndent()
 
+    /**
+     * The whole of `dumpsys media_session` as the code of Android 14 prints it (MediaSessionService, MediaSessionStack,
+     * MediaSessionRecord and PlaybackState.toString, read from the AOSP sources): the service header, the user record
+     * with its listeners, the stack, and the audio player monitor's list at the end. Titles and packages are invented.
+     */
+    val ANDROID_14_FULL_DUMP = """
+MEDIA SESSION SERVICE (dumpsys media_session)
+
+2 sessions listeners.
+Global priority session is null
+User Records:
+Record for full_user=0
+  Volume key long-press listener: null
+  Volume key long-press listener package: 
+  Media key listener: null
+  Media key listener package: 
+  OnMediaKeyEventDispatchedListener: added 1 listener(s)
+    from com.android.systemui
+  OnMediaKeyEventSessionChangedListener: added 1 listener(s)
+    from com.android.systemui
+  Last MediaButtonReceiver: null
+  Media button session is com.google.android.youtube/ParentHolder (userId=0)
+  Sessions Stack - have 2 sessions:
+    ParentHolder com.google.android.youtube/ParentHolder (userId=0)
+      ownerPid=12345, ownerUid=10234, userId=0
+      package=com.google.android.youtube
+      launchIntent=PendingIntent{1a2b3c4: PendingIntentRecord{5d6e7f8 com.google.android.youtube startActivity}}
+      mediaButtonReceiver=null
+      active=true
+      flags=3
+      rating type=0
+      controllers: 2
+      state=PlaybackState {state=PLAYING(3), position=45210, buffered position=60000, speed=1.0, updated=123456789, actions=823, custom actions=[], active item id=-1, error=null}
+      audioAttrs=AudioAttributes: usage=USAGE_MEDIA content=CONTENT_TYPE_MOVIE flags=0x800 tags= bformat=ENCODING_PCM_16BIT
+      volumeType=LOCAL, controlType=ABSOLUTE, max=0, current=0, volumeControlId=null
+      metadata: size=5, description=Funny cat compilation, SomeChannel, null
+      queueTitle=null, size=0
+    spotify com.spotify.music/spotify (userId=0)
+      ownerPid=2222, ownerUid=10120, userId=0
+      package=com.spotify.music
+      launchIntent=null
+      mediaButtonReceiver=MediaButtonReceiverHolder{com.spotify.music/com.spotify.music.MediaButtonReceiver}
+      active=true
+      flags=2
+      rating type=0
+      controllers: 1
+      state=PlaybackState {state=PAUSED(2), position=1000, buffered position=0, speed=0.0, updated=1, actions=1, custom actions=[], active item id=-1, error=null}
+      audioAttrs=AudioAttributes: usage=USAGE_MEDIA content=CONTENT_TYPE_MUSIC flags=0x0 tags= bformat=ENCODING_PCM_16BIT
+      volumeType=LOCAL, controlType=ABSOLUTE, max=0, current=0, volumeControlId=null
+      metadata: size=3, description=Song, Artist, Album
+      queueTitle=null, size=0
+
+Audio playback (lastly played comes first)
+  uid=10234 packages=com.google.android.youtube 
+  uid=10120 packages=com.spotify.music 
+MediaSessionDeviceConfig:
+  media_session_notification_listener_enabled=true
+""".trimIndent()
+
+    /** Android 15 adds the session's unique id to its name: "package/tag/id". */
+    val ANDROID_15_FULL_DUMP = ANDROID_14_FULL_DUMP
+        .replace("com.google.android.youtube/ParentHolder (userId=0)", "com.google.android.youtube/ParentHolder/4f1c2a (userId=0)")
+        .replace("com.spotify.music/spotify (userId=0)", "com.spotify.music/spotify/9b8d7e (userId=0)")
+
     val SPOTIFY_HAS_BUTTON = YOUTUBE_PLAYING_SPOTIFY_PAUSED.replace(
         "Media button session is MediaSessionRecord 3f2a1b com.google.android.youtube/youtube-session (userId=0)",
         "Media button session is MediaSessionRecord 9c8d7e com.spotify.music/spotify (userId=0)",
@@ -87,6 +151,33 @@ class MediaSessionDumpTest {
         val sp = dump.sessions[1]
         assertEquals("com.spotify.music", sp.packageName)
         assertEquals(PlayState.PAUSED, sp.state)
+    }
+
+    @Test
+    fun `the whole dump of android 14 and 15 is read - sessions, states, button holder, nothing from the other sections`() {
+        for ((name, text) in listOf("14" to Fixtures.ANDROID_14_FULL_DUMP, "15" to Fixtures.ANDROID_15_FULL_DUMP)) {
+            val dump = MediaSessionDump.parse(text)
+            assertEquals("android $name: sessions", listOf("com.google.android.youtube", "com.spotify.music"), dump.sessions.map { it.packageName })
+            assertEquals("android $name: button holder", "com.google.android.youtube", dump.mediaButtonPackage)
+            val yt = dump.forPackage("com.google.android.youtube")!!
+            assertEquals("android $name: state", PlayState.PLAYING, yt.state)
+            assertEquals(45_210L, yt.positionMs)
+            assertTrue(yt.active)
+            assertEquals(PlayState.PAUSED, dump.forPackage("com.spotify.music")!!.state)
+            assertNull("android $name: no session for an app that only appears in the audio list", dump.forPackage("com.android.systemui"))
+        }
+    }
+
+    @Test
+    fun `an outline of a real shaped dump still parses to the same sessions and shows no names`() {
+        val outline = MediaSessionDump.outline(Fixtures.ANDROID_15_FULL_DUMP)
+        for (secret in listOf("youtube", "spotify", "systemui", "Funny cat", "SomeChannel", "Artist", "4f1c2a", "9b8d7e")) {
+            assertFalse("outline must not contain '$secret':\n$outline", outline.contains(secret, ignoreCase = true))
+        }
+        val reparsed = MediaSessionDump.parse(outline)
+        assertEquals(listOf(PlayState.PLAYING, PlayState.PAUSED), reparsed.sessions.map { it.state })
+        assertEquals(2, reparsed.sessions.size)
+        assertEquals(reparsed.sessions[0].packageName, reparsed.mediaButtonPackage)
     }
 
     @Test
@@ -157,7 +248,7 @@ class MediaSessionDumpTest {
         assertTrue(outline.contains("state=PlaybackState {state=2"))
         assertTrue(outline.contains("active=true"))
         assertTrue(outline.contains("Media button session is"))
-        assertTrue("the same app keeps the same placeholder", outline.lines().first { it.startsWith("Media button") }.contains("app1/"))
+        assertTrue("the same app keeps the same placeholder", outline.lines().first { it.startsWith("Media button") }.contains("app1.pkg/"))
         // and what it keeps still parses to the same sessions
         assertEquals(2, outline.lines().count { it.contains("(userId=0)") && !it.startsWith("Media button") })
     }
@@ -341,6 +432,19 @@ class PrivilegedPlaybackBackendTest {
         assertTrue(b.pause("com.google.android.youtube"))
         assertEquals("cmd media_session dispatch pause", shell.commands.last())
         assertTrue(shell.commands.none { it.contains("play-pause") })
+    }
+
+    @Test
+    fun `a real shaped android 14 and 15 dump is enough to pause and resume`() = runTest {
+        for (text in listOf(Fixtures.ANDROID_14_FULL_DUMP, Fixtures.ANDROID_15_FULL_DUMP)) {
+            val (b, shell) = backend(text)
+            assertEquals(PlayState.PLAYING, b.snapshot("com.google.android.youtube").state)
+            assertTrue(b.pause("com.google.android.youtube"))
+            assertEquals("cmd media_session dispatch pause", shell.commands.last())
+            assertTrue(b.resume("com.google.android.youtube"))
+            assertEquals("cmd media_session dispatch play", shell.commands.last())
+            assertFalse("keys must not be sent for an app that has no session", b.pause("com.android.systemui"))
+        }
     }
 
     @Test

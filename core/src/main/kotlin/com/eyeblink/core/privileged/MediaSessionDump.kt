@@ -146,7 +146,7 @@ object MediaSessionDump {
         "Record for full_user=", "Sessions Stack", "ownerPid=", "package=", "active=", "flags=", "controllers:", "state=",
         "audioAttrs=", "volumeType=", "metadata:", "queueTitle=",
     )
-    private val SESSION_ALIAS = Regex("""(app\d+)/(\S+)""")
+    private val SESSION_ALIAS = Regex("""(app\d+\.pkg)/(\S+)""")
 
     /**
      * A copy of a dump that can go into a bug report: its shape, the playback states and the numbers stay; package
@@ -159,7 +159,8 @@ object MediaSessionDump {
         val aliases = LinkedHashMap<String, String>()
         val packages = (dump.sessions.map { it.packageName } + listOfNotNull(dump.mediaButtonPackage))
             .distinct().sortedByDescending { it.length }
-        packages.forEach { aliases.getOrPut(it) { "app${aliases.size + 1}" } }
+        // Placeholders that look like package names, so that the outline reads back with the same parser.
+        packages.forEach { aliases.getOrPut(it) { "app${aliases.size + 1}.pkg" } }
 
         val out = ArrayList<String>()
         for (raw in text.lineSequence()) {
@@ -172,10 +173,12 @@ object MediaSessionDump {
             if (t.startsWith("metadata:")) s = s.substringBefore("description=") + "description=…"
             if (t.startsWith("queueTitle=")) s = "${s.substring(0, s.indexOf("queueTitle="))}queueTitle=…, size=${s.substringAfterLast("size=", "?")}"
             for (p in packages) s = s.replace(p, aliases.getValue(p))
-            // "app1/SomeTag": the tag may name the app or the content, wherever it is repeated on the line.
+            // "app1/SomeTag" (Android 15: "app1/SomeTag/uniqueId"): the tag may name the app or the content, and is
+            // printed again in front of the line, so every part of it goes wherever it appears.
             SESSION_ALIAS.find(s)?.let { m ->
-                val tag = m.groupValues[2]
-                if (tag.isNotEmpty()) s = s.replace(Regex("(?<![A-Za-z0-9_])" + Regex.escape(tag) + "(?![A-Za-z0-9_])"), "tag")
+                for (part in m.groupValues[2].split('/').filter { it.isNotEmpty() }) {
+                    s = s.replace(Regex("(?<![A-Za-z0-9_])" + Regex.escape(part) + "(?![A-Za-z0-9_])"), "tag")
+                }
             }
             if (t.startsWith("audioAttrs=")) s = s.replace(Regex("""tags=\S*"""), "tags=…")
             out += s
