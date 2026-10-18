@@ -134,7 +134,7 @@ class Engine(val app: Application, ports: EnginePorts) {
 
     val lsposed = LsposedBackend(app)
 
-    private val power = PowerController(
+    private val power: PowerController = PowerController(
         app, scope, ports.shizuku, app.getSharedPreferences("eyeblink-power", 0),
         lsposedActive = { lsposed.everReplied }, onChange = { post { publish() } },
         // Root or Shizuku was just granted on purpose: start using it, unless a privileged mode already works.

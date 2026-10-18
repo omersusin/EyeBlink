@@ -106,7 +106,7 @@ fun main(args: Array<String>) {
     shot("diag-trouble-tr", h = 3600) { EyeBlinkApp(Sample.pausingTrouble(), NoActions, Strings.TR, initialPage = Page.DIAGNOSTICS) }
     both("stats", h = 2900) { d -> EyeBlinkApp(Sample.state(), NoActions, en, initialPage = Page.STATS, systemDark = d) }
     both("privacy", h = 3600) { d -> EyeBlinkApp(Sample.state(), NoActions, en, initialPage = Page.PRIVACY, systemDark = d) }
-    both("about", h = 2300) { d -> EyeBlinkApp(Sample.state(), NoActions, en, initialPage = Page.ABOUT, systemDark = d) }
+    both("about", h = 3100) { d -> EyeBlinkApp(Sample.state(), NoActions, en, initialPage = Page.ABOUT, systemDark = d) }
     fun rest(style: RestStyle, view: RestView, tr: Boolean = false) = @Composable {
         EbTheme(if (tr) Strings.TR else en) { RestScene(view, style, onSkip = {}, onTap = {}) }
     }

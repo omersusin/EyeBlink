@@ -65,8 +65,8 @@ fun AboutScreen(state: UiState, actions: UiActions, onBack: () -> Unit) {
             Spacer(Modifier.height(8.dp))
             EbText(
                 s.t(
-                    "Video apps differ, and they change with every update. So EyeBlink tests each app on your phone - and again when the app updates - before it relies on pausing it. Shizuku, Root and LSPosed paths are experimental and are only used once their test passes.",
-                    "Video uygulamaları birbirinden farklıdır ve her güncellemeyle değişir. Bu yüzden EyeBlink, bir uygulamayı duraklatmaya güvenmeden önce onu telefonunda test eder - uygulama güncellenince yeniden. Shizuku, Root ve LSPosed yolları deneyseldir ve yalnızca testleri geçtikten sonra kullanılır.",
+                    "Video apps differ, and they change with every update. So EyeBlink pauses only what it has seen playing, checks that the pause really happened, and remembers for each app - and again after the app updates - whether pausing works there. A way that keeps failing is switched off, and the experimental ways (media keys, audio focus, a tap) are used only after a test of theirs has passed.",
+                    "Video uygulamaları birbirinden farklıdır ve her güncellemeyle değişir. Bu yüzden EyeBlink yalnızca oynadığını gördüğü şeyi duraklatır, duraklatmanın gerçekten olduğunu kontrol eder ve duraklatmanın her uygulamada (uygulama güncellenince yeniden) çalışıp çalışmadığını hatırlar. Sürekli başarısız olan yol kapatılır; deneysel yollar (medya tuşu, ses odağı, dokunma) yalnızca kendi testleri geçildikten sonra kullanılır.",
                 ),
                 Ink.Body, color = P.ink,
             )
@@ -77,13 +77,31 @@ fun AboutScreen(state: UiState, actions: UiActions, onBack: () -> Unit) {
             )
         }
 
-        Card(Modifier.reveal(4).fillMaxWidth()) {
+        Card(Modifier.reveal(4).fillMaxWidth(), tint = P.mint) {
+            EbText(s.t("Licence", "Lisans"), Ink.Title)
+            Spacer(Modifier.height(8.dp))
+            EbText(
+                s.t(
+                    "Free to use, change and share for any non-commercial purpose. It may not be sold, put behind a paywall or ads, or built into a commercial product.",
+                    "Ticari olmayan her amaçla kullanmak, değiştirmek ve paylaşmak serbest. Satılamaz, ücretli ya da reklamlı hale getirilemez, ticari bir ürüne katılamaz.",
+                ),
+                Ink.Body, color = P.ink,
+            )
+            Spacer(Modifier.height(8.dp))
+            EbText("PolyForm Noncommercial License 1.0.0", Ink.BodyStrong)
+            EbText(
+                s.t("Copyright 2026 omersusin. The full text is in the LICENSE and NOTICE files of the project.", "Telif hakkı 2026 omersusin. Tam metin projenin LICENSE ve NOTICE dosyalarındadır."),
+                Ink.Caption, color = P.inkSoft,
+            )
+        }
+
+        Card(Modifier.reveal(5).fillMaxWidth()) {
             EbText(s.t("Made with", "Şunlarla yapıldı"), Ink.Title)
             Spacer(Modifier.height(8.dp))
             Credit("Bricolage Grotesque · Figtree", s.t("typefaces, SIL Open Font License", "yazı tipleri, SIL Açık Yazı Tipi Lisansı"))
             Credit("DM Mono", s.t("typeface, SIL Open Font License", "yazı tipi, SIL Açık Yazı Tipi Lisansı"))
             Credit("MediaPipe Face Landmarker", s.t("on-device face model, Apache 2.0", "cihaz üstü yüz modeli, Apache 2.0"))
-            Credit("Shizuku API", s.t("optional adb-level access, Apache 2.0", "isteğe bağlı adb düzeyi erişim, Apache 2.0"))
+            Credit("Shizuku API", s.t("optional adb-level access, MIT", "isteğe bağlı adb düzeyi erişim, MIT"))
             Credit("CameraX · Compose · Kotlin", "Apache 2.0")
             Spacer(Modifier.height(8.dp))
             EbText("github.com/omersusin/EyeBlink", Ink.BodyStrong, color = P.sky.text)

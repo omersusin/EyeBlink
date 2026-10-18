@@ -11,6 +11,9 @@ When it can't, it says so instead of guessing.
 
 > **Not a medical device.** EyeBlink does not replace blinking and does not treat dry eye. It gives you short, regular visual breaks.
 
+> **Free for everyone, not for sale.** EyeBlink is source-available under the [PolyForm Noncommercial License 1.0.0](LICENSE): use it, change it and share it for any
+> noncommercial purpose; nobody may sell it, wrap it in a paywall or ads, or build it into a commercial product. See [License](#license).
+
 <p align="center">
   <img src="docs/brand/tour.gif" alt="A tour of the app" width="260">
 </p>
@@ -87,8 +90,8 @@ This is an honest list. "Tested" means unit tests that run in CI; "built" means 
 
 | Part | State |
 |---|---|
-| Animation timeline, eyelid geometry, scheduling, interruption gates, rest state machine | **Tested** (450 JVM tests in `:core`) |
-| Playback safety protocol (pause, verify, remember, decide, resume, retry) and per-app compatibility policy | **Tested** |
+| Animation timeline, eyelid geometry, scheduling, interruption gates, rest state machine | **Tested** (518 JVM tests in `:core`) |
+| Playback safety protocol (pause, verify, remember, decide, resume, retry), per-app compatibility policy, and a whole break on a modelled phone with root whose shell and players answer slowly | **Tested** |
 | Calibration maths, tracking pipeline, adaptive learning, night planner, usage and battery ledgers | **Tested** |
 | Shell command building, quoting and `dumpsys media_session` parsing; settings codec | **Tested** |
 | The whole UI - every screen in both themes | **Rendered** by the design lab on every CI run |
@@ -163,11 +166,28 @@ onto when pressed - a lid coming down - and nothing glows or is translucent. Fiv
 Headlines and numerals are set in Bricolage Grotesque, reading text in Figtree. The mascot eye on the home screen, the logo, the launcher icon and the status-bar glyph are one drawing:
 `python3 docs/brand/build_brand.py` writes them all, and `docs/brand/refresh_docs.py` rebuilds the screenshots, the tour and (with `render.mjs`) the banner from the design lab.
 
-## Credits and licenses
+## License
+
+EyeBlink is released under the **[PolyForm Noncommercial License 1.0.0](LICENSE)** (SPDX: `PolyForm-Noncommercial-1.0.0`), copyright 2026 omersusin.
+
+| You may | You may not |
+|---|---|
+| use it on your own phone, for free, for as long as you like | sell it, or charge for a copy, an unlock, a subscription or support of it |
+| read it, change it, build your own version and share that | show advertising in it, or ship it inside a commercial product or service |
+| use it for study, research, a hobby project, a school or university, a charity or a public body | use it to make money in any other way |
+
+Whoever passes it on has to pass on the [LICENSE](LICENSE) and the [NOTICE](NOTICE) with it. The author may license it to someone else on other terms; to ask for that, open an issue.
+This is a *source-available* licence, not an OSI "open source" one - that is the point of it.
+
+Two honest limits. A licence covers the *code, design and texts* of EyeBlink; it cannot stop anyone from having the same *idea* (an app that blinks for you and pauses your
+video) and writing their own, and it works only as far as it is enforced. And whatever you contribute here is offered under the same licence.
+
+## Credits
+
+The components below are not covered by EyeBlink's licence; each stays under its own. The full texts are in [`licenses/`](licenses) and in the app's assets, the list is in [NOTICE](NOTICE).
 
 - Face model and runtime: [MediaPipe Face Landmarker](https://ai.google.dev/edge/mediapipe) (Apache 2.0; model license in `app/src/main/assets/MODEL_LICENSE.txt`)
-- [Shizuku API](https://github.com/RikkaApps/Shizuku-API) (Apache 2.0), CameraX, Jetpack Compose, Kotlin and kotlinx (Apache 2.0)
+- [Shizuku API](https://github.com/RikkaApps/Shizuku-API) (MIT)
+- CameraX, Jetpack Compose, AndroidX, Kotlin and kotlinx (Apache 2.0)
 - Typefaces: Bricolage Grotesque, Figtree and DM Mono, each under the SIL Open Font License 1.1 (`app/src/main/assets/FONT_LICENSES.txt`)
 - The LSPosed module compiles against stubs of the Xposed API; it does not bundle the framework.
-
-EyeBlink's own code has **no license file yet**, which means all rights are reserved by default. Choose one before inviting contributions.
