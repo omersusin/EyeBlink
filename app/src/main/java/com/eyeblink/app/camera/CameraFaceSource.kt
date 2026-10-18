@@ -242,6 +242,7 @@ class CameraFaceSource(private val app: Application) : FaceSource {
         private val matrix = Matrix()
         private var firstSeen = false
         private var firstDone = false
+        private var failures = 0
 
         override fun analyze(image: ImageProxy) {
             try {
@@ -267,9 +268,12 @@ class CameraFaceSource(private val app: Application) : FaceSource {
                     firstDone = true
                     Log.i(TAG, "camera: the first picture was analysed in $tookMs ms, face seen: ${frame.sample != null}")
                 }
+                if (failures > 0) { failures = 0; lastError = null }
                 onFrame(frame, tookMs)
             } catch (e: Throwable) {
-                onError(remember(e, "a camera frame could not be analysed"))
+                // One bad picture is not a broken camera: it is remembered for the report, and only a run of them stops the camera.
+                val why = remember(e, "a camera frame could not be analysed")
+                if (++failures >= MAX_FRAME_FAILURES) onError(why)
             } finally {
                 image.close()
             }
@@ -281,8 +285,16 @@ class CameraFaceSource(private val app: Application) : FaceSource {
         val none = FaceFrame(ts, null, QualityReport(0f, setOf(QualityIssue.NO_FACE)), frameLuma)
         val result = synchronized(lock) {
             val lm = landmarker ?: return none
-            val image = BitmapImageBuilder(bitmap).build()
-            try { lm.detectForVideo(image, ts) } finally { image.close() }
+            // Closing the image recycles the bitmap it was built from (newer MediaPipe does), and the brightness of the face is
+            // measured on this bitmap afterwards: the model gets a copy of its own, whatever it does to it.
+            val forModel = bitmap.copy(Bitmap.Config.ARGB_8888, false) ?: return none
+            val image = BitmapImageBuilder(forModel).build()
+            try {
+                lm.detectForVideo(image, ts)
+            } finally {
+                image.close()
+                if (!forModel.isRecycled) forModel.recycle()
+            }
         }
         val p = result.faceLandmarks().firstOrNull() ?: return none
         if (p.size <= MAX_INDEX) return none
@@ -381,6 +393,9 @@ class CameraFaceSource(private val app: Application) : FaceSource {
         const val WIDTH = 640
         const val HEIGHT = 480
         const val MODEL_IDLE_MS = 120_000L
+
+        /** Pictures in a row that may fail to be analysed before the camera is given up on. */
+        const val MAX_FRAME_FAILURES = 5
 
         /** A face region narrower than this many pixels is no better a sample of the face than the whole picture. */
         const val MIN_LUMA_REGION = 16
