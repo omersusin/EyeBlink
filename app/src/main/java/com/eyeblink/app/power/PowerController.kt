@@ -51,6 +51,12 @@ class PowerController(
     private val prefs: SharedPreferences,
     private val lsposedActive: () -> Boolean,
     private val onChange: () -> Unit,
+    /**
+     * Called, on the engine's thread, when the person has just given EyeBlink a privileged shell on purpose (the
+     * answer to "Check for root", or Shizuku's permission dialog): [OperatingMode.ROOT] or [OperatingMode.SHIZUKU].
+     * Granting access and then having to find and tap the mode card as well is a step nobody guesses.
+     */
+    private val onGranted: (OperatingMode) -> Unit = {},
 ) {
     @Volatile var ui: PowerUi = PowerUi()
         private set
@@ -66,8 +72,20 @@ class PowerController(
 
     val status: PowerStatus get() = ui.status
 
+    @Volatile private var shizukuRequested = false
+
     fun start() {
-        if (unlisten == null) unlisten = shizuku?.listen { scope.launch { reevaluate() } }
+        if (unlisten == null) {
+            unlisten = shizuku?.listen {
+                scope.launch {
+                    reevaluate()
+                    if (shizukuRequested && shizuku?.granted() == true) {
+                        shizukuRequested = false
+                        onGranted(OperatingMode.SHIZUKU)
+                    }
+                }
+            }
+        }
         publish()
     }
 
@@ -83,13 +101,14 @@ class PowerController(
     }
 
     fun requestShizuku() {
+        shizukuRequested = true
         shizuku?.request()
     }
 
     /** Asks `su` for access. Only ever called from a deliberate tap, because it shows a prompt. */
     fun detectRoot() {
         scope.launch {
-            mutex.withLock {
+            val granted = mutex.withLock {
                 update { copy(busy = true) }
                 val session = ShellSession(ProcessShellLauncher(listOf("su")))
                 val result = PowerProbe.probe(PowerKind.ROOT, session)
@@ -97,7 +116,9 @@ class PowerController(
                 prefs.edit().putBoolean(ROOT_OK, result.available).apply()
                 if (wanted == OperatingMode.ROOT && result.available) adopt(session) else session.close()
                 update { copy(busy = false, rootAvailable = rootChecked, status = if (wanted == OperatingMode.ROOT) result else status) }
+                result.available
             }
+            if (granted) onGranted(OperatingMode.ROOT)
         }
     }
 

@@ -45,7 +45,7 @@ cat ~/eyeblink-camera.txt
 ## Video
 
 7. **Media sessions.** Allow *Media session access* (the "Almost there" card on *Today*, or *More → Diagnostics → Permissions*). Open YouTube, play a long video, then in EyeBlink open YouTube's card and tap **Test compatibility**. Expect a notification that says EyeBlink can pause and resume it, and the card to read *pause verified*.
-8. **Break with a video.** Leave a video playing and wait for a blink: it should pause under the blink and resume where it was. Then pause the video yourself before a blink: it must **not** be resumed.
+8. **Break with a video.** Leave a video playing and wait for a blink: it should pause under the blink and resume where it was. This works without pressing **Test compatibility** first: with *Media session access* (or Shizuku/Root) the first break tries it, checks it, and the app's card changes from *will try at the next break* to *pause verified*. Then pause the video yourself before a blink: it must **not** be resumed. If nothing is paused, *Today → Last break* and *More → Diagnostics → Video pausing* say why (no media session, player unreadable, media keys going to another app...), and *Copy report* includes a name-free outline of the phone's media sessions.
 9. **A feed app.** Repeat the test in Instagram or TikTok. It is likely to report "can't pause" or "not tested" - that is the honest answer for apps without a media session; check that blinks still happen over the video (or follow the fallback you chose in *Rhythm → Your video*; switch on *Fine-tune everything* to see that choice).
 
 ## Camera
@@ -57,7 +57,7 @@ cat ~/eyeblink-camera.txt
 ## Elevated access (optional)
 
 13. **Shizuku.** Install and start Shizuku, then *More → Power modes → Shizuku → Grant access*. Tick the steps under *Set it up for me* and **Apply**: each should report *done*. Re-run *Test compatibility* for YouTube: a *Media session via Shizuku/Root* result should appear.
-14. **Root.** Magisk, KernelSU or APatch: *Check for root*, grant it, then the same *Set it up for me*.
+14. **Root.** Magisk, KernelSU or APatch: *Check for root*, grant it - the *Root* card is then selected for you (if it says *Ready, but this mode is not selected yet*, tap the card) - then the same *Set it up for me*. *More → Diagnostics → Video pausing* should list *Root / Shizuku: can read and pause media*; play a video in a selected app and wait for a break.
 15. **Night.** *More → Night* → on, then turn on *Night Light*. Without access it shows the one-time `adb shell pm grant ... WRITE_SECURE_SETTINGS` command; with Shizuku or root, tick *Change Night Light* under *Power modes → Set it up for me* and **Apply**. Warmth should ramp in over the chosen time, and stop the moment you change brightness yourself.
 
 ## Over time

@@ -37,7 +37,10 @@ import com.eyeblink.app.ui.state.UiActions
 import com.eyeblink.app.ui.state.UiState
 import com.eyeblink.core.model.OperatingMode
 import com.eyeblink.core.model.TrackingMode
+import com.eyeblink.core.engine.PauseSummary
 import com.eyeblink.core.perf.DrainEstimate
+import com.eyeblink.core.playback.CompatStatus
+import com.eyeblink.core.privileged.Capability
 import com.eyeblink.core.privileged.PowerKind
 
 /** Frame budget the camera pipeline is judged against: two frames at 30 fps. */
@@ -102,6 +105,47 @@ fun DiagnosticsScreen(state: UiState, actions: UiActions, onBack: () -> Unit) {
                     else -> s.t("${state.settings.mode.name.lowercase()} unavailable - using rootless", "${state.settings.mode.name.lowercase()} yok - rootsuz kullanılıyor")
                 },
             )
+        }
+
+        // ── video pausing ───────────────────────────────────────
+        Card(Modifier.reveal(2).fillMaxWidth()) {
+            EbText(s.t("Video pausing", "Video duraklatma"), Ink.Title)
+            Spacer(Modifier.height(4.dp))
+            EbText(
+                s.t("EyeBlink pauses a video only when it has seen it playing, checks that it paused, and gives it back. These are the ways it can do that right now.", "EyeBlink bir videoyu yalnızca oynadığını gördüğünde duraklatır, durduğunu kontrol eder ve geri verir. Şu an bunu yapabileceği yollar bunlar."),
+                Ink.Caption,
+            )
+            Spacer(Modifier.height(6.dp))
+            val sessionsAllowed = state.perms.has(PermissionKind.NOTIFICATION_LISTENER)
+            Health(
+                sessionsAllowed, s.t("Media sessions", "Medya oturumları"),
+                if (sessionsAllowed) s.t("allowed", "izinli") else s.t("not allowed (Permissions, below)", "izin yok (aşağıda İzinler)"),
+            )
+            val privilegedReady = power.status.can(Capability.MEDIA_CONTROL)
+            val privilegedWanted = state.settings.mode != OperatingMode.ROOTLESS
+            Health(
+                when { privilegedReady -> true; privilegedWanted -> false; else -> null },
+                "Root / Shizuku",
+                when {
+                    privilegedReady -> s.t("can read and pause media", "medyayı okuyup duraklatabilir")
+                    privilegedWanted -> s.t("not working: ${power.status.detail ?: "no answer"}", "çalışmıyor: ${power.status.detail ?: "yanıt yok"}")
+                    power.rootAvailable == true || power.shizukuGranted -> s.t("granted, not selected (Power modes)", "verildi, seçili değil (Güç modları)")
+                    else -> s.t("not selected", "seçili değil")
+                },
+            )
+            val verified = state.compat.values.count { it.status == CompatStatus.VERIFIED }
+            Health(
+                if (state.settings.apps.isEmpty()) null else verified > 0, s.t("Apps with a proven pause", "Duraklatması kanıtlanmış uygulamalar"),
+                "$verified / ${state.settings.apps.size}",
+            )
+            rt.lastBreak?.takeIf { it.pause != PauseSummary.NOT_ATTEMPTED || it.outcome != com.eyeblink.core.engine.BreakOutcome.ABORTED }?.let { br ->
+                Hairline(Modifier.padding(vertical = 10.dp))
+                EbText(s.t("Last break", "Son mola"), Ink.BodyStrong)
+                val pausingOn = state.settings.playback.pauseDuringBreaks && state.settings.profileFor(br.target)?.pauseVideo != false
+                val why = pauseExplanation(br, s, pausingOn)
+                if (why.isNotEmpty()) EbText(why, Ink.Caption)
+                if (!br.error.isNullOrBlank()) EbText(br.error ?: "", Ink.Caption, color = P.inkFaint, caps = false)
+            }
         }
 
         // ── permissions ─────────────────────────────────────────
@@ -189,7 +233,7 @@ fun DiagnosticsScreen(state: UiState, actions: UiActions, onBack: () -> Unit) {
         Column(Modifier.reveal(5).fillMaxWidth()) {
             PillButton(s.t("Copy report", "Raporu kopyala"), { actions.copyReport() }, kind = ButtonKind.Soft, icon = Icon.Link, compact = true)
             Spacer(Modifier.height(8.dp))
-            EbText(s.t("Plain text: versions, permissions and counters. No app list, no content, nothing personal.", "Düz metin: sürümler, izinler ve sayaçlar. Uygulama listesi, içerik, kişisel hiçbir şey yok."), Ink.Caption, color = P.inkFaint)
+            EbText(s.t("Plain text: versions, permissions, counters, and the shape of the phone's media-session list with every app name and title removed. Nothing personal.", "Düz metin: sürümler, izinler, sayaçlar ve telefonun medya oturumu listesinin biçimi; her uygulama adı ve başlık çıkarılmıştır. Kişisel hiçbir şey yok."), Ink.Caption, color = P.inkFaint)
         }
     }
 }

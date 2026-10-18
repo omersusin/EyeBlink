@@ -101,7 +101,9 @@ fun main(args: Array<String>) {
     shot("studio-tall", h = 3000) { EyeBlinkApp(Sample.state(), NoActions, en, initialTab = Tab.BLINK) }
     both("night", h = 2500) { d -> EyeBlinkApp(Sample.state().let { it.copy(settings = it.settings.copy(night = it.settings.night.copy(enabled = true))) }, NoActions, en, initialPage = Page.NIGHT, systemDark = d) }
     both("power", h = 4300) { d -> EyeBlinkApp(Sample.state(), NoActions, en, initialPage = Page.POWER, systemDark = d) }
-    both("diag", h = 3300) { d -> EyeBlinkApp(Sample.state(), NoActions, en, initialPage = Page.DIAGNOSTICS, systemDark = d) }
+    both("diag", h = 3600) { d -> EyeBlinkApp(Sample.state(), NoActions, en, initialPage = Page.DIAGNOSTICS, systemDark = d) }
+    shot("diag-trouble", h = 3600) { EyeBlinkApp(Sample.pausingTrouble(), NoActions, en, initialPage = Page.DIAGNOSTICS) }
+    shot("diag-trouble-tr", h = 3600) { EyeBlinkApp(Sample.pausingTrouble(), NoActions, Strings.TR, initialPage = Page.DIAGNOSTICS) }
     both("stats", h = 2900) { d -> EyeBlinkApp(Sample.state(), NoActions, en, initialPage = Page.STATS, systemDark = d) }
     both("privacy", h = 3600) { d -> EyeBlinkApp(Sample.state(), NoActions, en, initialPage = Page.PRIVACY, systemDark = d) }
     both("about", h = 2300) { d -> EyeBlinkApp(Sample.state(), NoActions, en, initialPage = Page.ABOUT, systemDark = d) }

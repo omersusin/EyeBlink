@@ -24,6 +24,15 @@ enum class Strategy(
     AUDIO_FOCUS(4, Verification.AUDIO_ACTIVITY, targeted = false, experimental = true, versionSensitive = false),
     A11Y_NODE(5, Verification.AUDIO_ACTIVITY, targeted = true, experimental = true, versionSensitive = true),
     A11Y_GESTURE(6, Verification.AUDIO_ACTIVITY, targeted = true, experimental = true, versionSensitive = true),
+    ;
+
+    /**
+     * A break may try this strategy on an app where it has not been proven yet. Only strategies that read the
+     * player's own state qualify: the coordinator pauses nothing that is not positively playing, checks that the
+     * pause landed and resumes only what it paused, so a first attempt can do no harm - and its outcome is what
+     * proves (or rules out) the strategy for that app. The rest need a deliberate test first.
+     */
+    val canTryUnproven: Boolean get() = verification == Verification.SESSION_STATE && !experimental
 }
 
 enum class Verification {
@@ -60,6 +69,10 @@ data class PlaybackSnapshot(
  */
 interface PlaybackBackend {
     val strategy: Strategy
+
+    /** Why the last command was not delivered, in words for the person; null when there is nothing to add. */
+    val lastProblem: String? get() = null
+
     suspend fun snapshot(target: String): PlaybackSnapshot
 
     /** @return false when the command could not even be delivered. */
@@ -88,8 +101,12 @@ sealed interface PauseResult {
     /** Command sent, paused state not seen in time. The coordinator may still reconcile later. */
     data class Unverified(val token: PauseToken) : PauseResult
 
-    /** Nothing was playing (or we cannot tell), so nothing was touched. */
-    data object NotPlaying : PauseResult
+    /**
+     * Nothing was playing (or we cannot tell), so nothing was touched. [saw] is what the player reported:
+     * [PlayState.NONE] means that it has no player to read (an app without a media session), [PlayState.UNKNOWN]
+     * that it could not be read at all, anything else that the player really was not playing.
+     */
+    data class NotPlaying(val saw: PlayState) : PauseResult
 
     /** The pause command was never delivered. */
     data class Failed(val error: String) : PauseResult
@@ -167,28 +184,30 @@ sealed interface ResumeDecision {
  *  4. A resume is itself verified, and retried once.
  */
 class PlaybackCoordinator(
-    private val verifyTimeoutMs: Long = 800L,
+    private val verifyTimeoutMs: Long = 2_500L,
     private val pollMs: Long = 50L,
-    private val resumeVerifyTimeoutMs: Long = 1_200L,
+    private val resumeVerifyTimeoutMs: Long = 2_500L,
     /** How long an unverified pause may still be "in flight" when the break ends. */
     private val unverifiedGraceMs: Long = 1_500L,
+    /** Milliseconds from any fixed point; what a look at the player costs counts against the waiting time. */
+    private val clock: () -> Long = { System.nanoTime() / 1_000_000L },
 ) {
 
     suspend fun pause(backend: PlaybackBackend, target: String, nowMs: () -> Long): PauseResult {
         val before = try {
             backend.snapshot(target)
         } catch (e: Exception) {
-            return PauseResult.NotPlaying
+            return PauseResult.NotPlaying(PlayState.UNKNOWN)
         }
-        if (before.state != PlayState.PLAYING) return PauseResult.NotPlaying
-        if (before.sourcePackage != null && before.sourcePackage != target) return PauseResult.NotPlaying
+        if (before.state != PlayState.PLAYING) return PauseResult.NotPlaying(before.state)
+        if (before.sourcePackage != null && before.sourcePackage != target) return PauseResult.NotPlaying(PlayState.NONE)
 
         val delivered = try {
             backend.pause(target)
         } catch (e: Exception) {
             return PauseResult.Failed(e.message ?: e.javaClass.simpleName)
         }
-        if (!delivered) return PauseResult.Failed("pause command was not delivered")
+        if (!delivered) return PauseResult.Failed(backend.lastProblem ?: "the pause command was not delivered")
 
         val pausedAt = nowMs()
         val paused = awaitState(backend, target, PlayState.PAUSED, verifyTimeoutMs)
@@ -213,6 +232,7 @@ class PlaybackCoordinator(
         // otherwise a late pause would strand the video with nobody to resume it.
         if (!token.verified) awaitState(backend, token.target, PlayState.PAUSED, unverifiedGraceMs)
 
+        var sent = false
         repeat(2) { attempt ->
             val now = try {
                 backend.snapshot(token.target)
@@ -221,7 +241,8 @@ class PlaybackCoordinator(
             }
             // Re-decide on every attempt: the world may have changed since the first one.
             when (val d = ResumeDecision.decide(token, now, environment())) {
-                ResumeDecision.NotNeeded -> return ResumeResult.AlreadyPlaying
+                // Playing again after a command of ours that was too slow to be seen in time is our resume taking.
+                ResumeDecision.NotNeeded -> return if (sent) ResumeResult.Resumed else ResumeResult.AlreadyPlaying
                 is ResumeDecision.Refuse -> return ResumeResult.Refused(d.reason)
                 ResumeDecision.Resume -> Unit
             }
@@ -231,6 +252,7 @@ class PlaybackCoordinator(
             } catch (e: Exception) {
                 return ResumeResult.Failed(e.message ?: e.javaClass.simpleName)
             }
+            if (delivered) sent = true
             if (delivered && awaitState(backend, token.target, PlayState.PLAYING, resumeVerifyTimeoutMs) != null) {
                 return ResumeResult.Resumed
             }
@@ -247,12 +269,15 @@ class PlaybackCoordinator(
     ): PlaybackSnapshot? {
         var waited = 0L
         while (true) {
+            val lookedAt = clock()
             val snap = try {
                 backend.snapshot(target)
             } catch (e: Exception) {
                 null
             }
             if (snap != null && snap.state == wanted) return snap
+            // Looking at a player through a shell can take a good part of a second; that time is waiting time too.
+            waited += (clock() - lookedAt).coerceAtLeast(0L)
             if (waited >= timeoutMs) return null
             delay(pollMs)
             waited += pollMs

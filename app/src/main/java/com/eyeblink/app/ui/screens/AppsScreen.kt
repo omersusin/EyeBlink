@@ -104,7 +104,10 @@ fun AppsScreen(state: UiState, actions: UiActions, onPick: () -> Unit, modifier:
 
         if (state.settings.apps.isNotEmpty()) {
             EbText(
-                s.t("A pause method is only called \"verified\" after a real test on this phone passes - pausing, confirming it paused, resuming, and confirming that too. Until then EyeBlink blinks over the app without touching playback.", "Bir duraklatma yöntemi, bu telefonda gerçek bir test geçilmeden \"doğrulandı\" sayılmaz: duraklat, durduğunu doğrula, devam ettir, onu da doğrula. O zamana dek EyeBlink oynatmaya dokunmadan uygulamanın üstünde göz kırpar."),
+                s.t(
+                    "A way of pausing is called \"verified\" only after it has worked on this phone: pausing, confirming that the video paused, resuming, and confirming that too. A way that can read the player back (a media session, through notification access, Shizuku or Root) is tried at an app's first break and remembered; every other way needs the test below first.",
+                    "Bir duraklatma yolu, bu telefonda çalıştıktan sonra \"doğrulandı\" sayılır: duraklat, videonun durduğunu doğrula, devam ettir, onu da doğrula. Oynatıcıyı geri okuyabilen bir yol (bildirim erişimi, Shizuku ya da Root ile medya oturumu) uygulamanın ilk molasında denenir ve hatırlanır; diğer yollar için önce aşağıdaki test gerekir.",
+                ),
                 Ink.Caption, color = P.inkFaint, modifier = Modifier.reveal(8).padding(horizontal = 4.dp),
             )
         }
@@ -121,7 +124,7 @@ private fun AppCard(profile: AppProfile, compat: CompatUi, nowMs: Long, expanded
             Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
                 EbText(profile.label.ifBlank { profile.packageName }, Ink.Title, maxLines = 1)
                 Spacer(Modifier.height(5.dp))
-                CompatBadge(compat.status)
+                CompatBadge(compat.status, trying = compat.trial != null)
             }
             LidSwitch(profile.enabled, { v -> set { it.copy(enabled = v) } }, description = profile.label)
         }
@@ -161,11 +164,13 @@ private fun AppCard(profile: AppProfile, compat: CompatUi, nowMs: Long, expanded
 }
 
 @Composable
-internal fun CompatBadge(status: CompatStatus) {
+internal fun CompatBadge(status: CompatStatus, trying: Boolean = false) {
     val s = S
     when (status) {
         CompatStatus.VERIFIED -> Badge(s.t("pause verified", "duraklatma doğrulandı"), Tone.Ok)
-        CompatStatus.UNTESTED -> Badge(s.t("not tested", "denenmedi"), Tone.Quiet)
+        CompatStatus.UNTESTED ->
+            if (trying) Badge(s.t("will try at the next break", "sonraki molada denenecek"), Tone.Sky)
+            else Badge(s.t("no way to pause yet", "duraklatma yolu henüz yok"), Tone.Quiet)
         CompatStatus.FAILING -> Badge(s.t("can't pause", "duraklatılamıyor"), Tone.Bad)
         CompatStatus.RETEST_ADVISED -> Badge(s.t("retest advised", "yeniden test önerilir"), Tone.Warn)
     }
@@ -178,8 +183,15 @@ private fun CompatSection(profile: AppProfile, compat: CompatUi, nowMs: Long, ac
     Spacer(Modifier.height(8.dp))
     EbText(
         when (compat.status) {
-            CompatStatus.VERIFIED -> s.t("Pauses and resumes through ${strategyName(compat.strategy ?: Strategy.MEDIA_SESSION, s).lowercase()}. Tested ${fmtAgo(nowMs - compat.lastTestedMs, s)}.", "${strategyName(compat.strategy ?: Strategy.MEDIA_SESSION, s).lowercase()} ile duraklatır ve sürdürür. ${fmtAgo(nowMs - compat.lastTestedMs, s)} test edildi.")
-            CompatStatus.UNTESTED -> s.t("Not tested yet. Until a test passes, EyeBlink blinks over this app without touching its video.", "Henüz denenmedi. Bir test geçilene dek EyeBlink videosuna dokunmadan bu uygulamanın üstünde göz kırpar.")
+            CompatStatus.VERIFIED -> s.t("Pauses and resumes through ${strategyName(compat.strategy ?: Strategy.MEDIA_SESSION, s).lowercase()}. Last worked ${fmtAgo(nowMs - compat.lastTestedMs, s)}.", "${strategyName(compat.strategy ?: Strategy.MEDIA_SESSION, s).lowercase()} ile duraklatır ve sürdürür. En son ${fmtAgo(nowMs - compat.lastTestedMs, s)} çalıştı.")
+            CompatStatus.UNTESTED ->
+                if (compat.trial != null) s.t(
+                    "Not proven yet. At the next break EyeBlink will try to pause this app's video through ${strategyName(compat.trial, s).lowercase()}, check that it really paused, and remember how it went.",
+                    "Henüz kanıtlanmadı. Bir sonraki molada EyeBlink bu uygulamanın videosunu ${strategyName(compat.trial, s).lowercase()} ile duraklatmayı dener, gerçekten durduğunu kontrol eder ve sonucu hatırlar.",
+                ) else s.t(
+                    "EyeBlink has no way to pause this app's video yet. Allow notification access (More → Diagnostics → Permissions), or use Shizuku or Root (More → Power modes), and it will try at the next break. Until then it blinks over the video.",
+                    "EyeBlink'in bu uygulamanın videosunu duraklatacak bir yolu henüz yok. Bildirim erişimine izin ver (Diğer → Tanılama → İzinler) ya da Shizuku veya Root kullan (Diğer → Güç modları); sonraki molada dener. O zamana dek videonun üstünde göz kırpar.",
+                )
             CompatStatus.FAILING -> s.t("No pause method worked here. Blinks happen over the playing video - nothing is paused or resumed.", "Burada hiçbir duraklatma yöntemi çalışmadı. Göz kırpmalar oynayan videonun üstünde olur; hiçbir şey duraklatılmaz ya da sürdürülmez.")
             CompatStatus.RETEST_ADVISED -> s.t("The app updated since the last test, so some results may no longer apply.", "Uygulama son testten beri güncellendi; bazı sonuçlar artık geçerli olmayabilir.")
         },
@@ -193,14 +205,21 @@ private fun CompatSection(profile: AppProfile, compat: CompatUi, nowMs: Long, ac
                     "${strategyName(r.strategy, s)}: " + when (r.outcome) {
                         CompatOutcome.PASSED -> s.t("passed", "geçti")
                         CompatOutcome.NOT_PLAYING -> s.t("nothing playing", "oynayan yok")
+                        CompatOutcome.NO_SESSION -> s.t("no media session", "medya oturumu yok")
+                        CompatOutcome.UNREADABLE -> s.t("could not read it", "okunamadı")
                         CompatOutcome.PAUSE_NOT_VERIFIED -> s.t("pause not confirmed", "duraklatma doğrulanmadı")
                         CompatOutcome.RESUME_FAILED -> s.t("resume failed", "devam başarısız")
                         CompatOutcome.REFUSED -> s.t("stopped safely", "güvenle durdu")
                         CompatOutcome.ERROR -> s.t("error", "hata")
                     },
-                    if (r.passed) Tone.Ok else if (r.outcome == CompatOutcome.NOT_PLAYING) Tone.Quiet else Tone.Bad,
+                    if (r.passed) Tone.Ok else if (r.outcome.sawNothing) Tone.Quiet else Tone.Bad,
                 )
             }
+        }
+        // The technical reason, as the strategy reported it, for whoever needs to see why a way did not work.
+        compat.results.filter { !it.passed && !it.note.isNullOrBlank() && it.outcome != CompatOutcome.REFUSED }.forEach { r ->
+            Spacer(Modifier.height(4.dp))
+            EbText("${strategyName(r.strategy, s)}: ${r.note}", Ink.Caption, color = P.inkFaint, caps = false)
         }
     }
     Spacer(Modifier.height(12.dp))

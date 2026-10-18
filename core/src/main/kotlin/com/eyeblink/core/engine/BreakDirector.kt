@@ -6,6 +6,7 @@ import com.eyeblink.core.playback.PauseResult
 import com.eyeblink.core.playback.PlaybackBackend
 import com.eyeblink.core.playback.PlaybackCoordinator
 import com.eyeblink.core.playback.PauseToken
+import com.eyeblink.core.playback.PlayState
 import com.eyeblink.core.playback.ResumeEnvironment
 import com.eyeblink.core.playback.ResumeResult
 import com.eyeblink.core.playback.Strategy
@@ -49,7 +50,21 @@ data class BreakRequest(
     val forced: Boolean = false,
 )
 
-enum class PauseSummary { NOT_ATTEMPTED, NOT_PLAYING, PAUSED, UNVERIFIED, FAILED }
+enum class PauseSummary {
+    NOT_ATTEMPTED,
+
+    /** The player reported that it was not playing, so nothing was touched. */
+    NOT_PLAYING,
+
+    /** The app has no player that can be read (no media session), so nothing was touched. */
+    NO_SESSION,
+
+    /** The player could not be read, so nothing was touched. */
+    UNREADABLE,
+    PAUSED,
+    UNVERIFIED,
+    FAILED,
+}
 enum class ResumeSummary { NOT_ATTEMPTED, RESUMED, ALREADY_PLAYING, REFUSED, FAILED }
 
 data class BreakReport(
@@ -145,7 +160,11 @@ class BreakDirector(
                     when (val r = coordinator.pause(b, target, env::nowMs)) {
                         is PauseResult.Paused -> { token = r.token; pause = PauseSummary.PAUSED }
                         is PauseResult.Unverified -> { token = r.token; pause = PauseSummary.UNVERIFIED }
-                        PauseResult.NotPlaying -> pause = PauseSummary.NOT_PLAYING
+                        is PauseResult.NotPlaying -> pause = when (r.saw) {
+                            PlayState.NONE -> PauseSummary.NO_SESSION
+                            PlayState.UNKNOWN -> PauseSummary.UNREADABLE
+                            else -> PauseSummary.NOT_PLAYING
+                        }
                         is PauseResult.Failed -> { pause = PauseSummary.FAILED; failure = r.error }
                     }
                 }

@@ -75,6 +75,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import java.lang.ref.WeakReference
 import java.time.LocalDate
 import java.time.LocalTime
@@ -136,6 +137,8 @@ class Engine(val app: Application, ports: EnginePorts) {
     private val power = PowerController(
         app, scope, ports.shizuku, app.getSharedPreferences("eyeblink-power", 0),
         lsposedActive = { lsposed.everReplied }, onChange = { post { publish() } },
+        // Root or Shizuku was just granted on purpose: start using it, unless a privileged mode already works.
+        onGranted = { mode -> post { if (!power.status.available && settings.mode != mode) updateNow { it.copy(mode = mode) } } },
     )
 
     private val compat = CompatController(
@@ -405,10 +408,15 @@ class Engine(val app: Application, ports: EnginePorts) {
 
     fun finishOnboarding() = update { it.copy(onboardingDone = true) }
 
-    fun copyReport() = post {
-        val text = report()
-        android.os.Handler(android.os.Looper.getMainLooper()).post {
-            app.systemService<ClipboardManager>().setPrimaryClip(ClipData.newPlainText("EyeBlink report", text))
+    fun copyReport() {
+        scope.launch {
+            // What the privileged shell makes of the media sessions is the one thing a bug report cannot do without
+            // when pausing misbehaves; it is read here, with names and titles stripped, and never kept.
+            val outline = withTimeoutOrNull(6_000L) { runCatching { compat.sessionOutline() }.getOrNull() }
+            val text = report(outline)
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                app.systemService<ClipboardManager>().setPrimaryClip(ClipData.newPlainText("EyeBlink report", text))
+            }
         }
     }
 
@@ -792,7 +800,7 @@ class Engine(val app: Application, ports: EnginePorts) {
     }
 
     /** A plain-text report for bug reports: versions, permissions, counters. No app names, no content. */
-    private fun report(): String {
+    private fun report(sessionOutline: String? = null): String {
         val d = diagnostics()
         val week = (0..6).map { ledger.day(LocalDate.now().minusDays(it.toLong()).toString()) }.fold(DayStats(), UsageLedger.Companion::merge)
         val verified = settings.apps.count { compat.ui(it.packageName).status == com.eyeblink.core.playback.CompatStatus.VERIFIED }
@@ -803,11 +811,19 @@ class Engine(val app: Application, ports: EnginePorts) {
             appendLine("permissions=${perms.joinToString { it.name }}")
             appendLine("power=${power.ui.status.kind}/${power.ui.status.available}  lsposedReplied=${lsposed.everReplied}")
             appendLine("selectedApps=${settings.apps.size}  playbackVerified=$verified")
+            appendLine("pauseMethods=${compat.available(fresh = true).joinToString { it.name }}  powerDetail=${power.ui.status.detail ?: "-"}")
+            lastBreak?.let { br ->
+                appendLine("lastBreak: kind=${br.kind} outcome=${br.outcome} strategy=${br.strategy ?: "-"} pause=${br.pause} resume=${br.resume} error=${br.error ?: "-"}")
+            }
             appendLine("week: micro=${week.microShown} rests=${week.restsCompleted} skipped=${week.restsSkipped} aborted=${week.aborted} failed=${week.failed}")
             appendLine("pauses: verified=${week.pausesVerified} unverified=${week.pausesUnverified} failed=${week.pausesFailed}")
             appendLine("resumes: ok=${week.resumesOk} refused=${week.resumesRefused} failed=${week.resumesFailed}")
             appendLine("camera: p50=${d.frameP50Ms}ms p95=${d.frameP95Ms}ms duty=${d.cameraDutyPercent}%  model=${faces?.ready}  lastError=${d.cameraError ?: "none"}")
             appendLine("battery=${d.batteryPercent}% charging=${d.charging} thermal=${d.thermal} powerSave=${d.powerSave}")
+            if (sessionOutline != null) {
+                appendLine("media sessions as the shell sees them (names and titles removed):")
+                appendLine(sessionOutline)
+            }
         }
     }
 

@@ -141,6 +141,48 @@ object MediaSessionDump {
 
         return MediaDump(buttonPackage, sessions)
     }
+
+    private val OUTLINE_PREFIXES = listOf(
+        "Record for full_user=", "Sessions Stack", "ownerPid=", "package=", "active=", "flags=", "controllers:", "state=",
+        "audioAttrs=", "volumeType=", "metadata:", "queueTitle=",
+    )
+    private val SESSION_ALIAS = Regex("""(app\d+)/(\S+)""")
+
+    /**
+     * A copy of a dump that can go into a bug report: its shape, the playback states and the numbers stay; package
+     * names and session tags become placeholders, and titles, artists and intents - everything that says what is
+     * being watched or listened to - are dropped. It exists so that a dump format this parser does not understand
+     * can be fixed without anybody sending their media sessions around.
+     */
+    fun outline(text: String, maxLines: Int = 60): String {
+        val dump = parse(text)
+        val aliases = LinkedHashMap<String, String>()
+        val packages = (dump.sessions.map { it.packageName } + listOfNotNull(dump.mediaButtonPackage))
+            .distinct().sortedByDescending { it.length }
+        packages.forEach { aliases.getOrPut(it) { "app${aliases.size + 1}" } }
+
+        val out = ArrayList<String>()
+        for (raw in text.lineSequence()) {
+            val line = raw.trimEnd()
+            val t = line.trimStart()
+            val keep = BUTTON_LINE.containsMatchIn(line) || HEADER_LINE.containsMatchIn(line) || OUTLINE_PREFIXES.any { t.startsWith(it) }
+            if (!keep) continue
+
+            var s = line
+            if (t.startsWith("metadata:")) s = s.substringBefore("description=") + "description=…"
+            if (t.startsWith("queueTitle=")) s = "${s.substring(0, s.indexOf("queueTitle="))}queueTitle=…, size=${s.substringAfterLast("size=", "?")}"
+            for (p in packages) s = s.replace(p, aliases.getValue(p))
+            // "app1/SomeTag": the tag may name the app or the content, wherever it is repeated on the line.
+            SESSION_ALIAS.find(s)?.let { m ->
+                val tag = m.groupValues[2]
+                if (tag.isNotEmpty()) s = s.replace(Regex("(?<![A-Za-z0-9_])" + Regex.escape(tag) + "(?![A-Za-z0-9_])"), "tag")
+            }
+            if (t.startsWith("audioAttrs=")) s = s.replace(Regex("""tags=\S*"""), "tags=…")
+            out += s
+            if (out.size >= maxLines) break
+        }
+        return out.joinToString("\n")
+    }
 }
 
 /** Reads the foreground package out of `dumpsys window` / `dumpsys activity` text. */

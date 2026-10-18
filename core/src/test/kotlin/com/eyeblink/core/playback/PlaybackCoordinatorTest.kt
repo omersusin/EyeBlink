@@ -53,7 +53,7 @@ class PlaybackCoordinatorTest {
     fun `something that is not playing is never touched`() = runTest {
         for (state in listOf(PlayState.PAUSED, PlayState.STOPPED, PlayState.NONE, PlayState.BUFFERING)) {
             val p = player(state)
-            assertEquals(PauseResult.NotPlaying, pause(p))
+            assertEquals(PauseResult.NotPlaying(state), pause(p))
             assertTrue("no command may be sent for $state", p.commands.isEmpty())
         }
     }
@@ -61,14 +61,14 @@ class PlaybackCoordinatorTest {
     @Test
     fun `an unreadable player is never touched`() = runTest {
         val p = player().apply { reportsUnknown = true }
-        assertEquals(PauseResult.NotPlaying, pause(p))
+        assertEquals(PauseResult.NotPlaying(PlayState.UNKNOWN), pause(p))
         assertTrue(p.commands.isEmpty())
     }
 
     @Test
     fun `a session owned by another package is not paused`() = runTest {
         val p = player().apply { source = "com.spotify.music" }
-        assertEquals(PauseResult.NotPlaying, pause(p))
+        assertEquals(PauseResult.NotPlaying(PlayState.NONE), pause(p))
         assertTrue(p.commands.isEmpty())
     }
 
@@ -76,6 +76,26 @@ class PlaybackCoordinatorTest {
     fun `a slow player is waited for within the verify timeout`() = runTest {
         val p = player(latency = 400)
         assertTrue(pause(p) is PauseResult.Paused)
+    }
+
+    @Test
+    fun `a player that takes a couple of seconds to report its pause is still verified`() = runTest {
+        // A phone that answers every shell command slowly and an app that updates its session late.
+        val p = player(latency = 2_000)
+        val r = pause(p)
+        assertTrue("a slow but real pause must not count as unverified: $r", r is PauseResult.Paused)
+    }
+
+    @Test
+    fun `a command that was not delivered says why when the backend knows`() = runTest {
+        val p = player().apply { deliversCommands = false }
+        val r = coordinator.pause(
+            object : PlaybackBackend by p {
+                override val lastProblem: String = "media keys go to another app"
+            },
+            APP,
+        ) { testScheduler.currentTime }
+        assertEquals(PauseResult.Failed("media keys go to another app"), r)
     }
 
     @Test
@@ -94,7 +114,7 @@ class PlaybackCoordinatorTest {
 
     @Test
     fun `exceptions from the backend never escape`() = runTest {
-        assertEquals(PauseResult.NotPlaying, pause(player().apply { snapshotThrows = true }))
+        assertEquals(PauseResult.NotPlaying(PlayState.UNKNOWN), pause(player().apply { snapshotThrows = true }))
         assertTrue(pause(player().apply { commandThrows = true }) is PauseResult.Failed)
     }
 
@@ -184,6 +204,15 @@ class PlaybackCoordinatorTest {
     }
 
     @Test
+    fun `a resume that lands just after the verify window still counts as ours`() = runTest {
+        val p = player()
+        val token = (pause(p) as PauseResult.Paused).token
+        p.playLatencyMs = 2_600 // the player starts playing a moment after the first wait is over
+        assertEquals(ResumeResult.Resumed, coordinator.resume(p, token, env()))
+        assertEquals("one play command is enough", listOf("pause", "play"), p.commands)
+    }
+
+    @Test
     fun `a flaky first resume succeeds on the retry`() = runTest {
         val p = player(latency = 0)
         val token = (pause(p) as PauseResult.Paused).token
@@ -214,7 +243,7 @@ class PlaybackCoordinatorTest {
 
     @Test
     fun `an unverified pause that did land is reconciled if the user did not touch the screen`() = runTest {
-        val p = player(latency = 2_000) // slower than the verify timeout
+        val p = player(latency = 4_000) // slower than the verify timeout
         val r = pause(p) as PauseResult.Unverified
         testScheduler.advanceTimeBy(3_000) // pause lands during the break
         assertEquals(ResumeResult.Resumed, coordinator.resume(p, r.token, env(touched = false)))
@@ -222,7 +251,7 @@ class PlaybackCoordinatorTest {
 
     @Test
     fun `an unverified pause is not undone if the user touched the screen meanwhile`() = runTest {
-        val p = player(latency = 2_000)
+        val p = player(latency = 4_000)
         val r = pause(p) as PauseResult.Unverified
         testScheduler.advanceTimeBy(3_000)
         assertEquals(ResumeResult.Refused(RefuseReason.USER_TOUCHED), coordinator.resume(p, r.token, env(touched = true)))
@@ -321,6 +350,17 @@ class CompatTesterTest {
         assertFalse(report.sawPlayback)
         assertEquals(CompatOutcome.NOT_PLAYING, report.results.single().outcome)
         assertTrue(p.commands.isEmpty())
+    }
+
+    @Test
+    fun `an app without a player to read and an unreadable player are told apart from one that is paused`() = runTest {
+        val none = player(Strategy.MEDIA_SESSION).apply { state = PlayState.NONE }
+        assertEquals(CompatOutcome.NO_SESSION, run(none).results.single().outcome)
+        val unreadable = player(Strategy.PRIVILEGED_SESSION).apply { reportsUnknown = true }
+        val report = run(unreadable)
+        assertEquals(CompatOutcome.UNREADABLE, report.results.single().outcome)
+        assertFalse("nothing was seen, so nothing counts against the strategy", report.sawPlayback)
+        assertTrue(none.commands.isEmpty() && unreadable.commands.isEmpty())
     }
 
     @Test

@@ -78,6 +78,7 @@ fun PowerScreen(state: UiState, actions: UiActions, onBack: () -> Unit) {
             Step(s.t("Shizuku installed", "Shizuku yüklü"), p.shizukuInstalled)
             Step(s.t("Shizuku running", "Shizuku çalışıyor"), p.shizukuRunning)
             Step(s.t("Access granted to EyeBlink", "EyeBlink'e erişim verildi"), p.shizukuGranted)
+            if (p.shizukuGranted && mode != OperatingMode.SHIZUKU) NotSelected()
             if (!p.shizukuGranted) {
                 Spacer(Modifier.height(10.dp))
                 PillButton(
@@ -93,6 +94,13 @@ fun PowerScreen(state: UiState, actions: UiActions, onBack: () -> Unit) {
                 null -> Step(s.t("Not checked yet", "Henüz denetlenmedi"), false)
                 true -> Step(s.t("Root access granted", "Root erişimi verildi"), true)
                 false -> Step(s.t("No root found", "Root bulunamadı"), false)
+            }
+            if (p.rootAvailable == true && mode != OperatingMode.ROOT) NotSelected()
+            if (mode == OperatingMode.ROOT && p.rootAvailable == true && !p.status.available) {
+                EbText(
+                    s.t("Root is granted but the shell did not start: ${p.status.detail ?: "no answer"}.", "Root verildi ama kabuk başlamadı: ${p.status.detail ?: "yanıt yok"}."),
+                    Ink.Caption, color = P.sun.text,
+                )
             }
             Spacer(Modifier.height(10.dp))
             PillButton(s.t("Check for root", "Root'u denetle"), { actions.detectRoot() }, kind = ButtonKind.Soft, compact = true, icon = Icon.Terminal)
@@ -178,6 +186,17 @@ private fun ModeCard(modifier: Modifier, selected: Boolean, icon: Icon, hue: Hue
         Spacer(Modifier.height(12.dp))
         content()
     }
+}
+
+/** Access that works but is not the chosen mode does nothing; say so where the person is looking. */
+@Composable
+private fun NotSelected() {
+    val s = S
+    Spacer(Modifier.height(4.dp))
+    EbText(
+        s.t("Ready, but this mode is not selected yet. Tap this card to use it.", "Hazır ama bu mod henüz seçili değil. Kullanmak için bu karta dokun."),
+        Ink.Caption, color = P.sun.text,
+    )
 }
 
 @Composable

@@ -61,7 +61,6 @@ import com.eyeblink.core.engine.BreakKind
 import com.eyeblink.core.engine.BreakOutcome
 import com.eyeblink.core.engine.FactorCode
 import com.eyeblink.core.engine.PauseSummary
-import com.eyeblink.core.engine.ResumeSummary
 import com.eyeblink.core.engine.TriggerMode
 import com.eyeblink.core.model.OperatingMode
 
@@ -231,17 +230,13 @@ fun HomeScreen(
                     Ink.Lead,
                 )
                 Spacer(Modifier.height(4.dp))
-                EbText(
-                    when {
-                        br.pause == PauseSummary.PAUSED && br.resume == ResumeSummary.RESUMED -> s.t("Video paused, verified, and resumed where it was.", "Video duraklatıldı, doğrulandı ve kaldığı yerden devam etti.")
-                        br.pause == PauseSummary.PAUSED && br.resume == ResumeSummary.REFUSED -> s.t("Paused, then left alone because you moved on.", "Duraklatıldı; sen devam ettiğin için dokunulmadı.")
-                        br.pause == PauseSummary.NOT_PLAYING -> s.t("Nothing was playing, so nothing was touched.", "Oynatılan bir şey yoktu, hiçbir şeye dokunulmadı.")
-                        br.pause == PauseSummary.UNVERIFIED -> s.t("The pause could not be verified.", "Duraklatma doğrulanamadı.")
-                        br.pause == PauseSummary.NOT_ATTEMPTED && br.outcome != BreakOutcome.ABORTED -> s.t("The video kept playing underneath. No verified pause exists for this app yet.", "Video altta oynamaya devam etti. Bu uygulama için henüz doğrulanmış duraklatma yok.")
-                        else -> ""
-                    },
-                    Ink.Caption, color = p.ink,
-                )
+                val pausingOn = state.settings.playback.pauseDuringBreaks && state.settings.profileFor(br.target)?.pauseVideo != false
+                val why = pauseExplanation(br, s, pausingOn)
+                if (why.isNotEmpty()) EbText(why, Ink.Caption, color = p.ink)
+                if (br.pause == PauseSummary.FAILED && !br.error.isNullOrBlank()) {
+                    Spacer(Modifier.height(4.dp))
+                    EbText(br.error ?: "", Ink.Caption, color = p.inkFaint, caps = false)
+                }
             }
         }
 

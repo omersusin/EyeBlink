@@ -132,6 +132,17 @@ class BreakDirectorTest {
     }
 
     @Test
+    fun `an app with no player to read and a player that cannot be read are reported as such`() = runTest {
+        val none = Rig(this)
+        none.player!!.state = PlayState.NONE
+        assertEquals(PauseSummary.NO_SESSION, none.director.run(micro(), settings).pause)
+        val unreadable = Rig(this)
+        unreadable.player!!.reportsUnknown = true
+        assertEquals(PauseSummary.UNREADABLE, unreadable.director.run(micro(), settings).pause)
+        assertTrue(none.commands().isEmpty() && unreadable.commands().isEmpty())
+    }
+
+    @Test
     fun `a video the user already paused is left paused`() = runTest {
         val rig = Rig(this)
         rig.player!!.state = PlayState.PAUSED
@@ -326,7 +337,7 @@ class BreakDirectorTest {
     @Test
     fun `a pause that lands after the break ends is still given back`() = runTest {
         val rig = Rig(this)
-        rig.player!!.latencyMs = 1_800 // slower than verify window AND the whole blink
+        rig.player!!.latencyMs = 3_200 // slower than the verify window, landing while the blink is on screen
         val report = rig.director.run(micro(), settings)
         assertEquals(PauseSummary.UNVERIFIED, report.pause)
         assertEquals("a late pause must not strand the video", PlayState.PLAYING, rig.player.state)
@@ -336,7 +347,7 @@ class BreakDirectorTest {
     @Test
     fun `an unverified pause is not undone when the user touched the screen`() = runTest {
         val rig = Rig(this)
-        rig.player!!.latencyMs = 1_000 // pause lands after the verify window but during the break
+        rig.player!!.latencyMs = 2_800 // pause lands after the verify window but during the break
         rig.overlay.onBlinkMidway = {
             rig.env.ctx = rig.env.ctx.copy(lastTouchMs = testScheduler.currentTime)
         }

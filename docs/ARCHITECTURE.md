@@ -117,8 +117,20 @@ A 1 px `TouchSentinel` window listens for `ACTION_OUTSIDE` so the scheduler can 
 ### Playback strategies
 
 Ranked best to last: LSPosed hook, media session, privileged media session, media key, audio focus, accessibility gesture.
-`CompatController` runs the real pause / verify / resume / verify test per app and version; `CompatPolicy` (in `:core`) turns the
-results into "verified", "failing", "untested" or "retest advised", and only a verified, available strategy is ever used.
+`CompatController` runs the real pause / verify / resume / verify test per app and version on request; `CompatPolicy` (in `:core`) turns the
+results into "verified", "failing", "untested" or "retest advised".
+
+A break uses a *proven* strategy when the app has one. When it has none, a break may *try* a strategy that reads the player's own state back
+(`Strategy.canTryUnproven`: LSPosed hook, media session, privileged media session): the coordinator pauses only what is positively playing,
+checks that the pause landed and resumes only what it paused, so a first attempt cannot do harm, and the outcome (`BreakReport.playbackVerdict()`) is
+folded into the app's record - the first successful break verifies the app, three failures in a row switch the strategy off. Strategies that can only
+see "is any audio playing" (media key, audio focus, tap) are never tried without a passed test. Which strategies are *available* is read from the live
+state of the permissions and of the privileged shell on every use, never remembered from start-up, because root and Shizuku finish connecting after the app starts.
+
+The coordinator counts the time a look at the player costs (a `dumpsys` through `su` takes a few hundred milliseconds) as waiting time, waits up to 2.5 s for a
+pause or a resume to show up, and treats a pause that was only seen after the window, followed by a resume that worked, as a success: a slow phone is not a broken one.
+When nothing was paused the break says why - not playing, no media session for the app, player unreadable, command not delivered (for instance because the media keys
+currently belong to another app) - and *Diagnostics* shows it, together with a name-free outline of the phone's media-session list in the copied report.
 
 ### Power modes
 

@@ -11,6 +11,8 @@ data class StrategyStat(
     val resumeFail: Int = 0,
     val consecutiveFails: Int = 0,
     val lastTestedMs: Long = 0L,
+    /** When a pause and a resume last both worked, in a test or in real use. */
+    val lastOkMs: Long = 0L,
     val lastLatencyMs: Long = 0L,
     /** A deliberate compatibility test has passed (as opposed to incidental real-world successes). */
     val testPassed: Boolean = false,
@@ -49,6 +51,16 @@ object CompatPolicy {
     fun isUsable(stat: StrategyStat?): Boolean =
         stat != null && stat.everWorked && stat.consecutiveFails < MAX_CONSECUTIVE_FAILS
 
+    /**
+     * True when a break may try [s] on an app although it has not proven itself there: it can read the player back
+     * ([Strategy.canTryUnproven]), it has not failed a deliberate test, and it has not failed [MAX_CONSECUTIVE_FAILS]
+     * attempts in a row. What the attempt shows is folded into the record, so the app is verified by its first
+     * successful break or the strategy is dropped by its failures - nobody has to press a test button first.
+     */
+    fun isTrialable(s: Strategy, stat: StrategyStat?): Boolean =
+        s.canTryUnproven &&
+            (stat == null || (!stat.everWorked && stat.lastTestedMs == 0L && stat.consecutiveFails < MAX_CONSECUTIVE_FAILS))
+
     /** Experimental strategies stay off unless the user switched them on. */
     fun allowedBySettings(s: Strategy, p: PlaybackSettings): Boolean = when (s) {
         Strategy.MEDIA_KEY -> p.allowMediaKeys
@@ -61,11 +73,8 @@ object CompatPolicy {
     private fun appliesTo(record: CompatRecord, s: Strategy, installedVersionCode: Long): Boolean =
         !s.versionSensitive || record.versionCode == 0L || installedVersionCode == 0L || record.versionCode == installedVersionCode
 
-    /**
-     * The strategy to use for real, or null to blink without touching playback.
-     * Needs a *proven* strategy: untested ones are never picked.
-     */
-    fun best(
+    /** The best strategy that has *proved* itself on this app, or null. */
+    fun proven(
         record: CompatRecord?,
         available: Set<Strategy>,
         settings: PlaybackSettings,
@@ -79,6 +88,34 @@ object CompatPolicy {
             .minByOrNull { it.rank }
     }
 
+    /**
+     * The strategy a break should try because nothing is proven yet, or null. The one that has failed least goes
+     * first (then the better ranked), so a strategy that does not work here is passed over after a single failure
+     * instead of three.
+     */
+    fun trial(
+        record: CompatRecord?,
+        available: Set<Strategy>,
+        settings: PlaybackSettings,
+        installedVersionCode: Long = 0L,
+    ): Strategy? = available
+        .filter { allowedBySettings(it, settings) }
+        .filter { record == null || appliesTo(record, it, installedVersionCode) }
+        .filter { isTrialable(it, record?.stats?.get(it)) }
+        .minWithOrNull(compareBy<Strategy>({ record?.stats?.get(it)?.consecutiveFails ?: 0 }, { it.rank }))
+
+    /**
+     * The strategy to use for real, or null to blink without touching playback: a proven one, else one worth trying.
+     */
+    fun best(
+        record: CompatRecord?,
+        available: Set<Strategy>,
+        settings: PlaybackSettings,
+        installedVersionCode: Long = 0L,
+    ): Strategy? = proven(record, available, settings, installedVersionCode)
+        ?: trial(record, available, settings, installedVersionCode)
+
+    /** What the person is told about an app; only a proven strategy makes it [CompatStatus.VERIFIED]. */
     fun status(
         record: CompatRecord?,
         available: Set<Strategy>,
@@ -86,7 +123,8 @@ object CompatPolicy {
         installedVersionCode: Long = 0L,
     ): CompatStatus {
         if (record == null || record.stats.isEmpty()) return CompatStatus.UNTESTED
-        if (best(record, available, settings, installedVersionCode) != null) return CompatStatus.VERIFIED
+        if (proven(record, available, settings, installedVersionCode) != null) return CompatStatus.VERIFIED
+        if (trial(record, available, settings, installedVersionCode) != null) return CompatStatus.UNTESTED
         val outdated = record.stats.keys.any { it.versionSensitive && !appliesTo(record, it, installedVersionCode) }
         return if (outdated) CompatStatus.RETEST_ADVISED else CompatStatus.FAILING
     }
@@ -113,6 +151,7 @@ object CompatPolicy {
             // A deliberate test starts from a clean slate; real use accumulates streaks.
             consecutiveFails = if (ok) 0 else if (fromTest) 1 else old.consecutiveFails + 1,
             lastTestedMs = if (fromTest) nowMs else old.lastTestedMs,
+            lastOkMs = if (ok) nowMs else old.lastOkMs,
             lastLatencyMs = latencyMs,
             testPassed = if (fromTest) ok else old.testPassed,
         )

@@ -2,7 +2,26 @@ package com.eyeblink.core.playback
 
 import kotlinx.coroutines.delay
 
-enum class CompatOutcome { PASSED, NOT_PLAYING, PAUSE_NOT_VERIFIED, RESUME_FAILED, REFUSED, ERROR }
+enum class CompatOutcome {
+    PASSED,
+
+    /** The player was there and reported that it was not playing. */
+    NOT_PLAYING,
+
+    /** The app has no player this strategy can see (no media session), so it cannot tell what plays. */
+    NO_SESSION,
+
+    /** The player could not be read at all (the shell or the session list did not answer). */
+    UNREADABLE,
+    PAUSE_NOT_VERIFIED,
+    RESUME_FAILED,
+    REFUSED,
+    ERROR,
+    ;
+
+    /** The strategy never got to pause anything, for a reason that says nothing against it. */
+    val sawNothing: Boolean get() = this == NOT_PLAYING || this == NO_SESSION || this == UNREADABLE
+}
 
 data class StrategyTestResult(
     val strategy: Strategy,
@@ -20,7 +39,7 @@ data class CompatReport(
     val leftPaused: Boolean,
 ) {
     val anyPassed: Boolean get() = results.any { it.passed }
-    val sawPlayback: Boolean get() = results.any { it.outcome != CompatOutcome.NOT_PLAYING }
+    val sawPlayback: Boolean get() = results.any { !it.outcome.sawNothing }
 }
 
 /**
@@ -69,7 +88,14 @@ class CompatTester(private val coordinator: PlaybackCoordinator = PlaybackCoordi
         val strategy = backend.strategy
         return try {
             when (val paused = coordinator.pause(backend, target, nowMs)) {
-                PauseResult.NotPlaying -> StrategyTestResult(strategy, CompatOutcome.NOT_PLAYING)
+                is PauseResult.NotPlaying -> StrategyTestResult(
+                    strategy,
+                    when (paused.saw) {
+                        PlayState.NONE -> CompatOutcome.NO_SESSION
+                        PlayState.UNKNOWN -> CompatOutcome.UNREADABLE
+                        else -> CompatOutcome.NOT_PLAYING
+                    },
+                )
                 is PauseResult.Failed -> StrategyTestResult(strategy, CompatOutcome.ERROR, note = paused.error)
                 is PauseResult.Unverified -> {
                     // Whatever happened, try to leave the player as we found it.

@@ -107,6 +107,20 @@ object Sample {
         )
     }
 
+    /** The Diagnostics page after a break in which nothing could be paused: root is selected but its shell is down. */
+    fun pausingTrouble(): UiState {
+        val base = state()
+        val br = BreakReport(
+            BreakKind.MICRO, "com.google.android.youtube", 0, 455, BreakOutcome.COMPLETED, strategy = Strategy.PRIVILEGED_SESSION,
+            pause = PauseSummary.FAILED, error = "media keys currently go to a different app than the one in front, so a key would not reach this one",
+        )
+        return base.copy(
+            settings = base.settings.copy(mode = com.eyeblink.core.model.OperatingMode.ROOT, apps = base.settings.apps),
+            runtime = base.runtime.copy(lastBreak = br),
+            power = PowerUi(rootAvailable = true, status = PowerStatus.unavailable(PowerKind.ROOT, "no answer")),
+        )
+    }
+
     fun state(lang: Language = Language.EN, running: Boolean = true, micro: Long? = 38_000, notReady: Boolean = false): UiState {
         val perms = if (notReady) emptySet() else setOf(PermissionKind.ACCESSIBILITY, PermissionKind.NOTIFICATION_LISTENER, PermissionKind.NOTIFICATIONS, PermissionKind.OVERLAY)
         val baseline = BlinkBaseline(9_200, 140, 0.88f, 64)
@@ -134,8 +148,9 @@ object Sample {
             ),
             compat = mapOf(
                 "com.google.android.youtube" to CompatUi(CompatStatus.VERIFIED, Strategy.MEDIA_SESSION, System.currentTimeMillis() - 3_600_000, setOf(Strategy.MEDIA_SESSION, Strategy.PRIVILEGED_SESSION), listOf(StrategyTestResult(Strategy.MEDIA_SESSION, CompatOutcome.PASSED, 120)), versionName = "19.38.35"),
-                "com.instagram.android" to CompatUi(CompatStatus.UNTESTED, available = setOf(Strategy.MEDIA_SESSION, Strategy.PRIVILEGED_SESSION)),
-                "com.zhiliaoapp.musically" to CompatUi(CompatStatus.FAILING, null, System.currentTimeMillis() - 86_400_000, setOf(Strategy.MEDIA_SESSION), listOf(StrategyTestResult(Strategy.MEDIA_SESSION, CompatOutcome.NOT_PLAYING))),
+                "com.instagram.android" to CompatUi(CompatStatus.UNTESTED, available = setOf(Strategy.MEDIA_SESSION, Strategy.PRIVILEGED_SESSION), trial = Strategy.MEDIA_SESSION),
+                "com.zhiliaoapp.musically" to CompatUi(CompatStatus.FAILING, null, System.currentTimeMillis() - 86_400_000, setOf(Strategy.MEDIA_SESSION), listOf(StrategyTestResult(Strategy.MEDIA_SESSION, CompatOutcome.NO_SESSION))),
+                "com.netflix.mediaclient" to CompatUi(CompatStatus.UNTESTED),
             ),
             personal = PersonalProfile(general = baseline, byContext = mapOf(ContextProfile.VIDEO to baseline.copy(medianIbiMs = 10_100))),
             stats = StatsUi(today = week.last(), week = week.fold(DayStats(), com.eyeblink.core.stats.UsageLedger.Companion::merge), series = week, seriesLabels = listOf("M", "T", "W", "T", "F", "S", "S")),

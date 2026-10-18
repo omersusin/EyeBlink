@@ -25,14 +25,15 @@ run on a physical phone; see [Status](../README.md#status) for what that means f
 | Shizuku and Root modes | **With limits** | Both run a short, fixed list of shell commands (`cmd media_session`, `dumpsys media_session`, `pm grant`, `appops`, `settings put secure ...`). Shizuku is reached by reflection on its private `newProcess`; root through `su`. They make setup one tap and add a more reliable view of media sessions. Not run on a device yet. |
 | LSPosed module | **Best effort** | A separate, optional APK that can pause a player from inside the target app. It talks to EyeBlink through a signature-permission broadcast bridge. Player internals change with every app release, so it is only used for an app after its own test passes. |
 | Optional screen analysis (MediaProjection) | **With limits** | Needs a consent dialog each session and shows a persistent capture indicator. The change detector (a 64-bit difference hash that stores no content) is implemented and tested in `:core`; the capture itself is not wired into the app. |
-| Per-app, per-version compatibility testing | **Yes** | Results are keyed by package and version code; an app update marks them "retest advised". A strategy is only called *verified* after pause, confirmation, resume and confirmation all succeed in a real test. |
+| Per-app, per-version compatibility testing | **Yes** | Results are keyed by package and version code; an app update marks them "retest advised". A strategy is only called *verified* after pause, confirmation, resume and confirmation all succeed - in a real test or in a real break. A strategy that reads the player back may be tried by the first real break, so nothing has to be tested by hand first. |
 | Privacy and safety | **Yes** | No `INTERNET` permission (removed in the manifest and checked in CI), no window content read, camera frames never stored, overlays disappear if the service dies, and a denylist keeps EyeBlink off calls, payments, sign-in and system screens. |
 | Battery and performance measurement | **With limits** | Frame time (p50/p95), camera duty cycle and battery drain are measured on the phone. A drain *comparison* needs hours of each mode, so until then the UI says "not measured" rather than guessing. |
 
 ## Pausing video, in detail
 
 There is no single Android API for "pause whatever video is playing". EyeBlink tries strategies in this
-order and only uses one that has passed a real test for that app and version:
+order and only uses one that has proved itself for that app and version - by a test, or by a real break that paused, checked and resumed
+(only the strategies that can read the player's own state back may be tried this way; the others need a passed test first):
 
 1. **LSPosed hook** (only if the module is installed and the app's test passed) - in-process, most precise, most fragile.
 2. **Media session** - through the notification listener's access to `MediaSessionManager`; `transportControls.pause()`

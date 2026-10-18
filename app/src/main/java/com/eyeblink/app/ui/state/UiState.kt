@@ -63,12 +63,15 @@ data class AppChoiceUi(val packageName: String, val label: String, val category:
 
 data class CompatUi(
     val status: CompatStatus = CompatStatus.UNTESTED,
+    /** The strategy that has proved itself on this app, if one has. */
     val strategy: Strategy? = null,
     val lastTestedMs: Long = 0L,
     val available: Set<Strategy> = emptySet(),
     val results: List<StrategyTestResult> = emptyList(),
     val testing: Boolean = false,
     val versionName: String = "",
+    /** What the next break will try, while nothing has been proven: a way that can read the player back. */
+    val trial: Strategy? = null,
 )
 
 enum class CalibrationStage { INTRO, RUNNING, RESULT }

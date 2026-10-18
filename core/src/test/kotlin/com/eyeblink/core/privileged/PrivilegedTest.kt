@@ -148,6 +148,28 @@ class MediaSessionDumpTest {
     }
 
     @Test
+    fun `an outline keeps the shape and the states and drops names and content`() {
+        val outline = MediaSessionDump.outline(Fixtures.YOUTUBE_PLAYING_SPOTIFY_PAUSED)
+        for (secret in listOf("youtube", "spotify", "Funny cat", "SomeChannel", "Song", "Artist", "com.")) {
+            assertFalse("outline must not contain '$secret':\n$outline", outline.contains(secret, ignoreCase = true))
+        }
+        assertTrue(outline.contains("state=PlaybackState {state=3"))
+        assertTrue(outline.contains("state=PlaybackState {state=2"))
+        assertTrue(outline.contains("active=true"))
+        assertTrue(outline.contains("Media button session is"))
+        assertTrue("the same app keeps the same placeholder", outline.lines().first { it.startsWith("Media button") }.contains("app1/"))
+        // and what it keeps still parses to the same sessions
+        assertEquals(2, outline.lines().count { it.contains("(userId=0)") && !it.startsWith("Media button") })
+    }
+
+    @Test
+    fun `an outline of garbage is empty and a long dump is cut`() {
+        assertEquals("", MediaSessionDump.outline("Permission Denial: can't dump"))
+        val many = (1..200).joinToString("\n") { "  s$it MediaSessionRecord $it com.x.p$it/s$it (userId=0)\n    package=com.x.p$it\n    active=true" }
+        assertEquals(60, MediaSessionDump.outline(many).lines().size)
+    }
+
+    @Test
     fun `focus dumps give the foreground package`() {
         assertEquals("com.instagram.android", FocusDump.foregroundPackage(Fixtures.FOCUS))
         assertEquals(
@@ -349,6 +371,53 @@ class PrivilegedPlaybackBackendTest {
     fun `if every delivery path fails the command is reported as not delivered`() = runTest {
         val (b, _) = backend(Fixtures.YOUTUBE_PLAYING_SPOTIFY_PAUSED) { fail(1) }
         assertFalse(b.pause("com.google.android.youtube"))
+        assertTrue(b.lastProblem!!.contains("pause key could not be sent"))
+    }
+
+    @Test
+    fun `a refused command says why`() = runTest {
+        val (spotifyHasKeys, _) = backend(Fixtures.SPOTIFY_HAS_BUTTON)
+        assertFalse(spotifyHasKeys.pause("com.google.android.youtube"))
+        assertTrue(spotifyHasKeys.lastProblem!!.contains("different app"))
+
+        val (noSession, _) = backend(Fixtures.YOUTUBE_PLAYING_SPOTIFY_PAUSED)
+        assertFalse(noSession.resume("com.instagram.android"))
+        assertTrue(noSession.lastProblem!!.contains("no media session"))
+
+        val unreadable = PrivilegedPlaybackBackend(ScriptedShell { fail(1, "denied") })
+        assertFalse(unreadable.pause("com.x.y"))
+        assertTrue(unreadable.lastProblem!!.contains("could not be read"))
+    }
+
+    @Test
+    fun `a delivered command leaves no problem behind`() = runTest {
+        val (b, _) = backend(Fixtures.YOUTUBE_PLAYING_SPOTIFY_PAUSED) { fail(1) }
+        assertFalse(b.pause("com.google.android.youtube"))
+        val (good, _) = backend(Fixtures.YOUTUBE_PLAYING_SPOTIFY_PAUSED)
+        assertTrue(good.pause("com.google.android.youtube"))
+        assertNull(good.lastProblem)
+    }
+
+    @Test
+    fun `the dump read for the snapshot is reused for the command but never for the next snapshot`() = runTest {
+        var now = 1_000L
+        val shell = ScriptedShell { cmd -> if (cmd.startsWith("dumpsys media_session")) ok(Fixtures.YOUTUBE_PLAYING_SPOTIFY_PAUSED) else ok() }
+        val b = PrivilegedPlaybackBackend(shell) { now }
+        b.snapshot("com.google.android.youtube")
+        now += 100
+        assertTrue(b.pause("com.google.android.youtube"))
+        assertEquals("one dump for the snapshot and the command", 1, shell.commands.count { it.startsWith("dumpsys") })
+
+        // the key went out: the next look must be a new one
+        b.snapshot("com.google.android.youtube")
+        assertEquals(2, shell.commands.count { it.startsWith("dumpsys") })
+        b.snapshot("com.google.android.youtube")
+        assertEquals("a snapshot never reuses an old dump", 3, shell.commands.count { it.startsWith("dumpsys") })
+
+        // an old dump is not good enough for a command either
+        now += 5_000
+        assertTrue(b.resume("com.google.android.youtube"))
+        assertEquals(4, shell.commands.count { it.startsWith("dumpsys") })
     }
 }
 
