@@ -428,27 +428,6 @@ class BlinkDetectorTest {
     }
 
     @Test
-    fun `lids that settle while the face model still says the eyes are shut are not a blink that settled`() {
-        // The model's blink score sits at 0.05 while the eyes are open and at 0.90 while they are shut.
-        fun s(t: Long, open: Float, score: Float) = EyeOpennessSample(t, open, open, 0.9f, 200f, blinkScore = score)
-        fun run(scoreWhileSettled: Float): Pair<BlinkObservation?, Boolean> {
-            val d = BlinkDetector()
-            var t = 0L
-            while (t < 1_200) { d.onSample(s(t, 0.80f, 0.05f)); t += 66 }
-            d.onSample(s(2_000, 0.05f, 0.90f)); d.onSample(s(2_066, 0.05f, 0.90f))
-            var found: BlinkObservation? = null
-            t = 2_132L
-            // They come back only to 0.62 of an 0.80 eye: a closure of 0.22, between end and start.
-            while (t < 2_700) { d.onSample(s(t, 0.62f, scoreWhileSettled))?.let { if (found == null) found = it }; t += 66 }
-            return found to d.isClosed
-        }
-        assertNotNull("the same lids with a score that is calm again are a blink that settled", run(0.05f).first)
-        val (settled, closed) = run(0.90f)
-        assertNull("the model still says shut: that is not a blink that came to rest", settled)
-        assertTrue("and the closure goes on, instead of being learned as the new open level", closed)
-    }
-
-    @Test
     fun `a blink soon after lids that settled is seen, there is no warm-up to wait out`() {
         val d = BlinkDetector()
         fun s(t: Long, open: Float) = EyeOpennessSample(t, open, open, 0.9f, 200f)

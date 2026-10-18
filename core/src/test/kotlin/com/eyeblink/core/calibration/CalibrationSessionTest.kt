@@ -187,6 +187,60 @@ class CalibrationSessionTest {
         assertEquals(0, s.instructed.size)
     }
 
+    // --- the note about holding the eyes shut --------------------------------------------------------------------------------------
+
+    private fun deliberateSession(): CalibrationSession {
+        val s = CalibrationSession(videoMs = 1_000, readingMs = 1_000, deliberateBlinksRequired = 3)
+        s.start(0); s.skipPhase(0); s.skipPhase(0)
+        return s
+    }
+
+    private fun scored(t: Long, open: Float, score: Float) = EyeOpennessSample(t, open, open, 0.9f, 120f, blinkScore = score)
+
+    @Test
+    fun `a long closure at the end of an earlier step is not held against the person in the next`() {
+        val s = CalibrationSession(videoMs = 1_000, readingMs = 1_000, deliberateBlinksRequired = 3)
+        s.start(0)
+        var t = 0L
+        while (t < 1_000) { s.process(sample(t, 0.60f)); t += 33 }
+        s.onTick(1_000)
+        // Eyes shut from 1.05 s: by the time the reading step is over they have been shut for longer than any blink lasts.
+        while (t < 1_050) { s.process(sample(t, 0.60f)); t += 33 }
+        while (t < 2_100) { s.process(sample(t, 0.05f)); t += 33 }
+        s.onTick(2_100)
+        assertEquals(CalibrationSession.Phase.DELIBERATE, s.phase)
+        s.process(sample(2_133, 0.60f))
+        assertTrue("nobody has done anything in this step yet", s.hint != CalibrationSession.Hint.OPEN_BETWEEN)
+    }
+
+    @Test
+    fun `a gaze lowered for a few seconds is not eyes held shut`() {
+        val s = deliberateSession()
+        var t = 0L
+        while (t < 2_000) { s.process(sample(t, 0.60f)); t += 33 }
+        while (t < 6_500) { s.process(sample(t, 0.33f)); t += 33 }
+        assertTrue("the eyes were open, only lower", s.hint != CalibrationSession.Hint.OPEN_BETWEEN)
+    }
+
+    @Test
+    fun `eyes held shut whose score reads low are told to open between blinks for as long as they are held`() {
+        val s = deliberateSession()
+        var t = 0L
+        while (t < 2_000) { s.process(scored(t, 0.60f, 0.05f)); t += 33 }
+        var shown = 0
+        var frames = 0
+        while (t < 22_000) {
+            s.process(scored(t, 0.05f, 0.30f))
+            if (t > 8_000) {
+                frames++
+                if (s.hint == CalibrationSession.Hint.OPEN_BETWEEN) shown++
+            }
+            t += 33
+        }
+        assertEquals("the note stays up while the eyes are held: $shown of $frames pictures", frames, shown)
+        assertEquals(0, s.instructed.size)
+    }
+
     // --- baseline ---------------------------------------------------------
 
     @Test

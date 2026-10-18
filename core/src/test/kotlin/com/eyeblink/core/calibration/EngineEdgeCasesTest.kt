@@ -416,32 +416,84 @@ class EngineEdgeCasesTest {
         assertTrue("counted ${s.instructed.size} deliberate blinks by ${t / 1000} s", s.instructed.size >= 3 && t < 30_000)
     }
 
-    // --- 12. "Higher" must find more of what a noisy eye does ------------------------------------------------------------
+    // --- 12. "Higher" must find more of what a noisy eye does - and not of what it does not do ---------------------------
+
+    private val noisyHeavy = EyeProfile("noisy heavy lids", openEar = 0.14f, closedEar = 0.075f, noise = 0.105f)
+    private val noisyMonolid = EyeProfile("noisy monolid", openEar = 0.17f, closedEar = 0.08f, noise = 0.09f)
+
+    /** What a pipeline finds in four two-minute streams of [eye] with 30 blinks each: the blinks found, and everything it reported. */
+    private fun blinkStreams(eye: EyeProfile, thresholds: BlinkThresholds, sensitivity: Float, withScore: Boolean): Pair<Int, Int> {
+        var hit = 0
+        var reported = 0
+        for (seed in 1L..4L) {
+            val sim = EyeSimulator(eye, 20, seed, withBlinkScore = withScore)
+            val times = (0 until 30).map { 3_000L + it * 3_700L }
+            times.forEachIndexed { i, tt -> sim.blink(tt, depth = if (i % 2 == 0) 0.55f else 0.7f) }
+            val p = TrackingPipeline(thresholds, sensitivity)
+            val found = mutableListOf<Long>()
+            for (smp in sim.samples(0, 120_000)) p.onFrame(FaceFrame(smp.timestampMs, smp, good, smp.illuminance)).blink?.let { found += it.startMs }
+            hit += times.count { e -> found.any { kotlin.math.abs(it - e) <= 400 } }
+            reported += found.size
+        }
+        return hit to reported
+    }
+
+    /** What a pipeline reports in four two-minute streams of [eye] that does not blink at all. */
+    private fun phantoms(eye: EyeProfile, thresholds: BlinkThresholds, sensitivity: Float, fps: Int = 20): Int {
+        var n = 0
+        for (seed in 1L..4L) {
+            val p = TrackingPipeline(thresholds, sensitivity)
+            for (smp in EyeSimulator(eye, fps, seed, withBlinkScore = true).samples(0, 120_000)) {
+                if (p.onFrame(FaceFrame(smp.timestampMs, smp, good, smp.illuminance)).blink != null) n++
+            }
+        }
+        return n
+    }
 
     @Test
-    fun `a higher sensitivity finds more blinks of a noisy heavy-lidded eye, not the same ones`() {
-        val eye = EyeProfile("noisy heavy lids", openEar = 0.14f, closedEar = 0.075f, noise = 0.105f)
-        val thr = BlinkThresholds.fromCalibration(openLevel = 0.31f, fullDepth = 0.50f)
-        fun recall(sensitivity: Float): Pair<Int, Int> {
-            var hit = 0
-            var total = 0
-            var reported = 0
-            for (seed in 1L..4L) {
-                val sim = EyeSimulator(eye, 20, seed)
-                val times = (0 until 30).map { 3_000L + it * 3_700L }
-                times.forEachIndexed { i, tt -> sim.blink(tt, depth = if (i % 2 == 0) 0.55f else 0.7f) }
-                val p = TrackingPipeline(thr, sensitivity)
-                val found = mutableListOf<Long>()
-                for (smp in sim.samples(0, 120_000)) p.onFrame(FaceFrame(smp.timestampMs, smp, good, smp.illuminance)).blink?.let { found += it.startMs }
-                hit += times.count { e -> found.any { kotlin.math.abs(it - e) <= 400 } }
-                total += times.size
-                reported += found.size
-            }
-            return hit to reported
+    fun `where the eyelids are all there is, a higher sensitivity finds more blinks of a noisy heavy-lidded eye and not a flood of false ones`() {
+        // The eyelids of an eye this noisy are a poor witness (Auto finds a third of the blinks; with the face model's score, which
+        // is what a calibration adds, nearly all). "Higher" is the person's way of asking for more of them at the price of some false
+        // ones: the gate gives way by the square root of the factor - held in place it finds 42 of 120 and the sensitivity does
+        // nothing, given way in full it reports 44 false blinks in eight minutes and a flood on a noisier eye.
+        val auto = blinkStreams(noisyHeavy, BlinkThresholds(), 1f, withScore = false)
+        val higher = blinkStreams(noisyHeavy, BlinkThresholds(), 0.7f, withScore = false)
+        assertTrue("Auto finds ${auto.first}, Higher ${higher.first} of 120 blinks", higher.first >= auto.first + 20 && higher.first >= 80)
+        assertTrue("Higher reported ${higher.second} for ${higher.first} blinks found", higher.second - higher.first <= 35)
+    }
+
+    @Test
+    fun `the noise of an eye that does not blink is not counted as blinks, at any sensitivity`() {
+        val fitted = BlinkThresholds.fromCalibration(openLevel = 0.31f, fullDepth = 0.50f)
+        val auto = phantoms(noisyHeavy, fitted, 1f)
+        val higher = phantoms(noisyHeavy, fitted, 0.7f)
+        assertTrue("Auto reported $auto blinks in 8 minutes of an eye that does not blink", auto <= 12)
+        assertTrue("Higher reported $higher", higher <= 36)
+        for (sensitivity in listOf(1f, 0.7f)) {
+            val (hit, reported) = blinkStreams(noisyHeavy, fitted, sensitivity, withScore = true)
+            assertTrue("sensitivity $sensitivity: found $hit of 120", hit >= 100)
+            assertTrue("sensitivity $sensitivity: reported $reported for $hit found", reported - hit <= 36)
         }
-        val auto = recall(1f)
-        val higher = recall(0.7f)
-        assertTrue("Auto finds ${auto.first}, Higher ${higher.first} blinks", higher.first >= auto.first + 4)
+    }
+
+    @Test
+    fun `open eyes that do not blink never complete the deliberate test, however noisy the tracker`() {
+        for (eye in listOf(noisyHeavy, noisyMonolid)) for (sensitivity in listOf(1f, 0.7f)) for (seed in 1L..3L) {
+            val s = CalibrationSession(videoMs = 1_000, readingMs = 1_000, deliberateBlinksRequired = 5, sensitivity = sensitivity)
+            s.start(0); s.skipPhase(0); s.skipPhase(0)
+            for (smp in EyeSimulator(eye, 30, seed, withBlinkScore = true).samples(0, 120_000)) s.process(smp)
+            assertTrue("${eye.name} at $sensitivity, seed $seed: ${s.instructed.size} of 5 deliberate blinks were counted from noise", s.instructed.size < 3)
+        }
+    }
+
+    @Test
+    fun `the ordinary eyes that move least are not walked through the deliberate test by noise either`() {
+        for (eye in listOf(EyeProfile.MONOLID, EyeProfile.HEAVY_LIDS)) for (sensitivity in listOf(1f, 0.7f)) for (seed in 1L..6L) {
+            val s = CalibrationSession(videoMs = 1_000, readingMs = 1_000, deliberateBlinksRequired = 5, sensitivity = sensitivity)
+            s.start(0); s.skipPhase(0); s.skipPhase(0)
+            for (smp in EyeSimulator(eye, 30, seed, withBlinkScore = true).samples(0, 120_000)) s.process(smp)
+            assertTrue("${eye.name} at $sensitivity, seed $seed: ${s.instructed.size} of 5 deliberate blinks were counted from noise", s.instructed.size < 5)
+        }
     }
 
     // --- 13. one deliberate hold is one deliberate blink, whatever the score does in the middle of it ---------------------
@@ -533,5 +585,84 @@ class EngineEdgeCasesTest {
         d.onSample(sample(t, 0.06f)); t += 66
         d.onSample(sample(t, 0.06f)); t += 66
         assertNotNull(d.onSample(sample(t, 0.52f)))
+    }
+
+    // --- 14. a rest whose shut score reads low is still a rest -------------------------------------------------------------
+
+    @Test
+    fun `a rest whose shut score reads low is held for as long as lids alone are`() {
+        for (shutScore in listOf(0.30f, 0.45f, 0.50f)) {
+            val random = java.util.Random(61)
+            val p = TrackingPipeline()
+            var t = 0L
+            while (t < 3_000) { p.onFrame(frame(t, jitter(random, 0.667f), 0.05f)); t += 50 }
+            val found = mutableListOf<BlinkObservation>()
+            var credited = 0
+            var frames = 0
+            while (t < 63_000) {
+                val score = (shutScore + (random.nextGaussian() * 0.03).toFloat()).coerceIn(0f, 1f)
+                val ev = p.onFrame(frame(t, jitter(random, 0.156f), score))
+                ev.blink?.let { found += it }
+                frames++
+                if (ev.trackable) credited++
+                t += 50
+            }
+            assertTrue("score $shutScore: blinks while shut: ${found.map { it.startMs }.take(6)}", found.isEmpty())
+            assertTrue("score $shutScore: $credited of $frames frames of a minute's rest counted as evidence", credited < frames * 0.6)
+            assertTrue("score $shutScore: lids alone hold the eyes for half a minute, not for ever ($credited of $frames)", credited > frames * 0.3)
+        }
+    }
+
+    // --- 15. the meter shows what the eyelids need ----------------------------------------------------------------------------
+
+    @Test
+    fun `the closure the meter says counts is the closure that starts a blink, with a face model or without`() {
+        val random = java.util.Random(67)
+        // The last ease step of the deliberate test (start 0.19), eyelids that scatter by 0.03 of an 0.31 level, a flat score.
+        val d = BlinkDetector(DetectorSettings(start = 0.19f, end = 0.095f, full = 0.30f, useBlinkScore = true))
+        fun reading(t: Long, level: Float) = EyeOpennessSample(t, jitter(random, level, 0.03f), jitter(random, level, 0.03f), 0.9f, 120f, blinkScore = 0.06f)
+        var t = 0L
+        while (t < 8_000) { d.onSample(reading(t, 0.311f)); t += 33 }
+        val counts = d.startDepth
+        assertTrue("the meter says $counts counts, the setting is 0.19: the jitter has to show in it", counts > 0.3f)
+
+        // Lids that close by less than that do not start a blink, by more do: judged on a steady closure, so the noise cannot decide.
+        fun steady(depth: Float): Boolean {
+            val probe = BlinkDetector(DetectorSettings(start = 0.19f, end = 0.095f, full = 0.30f, useBlinkScore = true))
+            val r = java.util.Random(71)
+            fun rd(tt: Long, level: Float) = EyeOpennessSample(tt, jitter(r, level, 0.03f), jitter(r, level, 0.03f), 0.9f, 120f, blinkScore = 0.06f)
+            var tt = 0L
+            while (tt < 8_000) { probe.onSample(rd(tt, 0.311f)); tt += 33 }
+            repeat(6) { probe.onSample(rd(tt, 0.311f * (1f - depth))); tt += 33 }
+            return probe.isClosed
+        }
+        assertFalse("a closure of ${counts - 0.08f} is below what the meter says counts", steady(counts - 0.08f))
+        assertTrue("a closure of ${counts + 0.12f} is above it", steady(counts + 0.12f))
+    }
+
+    // --- 16. a slow camera still tells a rest ----------------------------------------------------------------------------------
+
+    @Test
+    fun `eyes shut are held however the pictures fall at six and a half frames a second`() {
+        // 150 ms between pictures, give or take a few: whether the 900 ms after which a closure is judged fall on the sixth
+        // picture of it or the seventh decides how many pictures there are to judge it by.
+        var held = 0
+        for (seed in 1L..30L) {
+            val random = java.util.Random(seed)
+            val p = TrackingPipeline(BlinkThresholds())
+            var t = 0L
+            fun next() { t += 150 + random.nextInt(11) - 5 }
+            while (t < 4_000) { p.onFrame(frame(t, jitter(random, 0.66f, 0.015f), 0.05f)); next() }
+            var credited = 0
+            var frames = 0
+            while (t < 24_000) {
+                val ev = p.onFrame(frame(t, jitter(random, 0.15f, 0.015f), 0.9f))
+                frames++
+                if (ev.trackable) credited++
+                next()
+            }
+            if (credited < frames * 0.1) held++
+        }
+        assertTrue("$held of 30 twenty-second rests were held", held >= 28)
     }
 }

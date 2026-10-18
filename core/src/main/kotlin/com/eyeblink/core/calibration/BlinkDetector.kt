@@ -30,11 +30,16 @@ data class DetectorSettings(
      */
     val useBlinkScore: Boolean = false,
     /**
-     * Eyes whose lids are plainly down are held shut for this long when there is no face-model score to agree with them; after
-     * it open is learned anew. Where the score agrees they stay shut for [BlinkDetector.SHUT_FORGET_STRONG_MS].
+     * Eyes whose lids are plainly down are held shut for this long unless the face model puts them at their calm level (which
+     * it does for a gaze lowered a long way); after it open is learned anew. Where the score agrees with the lids they stay shut
+     * for [BlinkDetector.SHUT_FORGET_STRONG_MS].
      */
     val shutForgetMs: Long = BlinkDetector.SHUT_FORGET_MS,
-    /** How much the noise gate counts (see [BlinkDetector.startDepth]): 1 as it is, less for a detector that is to be more willing to see a blink. */
+    /**
+     * How far the noise gate gives way (see [BlinkDetector.startDepth]) where the eyelids are all there is to go by: 1 as it is,
+     * less for a detector that is to be more willing to see a blink. Where the face model takes part the gate stands whatever
+     * this says: the model's score already carries the shallow blinks, and the gate is what keeps the eyelids from adding noise to them.
+     */
     val gateScale: Float = 1f,
 ) {
     /** The same detector, more ([factor] < 1) or less ([factor] > 1) willing to call a closure a blink. */
@@ -44,7 +49,9 @@ data class DetectorSettings(
             start = s,
             end = min(end * factor, s * 0.6f).coerceAtLeast(MIN_END),
             singleFrameDepth = max(singleFrameDepth * factor, s),
-            gateScale = gateScale * factor,
+            // The false blinks of a noisy tracker grow much faster than the true ones when the bar is lowered, so the gate
+            // gives way half as far (in the log) as the thresholds do.
+            gateScale = gateScale * sqrt(factor),
         )
     }
 
@@ -75,12 +82,13 @@ data class DetectorSettings(
  *    are shut, so a long closure cannot redefine shut as open and then fill the minute with phantom blinks.
  *  - Eyes that are shut longer than any blink lasts stay shut: no blink is reported when they open, and the level of the
  *    open eye is still the one from before. What says they are shut is lids that are plainly down (half of the open level) with
- *    a face-model score that does not say otherwise - nothing here knows what a shut eye's score reads, so it is never asked
- *    to reach a number, only not to contradict the lids. A closure that is not that deep (a squint, a lowered gaze, eyes whose
- *    lids hardly move) is taken to be a new open level and learned again, and what the score says is learned with it.
+ *    a face-model score that does not put them at their calm level - nothing here knows what a shut eye's score reads, so it is
+ *    never asked to reach a number, and it holds them for longer the more it agrees. A closure that is not that deep (a squint,
+ *    a lowered gaze, eyes whose lids hardly move) is taken to be a new open level and learned again, and what the score says is
+ *    learned with it.
  *  - How far the readings of an eye scatter when it is open is learned along the way, and a blink has to stand out of it: so
  *    a level that was learned from readings that are all scatter (shut eyes taken for open ones, a very noisy tracker) cannot
- *    turn its own jitter into blinks.
+ *    turn its own jitter into blinks. (This holds the eyelids to it; a face model that is sure of a blink is not, it has no jitter.)
  *  - When the readings run out - the camera slept - the last level they made stands in for them, and a closure that began
  *    under it is judged like any other.
  *
@@ -119,7 +127,6 @@ class BlinkDetector(settings: DetectorSettings = DetectorSettings()) {
     private var peak = 0f
     private var deepAtMs = 0L
     private var agreedAtMs = 0L
-    private var lastShare = 0f
 
     // The last second or so of the closure, for judging whether the eyes are shut: the median of it does not move for a blink
     // inside a lowered gaze (not even a deliberate one), and does not flap for the jitter of lids that are only just down by enough.
@@ -140,10 +147,11 @@ class BlinkDetector(settings: DetectorSettings = DetectorSettings()) {
         private set
 
     /**
-     * The closure at which a blink starts right now: the setting, or - for what the eyelids alone show - higher if their
-     * readings are too scattered for that to mean anything. (A blink the face model is sure of is not held to the gate.)
+     * The closure the eyelids need to start a blink right now: the setting, or higher if their readings are too scattered for
+     * that to mean anything. (A blink the face model is sure of starts below it - the score has no jitter to stand out of - but
+     * what the eyelids need is what a person can see and act on.)
      */
-    val startDepth: Float get() = if (settings.useBlinkScore) settings.start else max(settings.start, gate)
+    val startDepth: Float get() = max(settings.start, gate)
 
     /** When a closure last went on for longer than a blink can, or 0: for telling a person who holds their eyes shut that it does not count. */
     var longClosureAtMs: Long = 0L
@@ -219,7 +227,6 @@ class BlinkDetector(settings: DetectorSettings = DetectorSettings()) {
                 peak = c
                 deepAtMs = t
                 agreedAtMs = 0L
-                lastShare = share ?: 0f
                 recentCount = 0
                 recentHead = 0
                 settledSinceMs = null
@@ -245,7 +252,6 @@ class BlinkDetector(settings: DetectorSettings = DetectorSettings()) {
             if (c >= holdStart) armedFrames++
             peak = max(peak, c)
             lowestOpenness = min(lowestOpenness, sample.openness)
-            if (share != null) lastShare = share
             remember(t, lids, share)
             when (shutEvidence()) {
                 EVIDENCE_AGREED -> { deepAtMs = t; agreedAtMs = t }
@@ -258,10 +264,9 @@ class BlinkDetector(settings: DetectorSettings = DetectorSettings()) {
             } else {
                 // Between the two thresholds: not shut any more, not open either. If the lids stay here after a closure that
                 // began like a blink, this person does not open as far as before (heavy lids, a lowered gaze, glare): the blink
-                // is over and this is the new open. A dip that only brushed the start threshold is not a blink to settle, and
-                // neither are eyes that the face model still says are shut.
+                // is over and this is the new open. A dip that only brushed the start threshold is not a blink to settle.
                 val settledAt = settledSinceMs ?: t.also { settledSinceMs = it }
-                if (t - settledAt >= SETTLE_MS && blinkShaped() && lastShare < AGREE_SHARE) {
+                if (t - settledAt >= SETTLE_MS && blinkShaped()) {
                     val blink = finish(settledAt, since)
                     relearn(t, l, r)
                     return blink
@@ -270,7 +275,9 @@ class BlinkDetector(settings: DetectorSettings = DetectorSettings()) {
 
             val shutFor = t - since
             if (shutFor > settings.maxDurationMs) {
-                longClosureAtMs = t
+                // A slow camera has not delivered enough pictures of the closure to judge it by yet: wait for them, but not for ever.
+                if (recentCount < EVIDENCE_MIN_FRAMES && shutFor <= settings.maxDurationMs + EVIDENCE_WINDOW_MS) return null
+                if (lidsAreDeep()) longClosureAtMs = t
                 // Longer than a blink can be. Eyes that are shut tight stay as they are - the level of open is still the one
                 // from before they closed, so that opening them again is not mistaken for anything. Anything shallower is a
                 // squint or a lowered gaze that has lasted: forget what open was, and learn it again from the next readings.
@@ -289,6 +296,7 @@ class BlinkDetector(settings: DetectorSettings = DetectorSettings()) {
     fun reset() {
         clearClosure()
         closure = 0f
+        longClosureAtMs = 0L
     }
 
     /**
@@ -368,25 +376,36 @@ class BlinkDetector(settings: DetectorSettings = DetectorSettings()) {
         return sorted[count / 2]
     }
 
+    /** Whether the lids, by their median over the last frames, are down by about half of the open level (and by more than a blink's worth). */
+    private fun lidsAreDeep(): Boolean {
+        if (recentCount < EVIDENCE_MIN_FRAMES) return false
+        val oldest = (recentHead - recentCount + EVIDENCE_CAPACITY) % EVIDENCE_CAPACITY
+        for (i in 0 until recentCount) sorted[i] = recentLids[(oldest + i) % EVIDENCE_CAPACITY]
+        return middle(recentCount) >= max(holdStart + DEEP_MARGIN, DEEP_FLOOR)
+    }
+
     /**
      * Whether the eyes look shut right now, judged by the last frames of the closure: [EVIDENCE_LIDS] when the lids are down by
      * half of the open level (and by more than a blink's worth) - which a gaze lowered at a phone or a squint does not reach - and
-     * [EVIDENCE_AGREED] when the face model, if it says anything, does not contradict them by sitting low. How high the score of
-     * this person's shut eyes goes does not matter, and neither does a score alone: it is not known what that is for eyes whose
-     * lids hardly move, or for a gaze lowered at a phone.
+     * the face model, if it says anything, does not put the eyes at their calm level; [EVIDENCE_AGREED] when it also puts them
+     * half way up its range. How high the score of this person's shut eyes goes does not matter, and neither does a score alone:
+     * it is not known what that is for eyes whose lids hardly move, or for a gaze lowered at a phone.
      */
     private fun shutEvidence(): Int {
-        if (recentCount < EVIDENCE_MIN_FRAMES) return EVIDENCE_NONE
+        if (!lidsAreDeep()) return EVIDENCE_NONE
         val oldest = (recentHead - recentCount + EVIDENCE_CAPACITY) % EVIDENCE_CAPACITY
-        for (i in 0 until recentCount) sorted[i] = recentLids[(oldest + i) % EVIDENCE_CAPACITY]
-        if (middle(recentCount) < max(holdStart + DEEP_MARGIN, DEEP_FLOOR)) return EVIDENCE_NONE
         var scored = 0
         for (i in 0 until recentCount) {
             val v = recentShare[(oldest + i) % EVIDENCE_CAPACITY]
             if (!v.isNaN()) sorted[scored++] = v
         }
         if (scored * 2 < recentCount) return EVIDENCE_LIDS
-        return if (middle(scored) >= AGREE_SHARE) EVIDENCE_AGREED else EVIDENCE_NONE
+        val share = middle(scored)
+        return when {
+            share >= AGREE_SHARE -> EVIDENCE_AGREED
+            share >= CONTRADICT_SHARE -> EVIDENCE_LIDS
+            else -> EVIDENCE_NONE
+        }
     }
 
     /**
@@ -426,15 +445,18 @@ class BlinkDetector(settings: DetectorSettings = DetectorSettings()) {
 
     /**
      * How far the closure of an open eye wanders by itself, from the jitter of its readings and the level it is measured
-     * against, times a factor that makes a wander that size a rarity. A blink has to stand out of that: for an eye whose level is
-     * the readings of shut eyes the jitter is large against it, and the gate rises with it. The eyes' jitter is taken to be their
-     * own (what the average of two shows), and a detector that is set to be more willing to see a blink is held to less of it.
+     * against, times a factor that makes a wander that size a rarity. A blink has to stand out of that: for an eye whose level
+     * is the readings of shut eyes the jitter is large against it, and the gate rises with it. The two eyes' jitter is
+     * averaged, not combined as if they shared none of it - how much of it they share depends on the tracker, and a gate that
+     * takes them for independent lets a noisy tracker report a blink every few seconds for eyes that do not blink at all.
+     * Where the eyelids are all there is, a detector that is set to be more willing to see a blink is held to less of it.
      */
     private fun noiseGate(baseL: Float, baseR: Float): Float {
         if (jitterL <= 0f || jitterR <= 0f || baseL < MIN_BASE || baseR < MIN_BASE) return 0f
         val sl = jitterL / JITTER_TO_SIGMA / baseL
         val sr = jitterR / JITTER_TO_SIGMA / baseR
-        return min(NOISE_GATE_K * settings.gateScale * sqrt(sl * sl + sr * sr) / 2f, MAX_NOISE_GATE)
+        val giveWay = if (settings.useBlinkScore) 1f else settings.gateScale
+        return min(NOISE_GATE_K * giveWay * (sl + sr) / 2f, MAX_NOISE_GATE)
     }
 
     /** The eyes settled lower than they were: that is where open is now. Nobody needs to wait for the warm-up to find out. */
@@ -467,7 +489,6 @@ class BlinkDetector(settings: DetectorSettings = DetectorSettings()) {
         peak = 0f
         deepAtMs = 0L
         agreedAtMs = 0L
-        lastShare = 0f
         recentCount = 0
         recentHead = 0
         resumed = false
@@ -541,8 +562,14 @@ class BlinkDetector(settings: DetectorSettings = DetectorSettings()) {
         private const val DEEP_MARGIN = 0.10f
         private const val DEEP_FLOOR = 0.46f
 
-        /** How far up the face model's score has to be not to contradict lids that look shut, and not to let a closure settle. */
+        /**
+         * How far up the face model's score (as a share of this face's own range) has to be to agree with lids that look shut, and
+         * how close to its calm level it has to be to contradict them. Between the two it is the score of eyes that may be shut
+         * whose face model reads low - nobody knows how low it goes for narrow, heavy-lidded eyes - and the lids are believed
+         * for as long as lids alone are.
+         */
         private const val AGREE_SHARE = 0.50f
+        private const val CONTRADICT_SHARE = 0.15f
 
         /** The model's blink score is high only while the eyes are shut; its calm level is the low end of what it says. */
         private const val SCORE_PERCENTILE = 0.20f
