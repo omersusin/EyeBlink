@@ -63,12 +63,18 @@ import kotlin.math.roundToInt
 fun CalibrationScreen(state: UiState, actions: UiActions, onBack: () -> Unit, onPage: (Page) -> Unit = {}) {
     val s = S
     val c = state.calibration
-    // A session that is still running when the page goes away (the system's back, say) must not keep the camera on.
-    val stage by rememberUpdatedState(c.stage)
-    DisposableEffect(Unit) { onDispose { if (stage == CalibrationStage.RUNNING) actions.cancelCalibration() } }
+    // However the page goes away (its own back arrow, the system's back), a session still running must not keep the camera
+    // on, and a result with nothing in it to keep must not be what the page opens on next time; a result that can still be
+    // saved stays until it is.
+    val latest by rememberUpdatedState(c)
+    DisposableEffect(Unit) {
+        onDispose {
+            val now = latest
+            val nothingToKeep = now.stage == CalibrationStage.RESULT && now.result?.hasEnoughSpontaneous != true
+            if (now.stage == CalibrationStage.RUNNING || nothingToKeep) actions.cancelCalibration()
+        }
+    }
     PageColumn(s.t("Calibration", "Kalibrasyon"), s.t("Meet your blink", "Kırpmanla tanış"), onBack = {
-        // A session in progress is dropped on the way out, and so is a result with nothing in it to keep; a result that can
-        // still be saved stays until it is.
         val nothingToKeep = c.stage == CalibrationStage.RESULT && c.result?.hasEnoughSpontaneous != true
         if (c.stage == CalibrationStage.RUNNING || nothingToKeep) actions.cancelCalibration()
         onBack()
