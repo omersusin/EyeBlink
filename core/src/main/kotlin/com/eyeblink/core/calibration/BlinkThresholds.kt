@@ -74,9 +74,10 @@ data class BlinkThresholds(
             // Half way to this person's shut eye starts a blink, and a bit under half of that is where it ends. It never
             // asks for more than the population default does (an eye that closes completely has no use for a start above
             // it) and never for less than the noise floor, unless the blinks themselves are so shallow that nothing else would see them.
+            // The end is that low only for a low start: the jitter of an open eye does not depend on how deep a blink goes.
             val floor = (0.60f * fullDepth).coerceIn(SHALLOWEST_START, FLOOR_START)
             val start = (0.50f * fullDepth).coerceIn(floor, BlinkDetector.DEFAULT_START)
-            val end = (0.45f * start).coerceAtLeast(MIN_END)
+            val end = (0.45f * start).coerceIn(MIN_END, BlinkDetector.DEFAULT_END)
             val full = (0.80f * fullDepth).coerceIn(start + 0.10f, MAX_FULL)
             return BlinkThresholds(start = start, end = end, full = full, fitted = true, openLevel = seed)
         }

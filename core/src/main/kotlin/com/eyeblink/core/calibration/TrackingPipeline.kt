@@ -46,6 +46,10 @@ class TrackingPipeline(thresholds: BlinkThresholds = BlinkThresholds(), sensitiv
     private var lastTrackableMs: Long? = null
     private var lastQualityScore: Float? = null
 
+    // The last picture the detector saw. A picture that cannot be trusted does not move it, so the length of a gap is
+    // measured from the last good one however many bad ones fall in between.
+    private var lastDetectorMs: Long? = null
+
     // The window being collected for the learner.
     private val windowBlinks = ArrayList<BlinkObservation>()
     private var windowTrackedMs = 0L
@@ -71,16 +75,22 @@ class TrackingPipeline(thresholds: BlinkThresholds = BlinkThresholds(), sensitiv
     fun onFrame(frame: FaceFrame): FrameEvents {
         val s = frame.sample
         if (s == null || !s.isTrackable) {
-            lose()
+            // A picture that cannot be trusted says nothing about the eyes. It ends the stretch of time that is credited to
+            // the blink rate, but it leaves a closure in progress alone: one bad picture in a blink, or in a rest, must not
+            // end it. An absence of any length is dealt with when the next good picture arrives (below).
+            rate.onTrackingLost()
+            lastTrackableMs = null
             return FrameEvents(null, trackable = false)
         }
 
-        val prev = lastTrackableMs
-        if (prev != null && frame.timestampMs - prev > BlinkRateTracker.MAX_FRAME_GAP_MS) {
-            // Tracking was away for a while: whatever closure was in progress is unknowable.
-            detector.reset()
+        val seen = lastDetectorMs
+        if (seen != null && frame.timestampMs - seen > BlinkRateTracker.MAX_FRAME_GAP_MS) {
+            // Tracking was away for a while: a blink that was in progress is unknowable.
+            detector.onGap()
             rate.onTrackingLost()
         }
+        lastDetectorMs = frame.timestampMs
+        val prev = lastTrackableMs
 
         val blink = detector.onSample(s)
         if (detector.isShut) {
@@ -144,14 +154,9 @@ class TrackingPipeline(thresholds: BlinkThresholds = BlinkThresholds(), sensitiv
         detector.reset()
         rate.reset()
         lastTrackableMs = null
+        lastDetectorMs = null
         lastQualityScore = null
         clearWindow()
-    }
-
-    private fun lose() {
-        detector.reset()
-        rate.onTrackingLost()
-        lastTrackableMs = null
     }
 
     private fun clearWindow() {

@@ -154,19 +154,20 @@ class CalibrationSessionTest {
     }
 
     @Test
-    fun `a face that is lost does not either`() {
+    fun `a run of bad pictures that lasts is a gap too`() {
         val s = midBlink()
-        s.onTrackingLost()
-        assertNull(s.process(sample(1_700, 0.60f)))
+        var t = 1_566L
+        while (t < 3_100) { s.process(sample(t, 0.18f, illuminance = 1f)); t += 33 }
+        assertNull("1.5 s of pictures too dark to trust, then an open eye", s.process(sample(t, 0.60f)))
         assertEquals(0, s.instructed.size)
     }
 
     @Test
-    fun `nor does a picture that is too dark to trust`() {
+    fun `one picture too dark to trust in the middle of a blink neither ends nor splits it`() {
         val s = midBlink()
         assertNull(s.process(sample(1_566, 0.18f, illuminance = 1f)))
-        assertNull("the eye is open when the light comes back", s.process(sample(1_700, 0.60f)))
-        assertEquals(0, s.instructed.size)
+        assertNotNull("the blink is counted when the eye opens", s.process(sample(1_600, 0.60f)))
+        assertEquals(1, s.instructed.size)
     }
 
     // --- baseline ---------------------------------------------------------

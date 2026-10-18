@@ -178,7 +178,7 @@ class EngineFuzzTest {
                 t += 16L + random.nextInt(80)
                 s.onTick(t)
                 if (random.nextFloat() < 0.002f) t += 500L + random.nextInt(3_000)
-                if (random.nextFloat() < 0.02f) { s.onTrackingLost(); continue }
+                if (random.nextFloat() < 0.02f) continue                                   // a picture that never came
                 val blinking = (t / 300) % 11 == 0L
                 val shut = (t / 1_000) % 25 in 20..22
                 val v = ((if (blinking || shut) open * 0.1f else open) + (random.nextGaussian() * 0.02).toFloat()).coerceIn(0f, 1f)

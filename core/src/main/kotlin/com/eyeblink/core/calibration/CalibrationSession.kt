@@ -184,25 +184,14 @@ class CalibrationSession(
      */
     fun process(sample: EyeOpennessSample): BlinkObservation? {
         onSample(sample)
-        if (!sample.isTrackable) {
-            // A closure that was in progress when the picture went bad cannot be told from a face that went away.
-            detector.reset()
-            return null
-        }
-        if (sample.timestampMs - lastSampleAtMs > MAX_SAMPLE_GAP_MS) detector.reset()
+        if (!sample.isTrackable) return null
+        // A gap in the pictures - the face went away, or a run of bad ones - is not part of a blink in progress, but eyes that
+        // were shut tight are most likely still shut when it ends. One bad picture on its own is no gap.
+        if (sample.timestampMs - lastSampleAtMs > MAX_SAMPLE_GAP_MS) detector.onGap()
         val blink = detector.onSample(sample)
         if (phase == Phase.DELIBERATE) trackDeliberate(sample, blink)
         lastSampleAtMs = sample.timestampMs
         return if (blink != null && onBlink(blink)) blink else null
-    }
-
-    /**
-     * No face in the picture at all. The time is not credited, and a closure that was in progress is dropped: with the face
-     * gone, a long "blink" is only the gap between the last frame before it and the first one after.
-     */
-    fun onTrackingLost() {
-        detector.reset()
-        tallies.getValue(phase).lastSampleMs = null
     }
 
     /**
@@ -361,6 +350,8 @@ class CalibrationSession(
             maxDurationMs = DELIBERATE_MAX_DURATION_MS,
             singleFrameDepth = start + 0.12f,
             useBlinkScore = true,
+            // Nobody keeps their eyes shut for half a minute to make a blink count; whatever that is, it is not a measurement.
+            shutForgetMs = BlinkDetector.SHUT_FORGET_SCORE_MS,
         ).scaled(sensitivity)
     }
 

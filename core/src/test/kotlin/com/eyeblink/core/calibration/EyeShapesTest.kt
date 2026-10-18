@@ -45,24 +45,36 @@ class EyeShapesTest {
         return Counted(found, found.map { it.startMs }) to times
     }
 
+    // A tracker's noise decides whether a single shallow blink is seen; three streams per eye say what is typical.
+    private val seeds = listOf(7L, 8L, 9L)
+
     @Test
     fun `natural blinks are found on every kind of eye at 30 fps`() {
         for (eye in EyeProfile.ALL) {
-            val (counted, expected) = natural(eye, fps = 30)
-            val hit = counted.found(expected)
-            val fullDepthEyes = eye.fullClosure
-            assertTrue("${eye.name}: found $hit of ${expected.size} (full closure $fullDepthEyes)", hit >= expected.size * 0.8)
-            assertTrue("${eye.name}: ${counted.blinks.size} blinks reported for ${expected.size} real ones", counted.blinks.size <= expected.size + 2)
+            var hit = 0
+            var total = 0
+            for (seed in seeds) {
+                val (counted, expected) = natural(eye, fps = 30, seed = seed)
+                hit += counted.found(expected)
+                total += expected.size
+                assertTrue("${eye.name}: ${counted.blinks.size} blinks reported for ${expected.size} real ones", counted.blinks.size <= expected.size + 2)
+            }
+            assertTrue("${eye.name}: found $hit of $total (full closure ${eye.fullClosure})", hit >= total * 0.8)
         }
     }
 
     @Test
     fun `natural blinks are found on every kind of eye at 15 fps`() {
         for (eye in EyeProfile.ALL) {
-            val (counted, expected) = natural(eye, fps = 15)
-            val hit = counted.found(expected, toleranceMs = 500)
-            assertTrue("${eye.name}: found $hit of ${expected.size}", hit >= expected.size * 0.75)
-            assertTrue("${eye.name}: ${counted.blinks.size} blinks reported for ${expected.size} real ones", counted.blinks.size <= expected.size + 3)
+            var hit = 0
+            var total = 0
+            for (seed in seeds) {
+                val (counted, expected) = natural(eye, fps = 15, seed = seed)
+                hit += counted.found(expected, toleranceMs = 500)
+                total += expected.size
+                assertTrue("${eye.name}: ${counted.blinks.size} blinks reported for ${expected.size} real ones", counted.blinks.size <= expected.size + 3)
+            }
+            assertTrue("${eye.name}: found $hit of $total", hit >= total * 0.75)
         }
     }
 
