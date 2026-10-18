@@ -36,6 +36,9 @@
   .brand img { width: 96px; height: 96px; display: block; }
   .brand span { font-family: "Bricolage Grotesque", sans-serif; font-weight: 800; font-size: 78px; letter-spacing: -2.4px; }
   .brand span i { font-style: normal; color: var(--sky-text); }
+  /* the version, so a picture of the banner says which release it belongs to */
+  .brand .ver { align-self: flex-end; margin: 0 0 22px 6px; font-family: "Figtree", sans-serif; font-weight: 700; font-size: 26px; letter-spacing: 0;
+    padding: 7px 20px 8px; border-radius: 30px; background: var(--white); color: var(--sky-text); border: 2px solid var(--line); box-shadow: 0 4px 0 var(--card-lip); }
 
   h1 { margin-top: 48px; font-family: "Bricolage Grotesque", sans-serif; font-weight: 800; font-size: 112px; line-height: 1.0; letter-spacing: -3.6px; }
   /* a highlighter swipe under the second line, the way a person would underline it */
@@ -108,12 +111,12 @@
   </svg>
 
   <div class="left">
-    <div class="brand"><img src="logo.svg" alt=""><span>Eye<i>Blink</i></span></div>
+    <div class="brand"><img src="logo.svg" alt=""><span>Eye<i>Blink</i></span><span class="ver">v0.3.0</span></div>
     <h1>Give your eyes<br><em>the pause back.</em></h1>
     <p class="lede">A soft half-second eyelid over your screen, a proper 20-20-20 rest when it matters, and a video that <b>waits for you</b> - only when it can prove it paused.</p>
     <div class="chips">
       <span class="chip on">Camera-assisted or camera-free</span><span class="chip">Rootless · Shizuku · Root</span>
-      <span class="chip">LSPosed module</span><span class="chip">English · Türkçe</span>
+      <span class="chip">LSPosed module</span><span class="chip">English · Türkçe</span><span class="chip">Calibrates to your eyes</span>
     </div>
   </div>
 

@@ -86,7 +86,7 @@ Nothing below the first row is required.
 
 ## Status
 
-This is an honest list. "Tested" means unit tests that run in CI; "built" means CI compiles and lints it; "on a phone" is something nobody has done yet.
+This is an honest list. "Tested" means unit tests that run in CI; "built" means CI compiles and lints it; "on a phone" means somebody checked it on real hardware - so far that is one phone, the author's, which is where the bugs fixed in the release notes came from. The fixes for the last two have not been confirmed there yet.
 
 | Part | State |
 |---|---|
@@ -97,7 +97,8 @@ This is an honest list. "Tested" means unit tests that run in CI; "built" means 
 | The whole UI - every screen in both themes | **Rendered** by the design lab on every CI run |
 | Android layer: engine, overlay, accessibility, notification listener, foreground service, tile, camera, Shizuku/root bridge | **Built and linted** by CI |
 | LSPosed module | **Built and linted** by CI |
-| Anything that needs a real device: the overlay on top of real apps, MediaPipe on real faces, media sessions of real video apps, Shizuku/root commands and `dumpsys` on real output, the LSPosed hooks, foreground-service rules on Android 14+, battery numbers | **Not run on a phone yet** |
+| The blink engine on real faces: it was built and tested on simulated eyes of many shapes | **Not confirmed on real faces** |
+| Anything else that needs a real device: the overlay on top of real apps, MediaPipe on real faces, media sessions of real video apps, Shizuku/root commands and `dumpsys` on real output, the LSPosed hooks, foreground-service rules on Android 14+, battery numbers | **Not confirmed on a phone yet** (the author's phone has run the app, not all of this) |
 | MediaProjection screen analysis | **Not wired** - the change detector is implemented and tested; the capture is not |
 
 Known limits you should know about before trusting it:
@@ -112,7 +113,11 @@ The reasoning behind each of these is in [docs/FEASIBILITY.md](docs/FEASIBILITY.
 
 ## Try it
 
-Every push is built by GitHub Actions. Open the latest run of **Android CI** and download one of its artifacts:
+**The easy way: the [latest release](https://github.com/omersusin/EyeBlink/releases/latest).** Download `EyeBlink-<version>-arm64-v8a.apk` (nearly every phone), open it on the phone and allow
+the install. The release APKs are signed, come with a checksum file, and the notes for each one say what changed and what is still unverified ([`docs/releases/`](docs/releases)).
+The module for LSPosed and the R8 mapping that decodes a crash log are attached too.
+
+Every push is also built by GitHub Actions. For something newer than the release, open the latest run of **Android CI** and download one of its artifacts:
 
 - **`eyeblink-release-arm64`** - the release APK for `arm64-v8a`, which is nearly every phone (about 15 MB).
 - **`eyeblink-debug-arm64`** - the debug build. It installs next to the release as `com.eyeblink.app.debug`, is not minified, and its crash logs read like the source.
@@ -121,7 +126,7 @@ Every push is built by GitHub Actions. Open the latest run of **Android CI** and
 A second job, **Start it on an emulator**, installs the debug build and a *minified* one (the release build as R8 leaves it, which is where reflection and native callbacks break) on an Android 15 emulator.
 It walks through onboarding, a rest (and skips it), a blink, every tab and page, the Blink Studio, the app picker, the calibration camera (allowed, then refused) and the language list and theme, then lets the engine run with the accessibility service on.
 It fails the run if the app dies or an engine task throws, and keeps screenshots and logs in `eyeblink-smoke-debug` and `eyeblink-smoke-minified`.
-Release builds are signed (v2 and v3) when the repository has keystore secrets, and CI verifies the signature.
+Release builds are signed (v2 and v3, and v4 for the app) when the repository has keystore secrets, and CI verifies the signature.
 On first start, onboarding explains each permission; only *Accessibility* (or *Display over other apps*) is required.
 
 ## Build it
@@ -136,7 +141,7 @@ On first start, onboarding explains each permission; only *Accessibility* (or *D
 ./gradlew :app:assembleDebug :app:assembleRelease :app:bundleRelease
 ```
 
-Signing secrets, if you have them, are read from `keystore.properties` (git-ignored) or the `KEYSTORE_*` environment variables.
+Signing secrets, if you have them, are read from `keystore.properties` (git-ignored) or from the environment: `KEYSTORE_FILE`, `KEYSTORE_PASSWORD`, `KEY_ALIAS` and `KEY_PASSWORD`.
 
 ## Privacy
 
@@ -158,6 +163,7 @@ Signing secrets, if you have them, are read from `keystore.properties` (git-igno
 | [`docs/FEASIBILITY.md`](docs/FEASIBILITY.md) | what Android allows, requirement by requirement |
 | [`docs/DEVICE_TEST.md`](docs/DEVICE_TEST.md) | a step-by-step first test on a real phone |
 | [`docs/brand/`](docs/brand) | logo, banner and the script that draws the icons |
+| [`docs/releases/`](docs/releases) | the notes of each release |
 
 ## The look
 

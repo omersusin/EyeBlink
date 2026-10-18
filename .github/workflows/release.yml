@@ -1,0 +1,177 @@
+name: Release
+
+# Publishes a GitHub release: the signed APKs, their checksums and the R8 mapping that decodes a crash log.
+#
+#   push a tag          git tag v0.3.0 && git push origin v0.3.0
+#   or run it by hand   Actions > Release > Run workflow, tag = v0.3.0 (the tag is created on the commit it runs on)
+#
+# It refuses to publish unless
+#   - the tag is vMAJOR.MINOR.PATCH and that version is what app/ and lsposed/ say (the tag cannot disagree with the APK),
+#   - the commit is on main and docs/releases/<tag>.md (the release notes) exists,
+#   - Android CI has passed on exactly this commit, emulator walkthrough included,
+#   - the signing key is there. An unsigned APK cannot be installed, so a release without the key would be a broken download.
+# It never moves a tag, never overwrites a release, and never publishes an APK that asks for the network.
+
+on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to publish, vMAJOR.MINOR.PATCH - the version in app/build.gradle.kts and lsposed/build.gradle.kts'
+        required: true
+        type: string
+
+permissions:
+  contents: write # create the tag and the release
+  actions: read # ask whether Android CI passed on this commit
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      # The signing block in app/build.gradle.kts and lsposed/build.gradle.kts reads these.
+      KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+      KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+      KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Check what is being released
+        run: |
+          set -euo pipefail
+          fail() { echo "::error::$*"; exit 1; }
+
+          [[ "$TAG" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)$ ]] || fail "'$TAG' is not a version tag (vMAJOR.MINOR.PATCH)"
+          VERSION="${BASH_REMATCH[1]}"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+          for f in app/build.gradle.kts lsposed/build.gradle.kts; do
+            grep -qF "versionName = \"$VERSION\"" "$f" || fail "$f does not say versionName = \"$VERSION\" - bump the version first"
+          done
+          [ -f "docs/releases/$TAG.md" ] || fail "docs/releases/$TAG.md (the release notes) is missing"
+
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor "$GITHUB_SHA" FETCH_HEAD || fail "$GITHUB_SHA is not on main - releases are cut from main"
+
+          # A tag that already exists must be on this very commit; a published tag is never moved.
+          at=$(git ls-remote --tags origin "refs/tags/$TAG" "refs/tags/$TAG^{}" | awk 'END { print $1 }')
+          if [ -n "$at" ] && [ "$at" != "$GITHUB_SHA" ]; then
+            fail "$TAG already points at $at, not at $GITHUB_SHA"
+          fi
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            fail "a release for $TAG already exists"
+          fi
+
+          passed=$(gh run list --workflow android.yml --commit "$GITHUB_SHA" --status success --limit 5 --json databaseId --jq 'length')
+          [ "$passed" -ge 1 ] || fail "Android CI has not passed on $GITHUB_SHA yet - wait for it, or fix it"
+          echo "releasing $TAG ($VERSION) from $GITHUB_SHA"
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Install SDK packages
+        run: sdkmanager --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      # Unlike the CI build, this one fails without the key instead of quietly producing unsigned APKs.
+      - name: Decode signing keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          for name in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              echo "::error::the secret $name is not set - a release has to be signed"; exit 1
+            fi
+          done
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/eyeblink-release.jks"
+          echo "KEYSTORE_FILE=$RUNNER_TEMP/eyeblink-release.jks" >> "$GITHUB_ENV"
+
+      - name: Core tests
+        run: ./gradlew :core:test --stacktrace
+
+      - name: Assemble the release APKs
+        run: ./gradlew :app:assembleRelease :lsposed:assembleRelease --stacktrace
+
+      # apksigner is the source of truth (the APKs carry v2/v3 signatures only, so there is nothing to grep in META-INF).
+      # The module and the app talk through a signature-level permission, so they must be signed with one key.
+      - name: Verify what was built
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          fail() { echo "::error::$*"; exit 1; }
+          BT="$ANDROID_HOME/build-tools/35.0.0"
+
+          APKS=(app/build/outputs/apk/release/*.apk lsposed/build/outputs/apk/release/*.apk)
+          [ ${#APKS[@]} -eq 4 ] || fail "expected 3 app APKs (one per ABI) and the module, found ${#APKS[@]}: ${APKS[*]}"
+
+          certs=""
+          for APK in "${APKS[@]}"; do
+            echo "=== $APK ($(du -h "$APK" | cut -f1)) ==="
+            out=$("$BT/apksigner" verify --verbose --print-certs "$APK") || fail "$APK is unsigned or its signature does not verify"
+            echo "$out" | grep -E "^(Verifies|Verified using|Signer #1 certificate SHA-256)"
+            certs+=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' <<< "$out")$'\n'
+
+            perms=$("$BT/aapt2" dump permissions "$APK")
+            if grep -qi "android.permission.INTERNET" <<< "$perms"; then fail "$APK declares INTERNET"; fi
+
+            badging=$("$BT/aapt2" dump badging "$APK")
+            grep -q "versionName='$VERSION'" <<< "$badging" || fail "$APK is not version $VERSION: $(grep -m1 '^package:' <<< "$badging")"
+          done
+          [ "$(sort -u <<< "$certs" | grep -c .)" -eq 1 ] || fail "the APKs are not all signed with one key"
+          echo "CERT=$(sort -u <<< "$certs" | grep .)" >> "$GITHUB_ENV"
+
+      - name: Collect the files
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          fail() { echo "::error::$*"; exit 1; }
+          one() { [ $# -eq 1 ] || fail "expected exactly one of: $*"; echo "$1"; }
+
+          mkdir dist
+          for abi in arm64-v8a armeabi-v7a x86_64; do
+            cp "$(one app/build/outputs/apk/release/*"$abi"*.apk)" "dist/EyeBlink-$VERSION-$abi.apk"
+          done
+          cp "$(one lsposed/build/outputs/apk/release/*.apk)" "dist/EyeBlink-LSPosed-module-$VERSION.apk"
+          # Turns a crash log from this release back into readable names (retrace -mapping this-file crash.txt).
+          cp "$(one app/build/outputs/mapping/release/mapping.txt)" "dist/EyeBlink-$VERSION-r8-mapping.txt"
+          (cd dist && sha256sum -- * > SHA256SUMS.txt && cat SHA256SUMS.txt)
+
+          {
+            cat "docs/releases/$TAG.md"
+            printf '\n---\n\nSigned with the certificate whose SHA-256 is `%s`. The checksum of every file is in `SHA256SUMS.txt`.\n' "$CERT"
+          } > notes.md
+
+      - name: Publish the release
+        run: |
+          set -euo pipefail
+          # With no tag yet (a manual run) GitHub creates it on --target; with a pushed tag --target is not needed and is ignored.
+          gh release create "$TAG" dist/* --title "EyeBlink $VERSION" --notes-file notes.md --target "$GITHUB_SHA"
+          gh release view "$TAG" --json url,assets --jq '.url, (.assets[] | "  " + .name + " (" + (.size / 1048576 | floor | tostring) + " MB)")' || true  # only a summary for the log; the release is already out
+
+      - name: Remove signing key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/eyeblink-release.jks"

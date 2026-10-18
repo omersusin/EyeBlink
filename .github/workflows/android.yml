@@ -92,18 +92,6 @@ jobs:
       - name: Assemble debug APKs
         run: ./gradlew :app:assembleDebug :lsposed:assembleDebug --stacktrace
 
-      # The privacy page promises that EyeBlink cannot reach the network. The manifest removes the
-      # permission even if a library asks for it; this proves it on what was actually built.
-      - name: Guard - no network permission
-        run: |
-          shopt -s nullglob
-          for APK in app/build/outputs/apk/debug/*.apk app/build/outputs/apk/release/*.apk; do
-            if "$ANDROID_HOME"/build-tools/35.0.0/aapt2 dump permissions "$APK" | grep -qi "android.permission.INTERNET"; then
-              echo "::error::$APK declares INTERNET"; exit 1
-            fi
-          done
-          echo "no APK declares INTERNET"
-
       # Renders the real UI (the same Compose sources as the app) headlessly, so every change can be
       # looked at. Non-blocking: a rendering hiccup must never hide a real build result.
       - name: Render UI screenshots
@@ -120,6 +108,23 @@ jobs:
       # bundle carries all ABIs while each install downloads only one slice.
       - name: Assemble release App Bundle
         run: ./gradlew :app:bundleRelease --stacktrace
+
+      # The privacy page promises that EyeBlink cannot reach the network. The manifest removes the permission even if a
+      # library asks for it; this proves it on every APK that was built - debug and release, the app and the module. It runs
+      # after the release build on purpose: before it, there were no release APKs to look at.
+      - name: Guard - no network permission
+        run: |
+          shopt -s nullglob
+          n=0
+          for APK in app/build/outputs/apk/debug/*.apk app/build/outputs/apk/release/*.apk \
+                     lsposed/build/outputs/apk/debug/*.apk lsposed/build/outputs/apk/release/*.apk; do
+            n=$((n + 1))
+            if "$ANDROID_HOME"/build-tools/35.0.0/aapt2 dump permissions "$APK" | grep -qi "android.permission.INTERNET"; then
+              echo "::error::$APK declares INTERNET"; exit 1
+            fi
+          done
+          [ "$n" -gt 0 ] || { echo "::error::no APK found to check"; exit 1; }
+          echo "$n APKs checked, none declares INTERNET"
 
       # apksigner is the source of truth. Do NOT look for META-INF/*.RSA:
       # at minSdk 26 AGP emits v2/v3 signatures only, which write an APK
