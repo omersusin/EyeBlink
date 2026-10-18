@@ -1,6 +1,7 @@
 package com.eyeblink.core.playback
 
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -84,6 +85,38 @@ class PlaybackCoordinatorTest {
         val p = player(latency = 2_000)
         val r = pause(p)
         assertTrue("a slow but real pause must not count as unverified: $r", r is PauseResult.Paused)
+    }
+
+    @Test
+    fun `the token is handed over before the command goes out, and a command that was not delivered is a failure the caller can see`() = runTest {
+        val p = player()
+        var seen: PauseToken? = null
+        var commandsWhenSeen = -1
+        val r = coordinator.pause(p, APP, onSending = { seen = it; commandsWhenSeen = p.commands.size }) { testScheduler.currentTime }
+        assertTrue(r is PauseResult.Paused)
+        assertEquals("handed over before the command", 0, commandsWhenSeen)
+        assertEquals(false, seen!!.verified)
+        assertEquals("video-1", seen!!.contentKey)
+
+        var seenOnFailure = false
+        val dead = player().apply { deliversCommands = false }
+        assertTrue(coordinator.pause(dead, APP, onSending = { seenOnFailure = true }) { testScheduler.currentTime } is PauseResult.Failed)
+        assertTrue("it was announced, and the result says nothing went out", seenOnFailure)
+        val idle = player(PlayState.PAUSED)
+        var announced = false
+        coordinator.pause(idle, APP, onSending = { announced = true }) { testScheduler.currentTime }
+        assertFalse("nothing is announced for a video that is not playing", announced)
+    }
+
+    @Test
+    fun `cancellation is never swallowed by a look at the player`() = runTest {
+        val p = player(latency = 5_000)
+        val job = launch { coordinator.pause(p, APP) { testScheduler.currentTime } }
+        testScheduler.advanceTimeBy(500)
+        testScheduler.runCurrent()
+        job.cancel()
+        job.join()
+        assertTrue(job.isCancelled)
     }
 
     @Test
@@ -361,6 +394,17 @@ class CompatTesterTest {
         assertEquals(CompatOutcome.UNREADABLE, report.results.single().outcome)
         assertFalse("nothing was seen, so nothing counts against the strategy", report.sawPlayback)
         assertTrue(none.commands.isEmpty() && unreadable.commands.isEmpty())
+    }
+
+    @Test
+    fun `a pause that shows up late but is followed by a resume that worked passes the test`() = runTest {
+        val slow = player(Strategy.PRIVILEGED_SESSION).apply { latencyMs = 3_000 } // later than the verify window
+        val report = run(slow)
+        val result = report.results.single()
+        assertEquals(CompatOutcome.PASSED, result.outcome)
+        assertEquals("the pause showed up late", result.note)
+        assertEquals(PlayState.PLAYING, slow.state)
+        assertFalse(report.leftPaused)
     }
 
     @Test

@@ -1,5 +1,6 @@
 package com.eyeblink.core.playback
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlin.math.abs
 
@@ -195,17 +196,34 @@ class PlaybackCoordinator(
     private val clock: () -> Long = { System.nanoTime() / 1_000_000L },
 ) {
 
-    suspend fun pause(backend: PlaybackBackend, target: String, nowMs: () -> Long): PauseResult {
+    /**
+     * @param onSending called just before the pause command goes out, with a token for the pause that is about to be
+     *        attempted (not yet verified). Whoever runs the break holds on to it: if the break is cancelled while the
+     *        command is on its way or being confirmed - which can take seconds on a phone that answers slowly - that
+     *        token is what lets the video be given back. A [PauseResult.Failed] means no command went out, and the
+     *        token is to be dropped.
+     */
+    suspend fun pause(
+        backend: PlaybackBackend,
+        target: String,
+        onSending: (PauseToken) -> Unit = {},
+        nowMs: () -> Long,
+    ): PauseResult {
         val before = try {
             backend.snapshot(target)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             return PauseResult.NotPlaying(PlayState.UNKNOWN)
         }
         if (before.state != PlayState.PLAYING) return PauseResult.NotPlaying(before.state)
         if (before.sourcePackage != null && before.sourcePackage != target) return PauseResult.NotPlaying(PlayState.NONE)
 
+        onSending(PauseToken(target, backend.strategy, before.contentKey, before.positionMs, nowMs(), verified = false))
         val delivered = try {
             backend.pause(target)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             return PauseResult.Failed(e.message ?: e.javaClass.simpleName)
         }
@@ -238,6 +256,8 @@ class PlaybackCoordinator(
         repeat(2) { attempt ->
             val now = try {
                 backend.snapshot(token.target)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 return ResumeResult.Failed(e.message ?: "snapshot failed")
             }
@@ -251,6 +271,8 @@ class PlaybackCoordinator(
 
             val delivered = try {
                 backend.resume(token.target)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 return ResumeResult.Failed(e.message ?: e.javaClass.simpleName)
             }
@@ -274,6 +296,8 @@ class PlaybackCoordinator(
             val lookedAt = clock()
             val snap = try {
                 backend.snapshot(target)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 null
             }

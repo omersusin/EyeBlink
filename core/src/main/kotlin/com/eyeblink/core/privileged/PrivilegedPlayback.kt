@@ -33,7 +33,9 @@ class PrivilegedPlaybackBackend(
         return PlaybackSnapshot(
             state = session.state,
             contentKey = session.contentKey,
-            positionMs = session.positionMs,
+            // The dump's position is where the player was when it last reported, not where it is now; for a playing
+            // session it is already seconds old and says nothing a later reading could be compared with.
+            positionMs = session.positionMs.takeUnless { session.state == PlayState.PLAYING },
             sourcePackage = session.packageName,
         )
     }

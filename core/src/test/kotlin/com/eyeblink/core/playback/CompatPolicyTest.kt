@@ -186,6 +186,17 @@ class CompatPolicyTest {
     }
 
     @Test
+    fun `a failed retest after an app update does not inherit the successes of the old version`() {
+        var r = record(Triple(Strategy.LSPOSED_HOOK, true, true), version = 100)
+        assertEquals(Strategy.LSPOSED_HOOK, CompatPolicy.best(r, setOf(Strategy.LSPOSED_HOOK), settings, installedVersionCode = 100))
+        // the app updates; the hook is tested again and fails
+        r = CompatPolicy.record(r, Strategy.LSPOSED_HOOK, false, false, 100, 9_000, fromTest = true, versionCode = 101)
+        assertEquals(0, r.stats.getValue(Strategy.LSPOSED_HOOK).pauseOk)
+        assertNull(CompatPolicy.best(r, setOf(Strategy.LSPOSED_HOOK), settings, installedVersionCode = 101))
+        assertEquals(CompatStatus.FAILING, CompatPolicy.status(r, setOf(Strategy.LSPOSED_HOOK), settings, installedVersionCode = 101))
+    }
+
+    @Test
     fun `an app update invalidates version sensitive strategies but not framework level ones`() {
         val r = record(
             Triple(Strategy.LSPOSED_HOOK, true, true),

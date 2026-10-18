@@ -254,6 +254,29 @@ class MediaSessionDumpTest {
     }
 
     @Test
+    fun `an outline hides a tag with spaces, custom actions, error texts and metadata of any shape`() {
+        val text = """
+Media button session is com.x.player/YouTube Music Session (userId=0)
+Sessions Stack - have 1 sessions:
+  YouTube Music Session com.x.player/YouTube Music Session (userId=0)
+    ownerPid=1, ownerUid=10001, userId=0
+    package=com.x.player
+    active=true
+    state=PlaybackState {state=PLAYING(3), position=777, buffered position=0, speed=1.0, updated=5, actions=823, custom actions=[Action:mName='Secret Playlist', mIcon=1], active item id=-1, error=Cannot play My Secret Song}
+    metadata: Funny cat video by SomeChannel
+    queueTitle=Secret Queue, size=4
+""".trimIndent()
+        val outline = MediaSessionDump.outline(text)
+        for (secret in listOf("YouTube", "Music", "Session ", "Secret", "Funny", "SomeChannel", "player", "Cannot play")) {
+            assertFalse("outline must not contain '$secret':\n$outline", outline.contains(secret))
+        }
+        val again = MediaSessionDump.parse(outline).sessions.single()
+        assertEquals(PlayState.PLAYING, again.state)
+        assertEquals(777L, again.positionMs)
+        assertTrue(outline.contains("actions=823"))
+    }
+
+    @Test
     fun `an outline of garbage is empty and a long dump is cut`() {
         assertEquals("", MediaSessionDump.outline("Permission Denial: can't dump"))
         val many = (1..200).joinToString("\n") { "  s$it MediaSessionRecord $it com.x.p$it/s$it (userId=0)\n    package=com.x.p$it\n    active=true" }
@@ -409,9 +432,11 @@ class PrivilegedPlaybackBackendTest {
         val (b, _) = backend(Fixtures.YOUTUBE_PLAYING_SPOTIFY_PAUSED)
         val s = b.snapshot("com.google.android.youtube")
         assertEquals(PlayState.PLAYING, s.state)
-        assertEquals(45_210L, s.positionMs)
+        assertNull("a playing session's dumped position is where it was when it last reported, not now", s.positionMs)
         assertEquals("com.google.android.youtube", s.sourcePackage)
         assertNotNull(s.contentKey)
+        // a paused one stands still, so its position is the position
+        assertEquals(1_000L, b.snapshot("com.spotify.music").positionMs)
     }
 
     @Test

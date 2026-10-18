@@ -18,8 +18,10 @@ import com.eyeblink.app.power.PowerController
 import com.eyeblink.app.store.Stores
 import com.eyeblink.app.ui.state.CompatUi
 import com.eyeblink.core.engine.BreakReport
+import com.eyeblink.core.engine.PauseSummary
 import com.eyeblink.core.engine.playbackVerdict
 import com.eyeblink.core.model.EyeBlinkSettings
+import com.eyeblink.core.playback.BlindTracker
 import com.eyeblink.core.playback.CompatOutcome
 import com.eyeblink.core.playback.CompatPolicy
 import com.eyeblink.core.playback.CompatRecord
@@ -29,6 +31,7 @@ import com.eyeblink.core.playback.PlayState
 import com.eyeblink.core.playback.PlaybackBackend
 import com.eyeblink.core.playback.Strategy
 import com.eyeblink.core.playback.StrategyTestResult
+import com.eyeblink.core.playback.Verification
 import com.eyeblink.core.privileged.Capability
 import com.eyeblink.core.privileged.PrivilegedPlaybackBackend
 import com.eyeblink.core.privileged.ShellExecutor
@@ -76,7 +79,9 @@ class CompatController(
     )
 
     private var availableCache: Set<Strategy> = emptySet()
-    private var availableAtMs = Long.MIN_VALUE
+    private var availableAtMs = 0L
+    private var availableStale = true
+    private val blind = BlindTracker()
     @Volatile var testing: String? = null
         private set
 
@@ -87,8 +92,9 @@ class CompatController(
      */
     fun available(fresh: Boolean = false): Set<Strategy> {
         val now = SystemClock.elapsedRealtime()
-        if (!fresh && now - availableAtMs < AVAILABLE_TTL_MS) return availableCache
+        if (!fresh && !availableStale && now - availableAtMs < AVAILABLE_TTL_MS) return availableCache
         availableAtMs = now
+        availableStale = false
         availableCache = buildSet {
             if (Access.listenerEnabled(app)) add(Strategy.MEDIA_SESSION)
             if (power.status.can(Capability.MEDIA_CONTROL)) add(Strategy.PRIVILEGED_SESSION)
@@ -102,8 +108,11 @@ class CompatController(
 
     /** Forgets the remembered list; kept for the call sites that know something just changed. */
     fun refreshAvailability() {
-        availableAtMs = Long.MIN_VALUE
+        availableStale = true
     }
+
+    /** What could change whether an app shows a player to read: its version and the ways EyeBlink can read players. */
+    private fun blindKey(version: Long, avail: Set<Strategy>) = "$version|${avail.sorted().joinToString(",")}"
 
     private fun backend(s: Strategy): PlaybackBackend? = when (s) {
         Strategy.MEDIA_SESSION -> mediaSession
@@ -124,11 +133,19 @@ class CompatController(
         CompatPolicy.candidates(records[target], available(fresh = true), settings().playback, versionOf(target).first)
             .mapNotNull { backend(it) }
 
-    /** Whether a break for [target] could pause its video; asked every turn of the loop, so it may use a half-second-old list. */
-    fun canPause(target: String?): Boolean = target != null && bestFor(target, fresh = false) != null
-
-    private fun bestFor(target: String, fresh: Boolean): Strategy? =
-        CompatPolicy.best(records[target], available(fresh), settings().playback, versionOf(target).first)
+    /**
+     * Whether a break for [target] could pause its video; asked every turn of the loop, so it may use a half-second-old
+     * list. A way that has not proved itself on the app counts only while the app has been showing players to read: one
+     * that shows none (a feed without a media session) is handled as the app that cannot be paused that it is.
+     */
+    fun canPause(target: String?): Boolean {
+        target ?: return false
+        val version = versionOf(target).first
+        val avail = available(fresh = false)
+        val p = settings().playback
+        if (CompatPolicy.proven(records[target], avail, p, version) != null) return true
+        return CompatPolicy.trial(records[target], avail, p, version) != null && !blind.isBlind(target, nowMs(), blindKey(version, avail))
+    }
 
     fun ui(target: String): CompatUi {
         val rec = records[target]
@@ -136,10 +153,13 @@ class CompatController(
         val (code, name) = versionOf(target)
         val avail = available()
         val stat = rec?.stats?.values?.maxByOrNull { maxOf(it.lastTestedMs, it.lastOkMs) }
+        val proven = CompatPolicy.proven(rec, avail, p, code)
+        val noSession = proven == null && blind.isBlind(target, nowMs(), blindKey(code, avail))
         return CompatUi(
             status = CompatPolicy.status(rec, avail, p, code),
-            strategy = CompatPolicy.proven(rec, avail, p, code),
-            trial = if (CompatPolicy.proven(rec, avail, p, code) == null) CompatPolicy.trial(rec, avail, p, code) else null,
+            strategy = proven,
+            trial = if (proven == null && !noSession) CompatPolicy.trial(rec, avail, p, code) else null,
+            noSession = noSession,
             lastTestedMs = stat?.let { maxOf(it.lastTestedMs, it.lastOkMs) } ?: 0L,
             available = avail.filter { CompatPolicy.allowedBySettings(it, p) }.toSet(),
             results = lastResults[target].orEmpty(),
@@ -151,6 +171,13 @@ class CompatController(
     /** Folds the outcome of a real break into the record, so a strategy is proven by use and a failing one is noticed. */
     fun recordReal(report: BreakReport) {
         val target = report.target ?: return
+        when (report.pause) {
+            PauseSummary.NO_SESSION -> blind.sawNoPlayer(target, nowMs(), blindKey(versionOf(target).first, available()))
+            // A player was there, whatever it was doing: the app is not blind.
+            PauseSummary.NOT_PLAYING, PauseSummary.PAUSED, PauseSummary.UNVERIFIED, PauseSummary.FAILED -> blind.sawPlayer(target)
+            // Nothing was learned about the app: the shell or the permission could not read, or no way was tried.
+            PauseSummary.UNREADABLE, PauseSummary.NOT_ATTEMPTED -> Unit
+        }
         val verdict = report.playbackVerdict() ?: return
         fold(target, verdict.strategy, verdict.pauseOk, verdict.resumeOk, report.endedMs - report.startedMs, fromTest = false)
         refreshAvailability()
@@ -165,6 +192,7 @@ class CompatController(
         if (testing != null) return
         testing = target
         lastResults[target] = emptyList()
+        blind.forget(target)
         onChange()
         scope.launch {
             var summary = CompatOutcomeSummary.NO_PLAYBACK
@@ -194,6 +222,10 @@ class CompatController(
                         CompatOutcome.PAUSE_NOT_VERIFIED, CompatOutcome.ERROR -> fold(target, r.strategy, false, false, r.pauseLatencyMs, fromTest = true)
                     }
                 }
+                // Did any way that reads players find one? Then the app is not blind; if every one of them found none, it is.
+                val readers = report.results.filter { it.strategy.verification == Verification.SESSION_STATE }
+                if (readers.any { !it.outcome.noPlayer }) blind.sawPlayer(target)
+                else if (readers.isNotEmpty()) blind.markBlind(target, nowMs(), blindKey(versionOf(target).first, available(fresh = true)))
                 summary = when {
                     report.anyPassed -> CompatOutcomeSummary.VERIFIED
                     report.leftPaused -> CompatOutcomeSummary.LEFT_PAUSED

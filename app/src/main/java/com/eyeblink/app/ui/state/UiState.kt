@@ -72,6 +72,8 @@ data class CompatUi(
     val versionName: String = "",
     /** What the next break will try, while nothing has been proven: a way that can read the player back. */
     val trial: Strategy? = null,
+    /** Several breaks in a row found no player to read: the app shows no media session, so nothing can be paused through one. */
+    val noSession: Boolean = false,
 )
 
 enum class CalibrationStage { INTRO, RUNNING, RESULT }

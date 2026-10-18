@@ -21,6 +21,9 @@ enum class CompatOutcome {
 
     /** The strategy never got to pause anything, for a reason that says nothing against it. */
     val sawNothing: Boolean get() = this == NOT_PLAYING || this == NO_SESSION || this == UNREADABLE
+
+    /** The strategy looked and found no player (as opposed to one that was not playing, or could not look at all). */
+    val noPlayer: Boolean get() = this == NO_SESSION || this == UNREADABLE
 }
 
 data class StrategyTestResult(
@@ -87,7 +90,7 @@ class CompatTester(private val coordinator: PlaybackCoordinator = PlaybackCoordi
     ): StrategyTestResult {
         val strategy = backend.strategy
         return try {
-            when (val paused = coordinator.pause(backend, target, nowMs)) {
+            when (val paused = coordinator.pause(backend, target, nowMs = nowMs)) {
                 is PauseResult.NotPlaying -> StrategyTestResult(
                     strategy,
                     when (paused.saw) {
@@ -98,9 +101,14 @@ class CompatTester(private val coordinator: PlaybackCoordinator = PlaybackCoordi
                 )
                 is PauseResult.Failed -> StrategyTestResult(strategy, CompatOutcome.ERROR, note = paused.error)
                 is PauseResult.Unverified -> {
-                    // Whatever happened, try to leave the player as we found it.
-                    coordinator.resume(backend, paused.token) { envFor(nowMs, foregroundPackage) }
-                    StrategyTestResult(strategy, CompatOutcome.PAUSE_NOT_VERIFIED, nowMs() - started)
+                    // Whatever happened, try to leave the player as we found it. A resume is only sent to a player found
+                    // paused, so one that worked shows that the pause did land - late, which is slow but works.
+                    val back = coordinator.resume(backend, paused.token) { envFor(nowMs, foregroundPackage) }
+                    if (back == ResumeResult.Resumed) {
+                        StrategyTestResult(strategy, CompatOutcome.PASSED, nowMs() - started, note = "the pause showed up late")
+                    } else {
+                        StrategyTestResult(strategy, CompatOutcome.PAUSE_NOT_VERIFIED, nowMs() - started)
+                    }
                 }
                 is PauseResult.Paused -> {
                     val latency = nowMs() - started

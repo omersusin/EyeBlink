@@ -10,6 +10,7 @@ import com.eyeblink.core.playback.PlayState
 import com.eyeblink.core.playback.ResumeEnvironment
 import com.eyeblink.core.playback.ResumeResult
 import com.eyeblink.core.playback.Strategy
+import com.eyeblink.core.playback.Verification
 import com.eyeblink.core.rest.RestOutcome
 import com.eyeblink.core.rest.RestRequest
 import com.eyeblink.core.rest.RestSession
@@ -160,11 +161,19 @@ class BreakDirector(
             // 2. Pause and verify - only for a proven backend and only a player that is playing.
             if (target != null && settings.playback.pauseDuringBreaks && (profile?.pauseVideo != false)) {
                 var sawNoPlayer = false
+                var asked = false
                 for (candidate in env.backendsFor(target)) {
+                    // Once one backend has been asked, only those that read the player's own state may be asked after it:
+                    // a blind one is no reason to reach for a way that cannot tell whose sound it is (a media key would
+                    // pause whatever else is playing).
+                    if (asked && candidate.strategy.verification != Verification.SESSION_STATE) continue
+                    asked = true
                     strategy = candidate.strategy
                     backend = candidate
                     var next = false
-                    when (val r = coordinator.pause(candidate, target, env::nowMs)) {
+                    // The token is held from the moment a command may go out, so that a break cancelled while the pause is
+                    // still being confirmed (Stop everything, the tile) can still give the video back.
+                    when (val r = coordinator.pause(candidate, target, onSending = { token = it }, nowMs = env::nowMs)) {
                         is PauseResult.Paused -> { token = r.token; pause = PauseSummary.PAUSED; failure = null }
                         is PauseResult.Unverified -> { token = r.token; pause = PauseSummary.UNVERIFIED; failure = null }
                         is PauseResult.NotPlaying -> {
@@ -178,7 +187,7 @@ class BreakDirector(
                             }
                         }
                         // Nothing was delivered, so nothing has happened to the video: the next backend may try.
-                        is PauseResult.Failed -> { pause = PauseSummary.FAILED; failure = r.error; next = true }
+                        is PauseResult.Failed -> { token = null; pause = PauseSummary.FAILED; failure = r.error; next = true }
                     }
                     if (!next) break
                 }

@@ -45,6 +45,9 @@ class RootPauseEndToEndTest {
     /** `dumpsys` and the key commands cost time, and the player follows a key a while after it was sent. */
     private class FakePhone(private val scope: TestScope) {
         var state = 3 // PlaybackState.STATE_PLAYING
+        /** Where the player really is; the dump of a playing session still says where it was when it last reported. */
+        var truePositionMs = 45_210L
+        private var lastReportedMs = 45_210L
         var buttonHolder: String? = YOUTUBE
         var dumpMs = 300L
         var keyMs = 100L
@@ -56,8 +59,19 @@ class RootPauseEndToEndTest {
         private fun now() = scope.testScheduler.currentTime
 
         private fun settle() {
-            pending?.let { (at, s) -> if (now() >= at) { state = s; pending = null } }
+            pending?.let { (at, s) ->
+                if (now() >= at) {
+                    // a player reports its real position when its state changes
+                    if (s != 3) lastReportedMs = 45_210L + (at - startedAt)
+                    state = s
+                    pending = null
+                }
+            }
         }
+
+        private val startedAt = scope.testScheduler.currentTime
+
+        private fun stateName() = if (state == 3) "PLAYING" else "PAUSED"
 
         fun dump(): String {
             settle()
@@ -70,7 +84,7 @@ Sessions Stack - have 2 sessions:
     ownerPid=12345, ownerUid=10234, userId=0
     package=$YOUTUBE
     active=true
-    state=PlaybackState {state=$state, position=45210, buffered position=60000, speed=1.0, updated=123456789, actions=823, custom actions=[], active item id=-1, error=null}
+    state=PlaybackState {state=${stateName()}($state), position=${if (state == 3) 45210L else lastReportedMs}, buffered position=60000, speed=1.0, updated=123456789, actions=823, custom actions=[], active item id=-1, error=null}
     metadata: size=5, description=Funny cat compilation, SomeChannel, null
   spotify $SPOTIFY/spotify (userId=0)
     package=$SPOTIFY
@@ -154,6 +168,18 @@ Sessions Stack - have 2 sessions:
         assertEquals(3, phone.state)
         val verdict = report.playbackVerdict()!!
         assertTrue("a late pause is a success, not a failure to learn from", verdict.pauseOk && verdict.resumeOk)
+    }
+
+    @Test
+    fun `a late pause is still given back when the player has moved on by seconds meanwhile`() = runTest {
+        // The dump of a playing session says where the player was when it last reported; when the late pause lands the
+        // player reports where it really is, several seconds on. That is time passing, not the person scrubbing.
+        val phone = FakePhone(this).apply { followsKeyAfterMs = 3_200 }
+        val backend = PrivilegedPlaybackBackend(phone.shell) { testScheduler.currentTime }
+        val report = BreakDirector(Overlay(this), coordinator(), Env(this, backend)).run(BreakRequest(BreakKind.MICRO, YOUTUBE), settings)
+        assertEquals(PauseSummary.UNVERIFIED, report.pause)
+        assertEquals(ResumeSummary.RESUMED, report.resume)
+        assertEquals("the video is playing again", 3, phone.state)
     }
 
     @Test

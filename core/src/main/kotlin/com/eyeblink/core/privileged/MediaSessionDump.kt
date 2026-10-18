@@ -143,48 +143,59 @@ object MediaSessionDump {
     }
 
     private val OUTLINE_PREFIXES = listOf(
-        "Record for full_user=", "Sessions Stack", "ownerPid=", "package=", "active=", "flags=", "controllers:", "state=",
-        "audioAttrs=", "volumeType=", "metadata:", "queueTitle=",
+        "Record for full_user=", "Sessions Stack", "ownerPid=", "package=", "active=", "flags=", "controllers:", "volumeType=",
     )
-    private val SESSION_ALIAS = Regex("""(app\d+\.pkg)/(\S+)""")
+    private val USER_ID_SUFFIX = Regex("""\(userId=\d+\)\s*$""")
+    private val TAGS = Regex("""tags=\S*""")
+    private val METADATA_SIZE = Regex("""size=\d+""")
 
     /**
      * A copy of a dump that can go into a bug report: its shape, the playback states and the numbers stay; package
-     * names and session tags become placeholders, and titles, artists and intents - everything that says what is
-     * being watched or listened to - are dropped. It exists so that a dump format this parser does not understand
-     * can be fixed without anybody sending their media sessions around.
+     * names and session tags become placeholders, and titles, artists, intents, custom actions and error texts -
+     * everything that can say what is being watched or listened to, or by which app - are dropped. The lines that
+     * name a session are rewritten whole (a tag may contain spaces), not edited. It exists so that a dump format this
+     * parser does not understand can be fixed without anybody sending their media sessions around.
      */
     fun outline(text: String, maxLines: Int = 60): String {
         val dump = parse(text)
         val aliases = LinkedHashMap<String, String>()
+        // Placeholders that look like package names, so that the outline reads back with the same parser.
+        fun alias(pkg: String) = aliases.getOrPut(pkg) { "app${aliases.size + 1}.pkg" }
         val packages = (dump.sessions.map { it.packageName } + listOfNotNull(dump.mediaButtonPackage))
             .distinct().sortedByDescending { it.length }
-        // Placeholders that look like package names, so that the outline reads back with the same parser.
-        packages.forEach { aliases.getOrPut(it) { "app${aliases.size + 1}.pkg" } }
+        packages.forEach { alias(it) }
+        fun aliasIn(line: String) = PACKAGE_SLASH.find(line)?.let { alias(it.groupValues[1]) }
+        fun userId(line: String) = USER_ID_SUFFIX.find(line)?.value?.trim()?.let { " $it" } ?: ""
 
         val out = ArrayList<String>()
         for (raw in text.lineSequence()) {
             val line = raw.trimEnd()
             val t = line.trimStart()
-            val keep = BUTTON_LINE.containsMatchIn(line) || HEADER_LINE.containsMatchIn(line) || OUTLINE_PREFIXES.any { t.startsWith(it) }
-            if (!keep) continue
-
-            var s = line
-            if (t.startsWith("metadata:")) s = s.substringBefore("description=") + "description=…"
-            if (t.startsWith("queueTitle=")) s = "${s.substring(0, s.indexOf("queueTitle="))}queueTitle=…, size=${s.substringAfterLast("size=", "?")}"
-            for (p in packages) s = s.replace(p, aliases.getValue(p))
-            // "app1/SomeTag" (Android 15: "app1/SomeTag/uniqueId"): the tag may name the app or the content, and is
-            // printed again in front of the line, so every part of it goes wherever it appears.
-            SESSION_ALIAS.find(s)?.let { m ->
-                for (part in m.groupValues[2].split('/').filter { it.isNotEmpty() }) {
-                    s = s.replace(Regex("(?<![A-Za-z0-9_])" + Regex.escape(part) + "(?![A-Za-z0-9_])"), "tag")
+            val indent = line.substring(0, line.length - t.length)
+            val kept: String = when {
+                BUTTON_LINE.containsMatchIn(line) -> "${indent}Media button session is ${aliasIn(line)?.let { "$it/tag" } ?: "null"}${userId(line)}"
+                HEADER_LINE.containsMatchIn(line) -> "${indent}tag ${aliasIn(line)?.let { "$it/tag" } ?: "tag"}${userId(line)}"
+                t.startsWith("state=") -> indent + cutState(t)
+                t.startsWith("metadata:") -> "${indent}metadata: ${METADATA_SIZE.find(t)?.value ?: "…"}, description=…"
+                t.startsWith("queueTitle=") -> "${indent}queueTitle=…, size=${t.substringAfterLast("size=", "?")}"
+                t.startsWith("audioAttrs=") -> indent + t.replace(TAGS, "tags=…")
+                OUTLINE_PREFIXES.any { t.startsWith(it) } -> {
+                    var copy = line
+                    for (pkg in packages) copy = copy.replace(pkg, alias(pkg))
+                    copy
                 }
+                else -> continue
             }
-            if (t.startsWith("audioAttrs=")) s = s.replace(Regex("""tags=\S*"""), "tags=…")
-            out += s
+            out += kept
             if (out.size >= maxLines) break
         }
         return out.joinToString("\n")
+    }
+
+    /** The playback state line up to the numbers: custom action names and the error text are the app's own words. */
+    private fun cutState(t: String): String {
+        val cut = listOf(t.indexOf(", custom actions="), t.indexOf(", error")).filter { it >= 0 }.minOrNull() ?: return t
+        return t.substring(0, cut) + "}"
     }
 }
 

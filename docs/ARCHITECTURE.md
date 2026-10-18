@@ -126,8 +126,11 @@ checks that the pause landed and resumes only what it paused, so a first attempt
 folded into the app's record - the first successful break verifies the app, three failures in a row switch the strategy off. Strategies that can only
 see "is any audio playing" (media key, audio focus, tap) are never tried without a passed test. A break asks the candidates in order (proven ones by rank, then the
 ones worth trying, fewest failures first) and moves on to the next when one cannot see the player or cannot deliver its command - that costs the video nothing -
-but never after a command has gone out; so a way that is blind on this phone (notification access listed but not working, say) cannot stand in the way of
-root reading the very same sessions. Which strategies are *available* is read from the live
+but never after a command has gone out, and only to ways that read the player's own state (a blind precise way is no reason to reach for a media key, which would
+pause whatever else is playing); so a way that is blind on this phone (notification access listed but not working, say) cannot stand in the way of
+root reading the very same sessions. An app for which three breaks in a row found no session at all (`BlindTracker`; forgotten after 12 h, after an app update and
+when the available ways change) stops counting as "will try": the scheduler treats it as an app that cannot be paused. The token for a pause is handed to the break
+director *before* the command goes out, so a break cancelled while the pause is still being confirmed (Stop everything, the tile) still gives the video back. Which strategies are *available* is read from the live
 state of the permissions and of the privileged shell on every use, never remembered from start-up, because root and Shizuku finish connecting after the app starts.
 
 The coordinator counts the time a look at the player costs (a `dumpsys` through `su` takes a few hundred milliseconds) as waiting time, waits up to 2.5 s for a

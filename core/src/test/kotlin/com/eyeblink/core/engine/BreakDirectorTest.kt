@@ -274,6 +274,26 @@ class BreakDirectorTest {
         assertEquals("one that could look and found no session outweighs one that could not look", PauseSummary.NO_SESSION, rig3.director.run(micro(), settings).pause)
     }
 
+    @Test
+    fun `a blind backend is never followed by a way that cannot tell whose sound it is`() = runTest {
+        // A feed with no session while another app plays music: a media key would pause the music.
+        val key = spare(Strategy.MEDIA_KEY)
+        val rig = Rig(this, later = listOf(key))
+        rig.player!!.state = PlayState.NONE
+        val report = rig.director.run(micro(), settings)
+        assertEquals(PauseSummary.NO_SESSION, report.pause)
+        assertTrue("the media key was never sent", key.commands.isEmpty())
+
+        // ...but a way that reads the player's own state still is
+        val precise = spare(Strategy.PRIVILEGED_SESSION)
+        val rig2 = Rig(this, later = listOf(key, precise))
+        rig2.player!!.state = PlayState.NONE
+        val report2 = rig2.director.run(micro(), settings)
+        assertEquals(PauseSummary.PAUSED, report2.pause)
+        assertTrue(key.commands.isEmpty())
+        assertEquals(listOf("pause", "play"), precise.commands)
+    }
+
     // --- re-check ----------------------------------------------------------
 
     @Test
@@ -328,6 +348,35 @@ class BreakDirectorTest {
         job.join()
         assertTrue(rig.overlay.clears >= 1)
         assertEquals("emergency stop must not strand a paused video", PlayState.PLAYING, rig.player.state)
+    }
+
+    @Test
+    fun `cancelling while the pause is still being confirmed still gives the video back`() = runTest {
+        // A phone that takes a second to act on the key: the break is cancelled (Stop everything, the tile) at 300 ms,
+        // after the command went out and before the pause was seen. The video must not be left paused.
+        val rig = Rig(this)
+        rig.player!!.latencyMs = 1_000
+        val job = launch { rig.director.run(micro(), settings) }
+        advanceTimeBy(300)
+        runCurrent()
+        assertEquals("the command is out", listOf("pause"), rig.commands())
+        job.cancel(CancellationException("emergency stop"))
+        job.join()
+        assertEquals("the video was given back", PlayState.PLAYING, rig.player.state)
+        assertEquals(listOf("pause", "play"), rig.commands())
+    }
+
+    @Test
+    fun `cancelling while a pause is being confirmed on a player that never obeyed leaves it playing and sends nothing more`() = runTest {
+        val rig = Rig(this)
+        rig.player!!.obeysPause = false
+        val job = launch { rig.director.run(micro(), settings) }
+        advanceTimeBy(300)
+        runCurrent()
+        job.cancel()
+        job.join()
+        assertEquals(PlayState.PLAYING, rig.player.state)
+        assertEquals("a player that was never paused is not sent a play", listOf("pause"), rig.commands())
     }
 
     @Test

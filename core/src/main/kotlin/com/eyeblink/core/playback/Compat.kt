@@ -168,7 +168,11 @@ object CompatPolicy {
         versionCode: Long = record.versionCode,
         versionName: String = record.versionName,
     ): CompatRecord {
-        val old = record.stats[strategy] ?: StrategyStat()
+        // A version bump drops results that depended on the old build's internals - before this attempt is folded in,
+        // so that a failed retest does not inherit the successes of a build that is gone.
+        val bumped = versionCode != record.versionCode && versionCode != 0L
+        val kept = if (bumped) record.stats.filterKeys { !it.versionSensitive } else record.stats
+        val old = kept[strategy] ?: StrategyStat()
         val ok = pauseVerified && resumeVerified
         val next = old.copy(
             pauseOk = old.pauseOk + if (pauseVerified) 1 else 0,
@@ -182,12 +186,6 @@ object CompatPolicy {
             lastLatencyMs = latencyMs,
             testPassed = if (fromTest) ok else old.testPassed,
         )
-        // A version bump drops results that depended on the old build's internals.
-        val survives = if (versionCode != record.versionCode && versionCode != 0L) {
-            record.stats.filterKeys { !it.versionSensitive }
-        } else {
-            record.stats
-        }
-        return record.copy(versionCode = versionCode, versionName = versionName, stats = survives + (strategy to next))
+        return record.copy(versionCode = versionCode, versionName = versionName, stats = kept + (strategy to next))
     }
 }
