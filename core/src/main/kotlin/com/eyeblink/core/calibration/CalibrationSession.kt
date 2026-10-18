@@ -74,7 +74,7 @@ class CalibrationSession(
     val closure: Float get() = detector.closure
 
     /** The depth at which the detector currently starts counting a closure, in the same terms as [closure]. */
-    val startDepth: Float get() = detector.settings.start
+    val startDepth: Float get() = detector.startDepth
 
     /** A suggestion for the person, or [Hint.NONE]. Only the deliberate phase has any. */
     val hint: Hint
@@ -83,7 +83,7 @@ class CalibrationSession(
             if (detector.isShut) return Hint.OPEN_BETWEEN
             val eased = easedAtMs
             if (eased != null && lastSampleAtMs - eased < HINT_HOLD_MS) return Hint.EASED
-            if (trackedSinceCountMs >= CLOSE_MORE_AFTER_MS && peakSinceCount < detector.settings.start) return Hint.CLOSE_MORE
+            if (trackedSinceCountMs >= CLOSE_MORE_AFTER_MS && peakSinceCount < detector.startDepth) return Hint.CLOSE_MORE
             return Hint.NONE
         }
 
@@ -196,6 +196,14 @@ class CalibrationSession(
         if (phase == Phase.DELIBERATE) trackDeliberate(sample, blink)
         lastSampleAtMs = sample.timestampMs
         return if (blink != null && onBlink(blink)) blink else null
+    }
+
+    /**
+     * A picture with no face in it. It says nothing about the eyes and leaves the detector alone (a gap that lasts is noticed
+     * when the next picture arrives), but the time between the pictures on either side of it is not tracked time.
+     */
+    fun onNoFace() {
+        tallies.getValue(phase).lastSampleMs = null
     }
 
     /**
@@ -355,7 +363,7 @@ class CalibrationSession(
             singleFrameDepth = start + 0.12f,
             useBlinkScore = true,
             // Nobody keeps their eyes shut for half a minute to make a blink count; whatever that is, it is not a measurement.
-            shutForgetMs = BlinkDetector.SHUT_FORGET_SCORE_MS,
+            shutForgetMs = DELIBERATE_SHUT_FORGET_MS,
         ).scaled(sensitivity)
     }
 
@@ -389,6 +397,9 @@ class CalibrationSession(
 
         /** Closing the eyes on purpose can be slow and held; a closure is a deliberate blink for up to this long. */
         const val DELIBERATE_MAX_DURATION_MS = 3_000L
+
+        /** Eyes that look shut stay shut for this long in the deliberate step, whatever tells so: nobody holds them for a blink. */
+        private const val DELIBERATE_SHUT_FORGET_MS = 600_000L
 
         /** Tracked time without a counted deliberate blink after which the test eases by one step. */
         const val EASE_AFTER_MS = 8_000L

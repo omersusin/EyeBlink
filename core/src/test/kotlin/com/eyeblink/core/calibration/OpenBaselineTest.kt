@@ -30,6 +30,17 @@ class OpenBaselineTest {
     }
 
     @Test
+    fun `when the readings run out the last level they made stands in, not the seed`() {
+        val b = OpenBaseline().apply { seed = 0.55f }
+        b.feed(0, 2_000) { 0.40f }
+        assertEquals(0.40f, b.level(2_000)!!, 0.001f)
+        // The camera sleeps for a minute: the window is empty, and the best guess is what the eye read last.
+        assertEquals(0.40f, b.level(62_000)!!, 0.001f)
+        b.clear()
+        assertNull("clearing forgets that too", b.level(62_000))
+    }
+
+    @Test
     fun `the level is the open eye and blinks hardly move it`() {
         val b = OpenBaseline()
         b.feed(0, 8_000) { t -> if (t % 3_000L < 150) 0.10f else 0.62f }   // a blink every 3 s, 150 ms each

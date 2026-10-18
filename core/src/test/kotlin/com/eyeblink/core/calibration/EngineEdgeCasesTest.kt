@@ -243,6 +243,129 @@ class EngineEdgeCasesTest {
         assertEquals(1, found.size)
     }
 
+    // --- 6. what the face model really says is not known: nothing may hang on an exact score ------------------------------
+
+    @Test
+    fun `eyes shut are shut whatever the shut score reads, as long as the lids agree`() {
+        for (shutScore in listOf(0.60f, 0.72f, 0.95f)) {
+            val random = java.util.Random(13)
+            val p = TrackingPipeline(BlinkThresholds.fromCalibration(openLevel = 0.60f, fullDepth = 0.75f))
+            val found = mutableListOf<BlinkObservation>()
+            var t = 0L
+            while (t < 3_000) { p.onFrame(frame(t, jitter(random, 0.60f), 0.06f)).blink?.let { found += it }; t += 66 }
+            while (t < 123_000) { p.onFrame(frame(t, jitter(random, 0.05f), shutScore)).blink?.let { found += it }; t += 66 }
+            assertTrue("shut score $shutScore: blinks while shut: ${found.map { it.startMs }.take(10)}", found.isEmpty())
+            val credited = p.rate.observed(t).trackedMs
+            assertTrue("shut score $shutScore: $credited ms credited", credited < 10_000)
+        }
+    }
+
+    @Test
+    fun `the deliberate test is not completed by shut eyes whatever the shut score reads`() {
+        for (shutScore in listOf(0.60f, 0.70f, 0.95f)) {
+            val random = java.util.Random(5)
+            val s = CalibrationSession(videoMs = 1_000, readingMs = 1_000, deliberateBlinksRequired = 3)
+            s.start(0); s.skipPhase(0); s.skipPhase(0)
+            var t = 0L
+            while (t < 2_000) { s.process(sample(t, jitter(random, 0.60f), 0.06f)); t += 33 }
+            while (t < 60_000) { s.process(sample(t, jitter(random, 0.06f), shutScore)); t += 33 }
+            assertEquals("shut score $shutScore: counted ${s.instructed.size}", 0, s.instructed.size)
+        }
+    }
+
+    @Test
+    fun `a rest that begins while the camera is off is a rest when the next burst finds it`() {
+        val random = java.util.Random(17)
+        val p = TrackingPipeline(BlinkThresholds.fromCalibration(openLevel = 0.60f, fullDepth = 0.75f))
+        val found = mutableListOf<BlinkObservation>()
+        var t = 0L
+        // One burst of open eyes, then the camera sleeps and wakes for eight seconds every 53 s while the eyes are shut.
+        while (t < 8_000) { p.onFrame(frame(t, jitter(random, 0.60f), 0.06f)).blink?.let { found += it }; t += 66 }
+        val opened = found.size
+        var frames = 0
+        var counted = 0
+        for (k in 1..3) {
+            t = k * 53_000L
+            val from = t
+            while (t < from + 8_000) {
+                val ev = p.onFrame(frame(t, jitter(random, 0.05f), 0.95f))
+                ev.blink?.let { found += it }
+                frames++
+                if (ev.trackable) counted++
+                t += 66
+            }
+        }
+        assertEquals("blinks in the bursts of a rest: ${found.drop(opened).map { it.startMs }}", opened, found.size)
+        // The first second of each burst is a closure that has not outlasted a blink yet; after that nothing is evidence.
+        assertTrue("$counted of $frames frames of a rest counted as evidence", counted < frames * 0.25)
+    }
+
+    @Test
+    fun `a score that rises while the eyes are open and the gaze is down does not blind the detector for long`() {
+        val random = java.util.Random(19)
+        val p = TrackingPipeline(BlinkThresholds.fromCalibration(openLevel = 0.60f, fullDepth = 0.75f))
+        val found = mutableListOf<BlinkObservation>()
+        val blinkTimes = (1..39).map { it * 3_000L }
+        var t = 0L
+        while (t < 120_000) {
+            val base = if (t < 5_000) 0.60f else 0.42f
+            val restScore = if (t < 5_000) 0.06f else 0.85f
+            val blink = blinkTimes.any { t >= it && t < it + 3 * 66 }
+            p.onFrame(frame(t, jitter(random, if (blink) 0.05f else base), if (blink) 0.95f else restScore)).blink?.let { found += it }
+            t += 66
+        }
+        val late = blinkTimes.filter { it >= 90_000 }
+        val hit = late.count { e -> found.any { kotlin.math.abs(it.startMs - e) <= 400 } }
+        assertTrue("found $hit of ${late.size} blinks in the last half minute", hit >= late.size * 0.8)
+    }
+
+    @Test
+    fun `squeezed shut and then relaxed shut, with the score saying so, is still shut`() {
+        val random = java.util.Random(23)
+        val p = TrackingPipeline()
+        val found = mutableListOf<BlinkObservation>()
+        var t = 0L
+        while (t < 3_000) { p.onFrame(frame(t, jitter(random, 0.60f), 0.06f)).blink?.let { found += it }; t += 66 }
+        while (t < 4_000) { p.onFrame(frame(t, jitter(random, 0.05f), 0.95f)).blink?.let { found += it }; t += 66 }
+        while (t < 24_000) { p.onFrame(frame(t, jitter(random, 0.45f), 0.95f)).blink?.let { found += it }; t += 66 }
+        assertTrue("blinks while the eyes were shut: ${found.map { it.startMs }.take(10)}", found.isEmpty())
+        assertTrue("credited ${p.rate.observed(t).trackedMs} ms", p.rate.observed(t).trackedMs < 6_000)
+    }
+
+    // --- 7. the open level of an eye is remembered between bursts -------------------------------------------------------
+
+    @Test
+    fun `a burst starts from the open level the last one ended with, however many times the detector has relearned`() {
+        val random = java.util.Random(29)
+        val p = TrackingPipeline(BlinkThresholds.fromCalibration(openLevel = 0.60f, fullDepth = 0.75f))
+        var t = 0L
+        // A change of posture: the lids settle at 0.34 and stay, the detector relearns what open is, the burst ends...
+        while (t < 3_000) { p.onFrame(frame(t, jitter(random, 0.60f), 0.06f)); t += 66 }
+        while (t < 12_000) { p.onFrame(frame(t, jitter(random, 0.34f), 0.06f)); t += 66 }
+        // ...and 45 s later the next one opens with a blink straight away: the second frame is the closing one.
+        t = 57_000
+        p.onFrame(frame(t, 0.34f, 0.06f)); t += 66
+        p.onFrame(frame(t, 0.05f, 0.95f)); t += 66
+        p.onFrame(frame(t, 0.05f, 0.95f)); t += 66
+        assertNotNull("no blind frames at the start of the burst", p.onFrame(frame(t, 0.34f, 0.06f)).blink)
+    }
+
+    // --- 8. pictures with no face at all are not tracked time -----------------------------------------------------------
+
+    @Test
+    fun `pictures with no face are not credited as tracked time by the calibration`() {
+        val s = CalibrationSession(videoMs = 60_000, readingMs = 60_000, deliberateBlinksRequired = 3)
+        s.start(0)
+        var t = 0L
+        var n = 0
+        while (t < 10_000) {
+            if (n++ % 3 == 2) s.onNoFace() else s.process(sample(t, 0.60f))
+            t += 33
+        }
+        val tracked = s.result().phases.getValue(CalibrationSession.Phase.VIDEO).trackedMs
+        assertTrue("$tracked ms tracked of 10 s with every third picture empty", tracked in 3_000L..7_000L)
+    }
+
     // --- 5. a seed that is right ----------------------------------------------------------------------------------------
 
     @Test

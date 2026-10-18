@@ -39,7 +39,7 @@ class TrackingPipeline(thresholds: BlinkThresholds = BlinkThresholds(), sensitiv
     val closure: Float get() = detector.closure
 
     /** The closure at which the detector currently starts counting a blink, in the same terms as [closure]. */
-    val startDepth: Float get() = detector.settings.start
+    val startDepth: Float get() = detector.startDepth
 
     val rate = BlinkRateTracker()
 

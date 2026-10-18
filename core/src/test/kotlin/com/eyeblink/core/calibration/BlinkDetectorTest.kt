@@ -432,11 +432,11 @@ class BlinkDetectorTest {
         val d = BlinkDetector().apply { seed(0.80f) }
         val reported = mutableListOf<BlinkObservation>()
         var t = 0L
-        while (t < 1_300) { d.onSample(sample(t, 0.50f))?.let { reported += it }; t += 66 }
+        while (t < 2_000) { d.onSample(sample(t, 0.50f))?.let { reported += it }; t += 66 }
         assertTrue("those frames are not a blink", reported.isEmpty())
         assertFalse("and the detector is not stuck in a closure it can never end", d.isClosed)
-        d.onSample(sample(1_300, 0.08f)); d.onSample(sample(1_366, 0.08f))
-        assertNotNull("a blink 1.3 s into the session is seen", d.onSample(sample(1_432, 0.50f)))
+        d.onSample(sample(2_000, 0.08f)); d.onSample(sample(2_066, 0.08f))
+        assertNotNull("a blink 2 s into the session is seen", d.onSample(sample(2_132, 0.50f)))
     }
 
     @Test
@@ -464,6 +464,58 @@ class BlinkDetectorTest {
         d.onSample(s(2_000, 0.10f)); d.onSample(s(2_066, 0.10f))
         assertFalse("the closure is a number", d.closure.isNaN())
         assertNotNull("and the eyelids alone still see the blink", d.onSample(s(2_132, 0.50f)))
+    }
+
+    // --- the jitter of the readings is not a blink ------------------------------------------------------------------
+
+    private fun noisy(d: BlinkDetector, level: Float, jitter: Float, fromMs: Long, toMs: Long, stepMs: Long = 33, seed: Long = 3): List<BlinkObservation> {
+        val random = java.util.Random(seed)
+        val found = mutableListOf<BlinkObservation>()
+        var t = fromMs
+        while (t < toMs) {
+            val v = (level + (random.nextGaussian() * jitter).toFloat()).coerceIn(0f, 1f)
+            d.onSample(sample(t, v))?.let { found += it }
+            t += stepMs
+        }
+        return found
+    }
+
+    @Test
+    fun `a level that was learned from readings that are all jitter cannot turn the jitter into blinks`() {
+        // What shut eyes taken for open ones look like: 0.15 with a jitter of 0.02 (13 % of it), and a start threshold as low as
+        // the deliberate test eases to.
+        val d = BlinkDetector(DetectorSettings(start = 0.20f, end = 0.08f))
+        val found = noisy(d, level = 0.15f, jitter = 0.02f, fromMs = 0, toMs = 120_000)
+        assertTrue("${found.size} phantom blinks in two minutes", found.size <= 6)
+        assertTrue("the start threshold the detector works with: ${d.startDepth}", d.startDepth > 0.30f)
+        // A decisive blink is still a blink (reported a moment later than usual: the jitter keeps the closure from ending at once).
+        var t = 120_000L
+        d.onSample(sample(t, 0.02f)); t += 33
+        d.onSample(sample(t, 0.02f)); t += 33
+        d.onSample(sample(t, 0.02f)); t += 33
+        var blink: BlinkObservation? = null
+        while (t < 121_000 && blink == null) { blink = d.onSample(sample(t, 0.15f)); t += 33 }
+        assertNotNull(blink)
+    }
+
+    @Test
+    fun `an eye that is merely noisy is not held back`() {
+        // A heavy-lidded eye: 0.31 open with a jitter of 7 % of it, thresholds fitted to its half-closed blinks.
+        val d = BlinkDetector(DetectorSettings(start = 0.27f, end = 0.11f))
+        noisy(d, level = 0.31f, jitter = 0.0217f, fromMs = 0, toMs = 20_000)
+        assertEquals("the gate is below the fitted start", 0.27f, d.startDepth, 0.001f)
+        var t = 20_000L
+        d.onSample(sample(t, 0.17f)); t += 33
+        d.onSample(sample(t, 0.15f)); t += 33
+        d.onSample(sample(t, 0.17f)); t += 33
+        assertNotNull("a blink that closes it by 45 % is seen", d.onSample(sample(t, 0.31f)))
+    }
+
+    @Test
+    fun `a quiet eye is judged by the thresholds it was given`() {
+        val d = BlinkDetector()
+        noisy(d, level = 0.60f, jitter = 0.01f, fromMs = 0, toMs = 10_000)
+        assertEquals(BlinkDetector.DEFAULT_START, d.startDepth, 0.001f)
     }
 
     @Test

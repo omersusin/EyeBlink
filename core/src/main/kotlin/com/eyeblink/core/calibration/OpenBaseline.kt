@@ -33,6 +33,12 @@ class OpenBaseline(
     /** A level known from an earlier session, used until this one has gathered readings of its own. */
     var seed: Float? = null
 
+    /**
+     * The last level the readings themselves made. When they run out - the camera slept for longer than the window, as it does
+     * between two bursts - this is the best guess there is, better than a [seed] from a calibration made hours ago.
+     */
+    private var last: Float? = null
+
     /** How many readings the window holds. */
     val count: Int get() = size
 
@@ -45,33 +51,29 @@ class OpenBaseline(
         cachedFresh = false
     }
 
-    /** True once the readings of the last window are enough to make a level of their own, so the [seed] is no longer needed. */
-    fun hasLevel(nowMs: Long): Boolean {
-        evict(nowMs)
-        return size >= MIN_SAMPLES
-    }
-
     /**
-     * The open level at [nowMs]: the percentile of the readings of the last window, the [seed] while
-     * there are too few of them, or null when neither exists yet.
+     * The open level at [nowMs]: the percentile of the readings of the last window; while there are too few of them the last
+     * level they made, or the [seed]; or null when none of these exists yet.
      */
     fun level(nowMs: Long): Float? {
         evict(nowMs)
-        if (size < MIN_SAMPLES) return seed
+        if (size < MIN_SAMPLES) return last ?: seed
         if (cachedFresh) return cached
         val oldest = (head - size + capacity) % capacity
         for (i in 0 until size) scratch[i] = values[(oldest + i) % capacity]
         Arrays.sort(scratch, 0, size)
         cached = scratch[((size - 1) * percentile).toInt().coerceIn(0, size - 1)]
         cachedFresh = true
+        last = cached
         return cached
     }
 
-    /** Forgets every reading. The seed is dropped as well: whatever it described, it no longer does. */
+    /** Forgets every reading. The seed and the last level are dropped as well: whatever they described, they no longer do. */
     fun clear() {
         size = 0
         head = 0
         seed = null
+        last = null
         cachedFresh = false
     }
 
