@@ -79,14 +79,32 @@ object CompatPolicy {
         available: Set<Strategy>,
         settings: PlaybackSettings,
         installedVersionCode: Long = 0L,
-    ): Strategy? {
-        if (record == null) return null
+    ): Strategy? = provenAll(record, available, settings, installedVersionCode).firstOrNull()
+
+    private fun provenAll(
+        record: CompatRecord?,
+        available: Set<Strategy>,
+        settings: PlaybackSettings,
+        installedVersionCode: Long,
+    ): List<Strategy> {
+        if (record == null) return emptyList()
         return available
             .filter { allowedBySettings(it, settings) }
             .filter { appliesTo(record, it, installedVersionCode) }
             .filter { isUsable(record.stats[it]) }
-            .minByOrNull { it.rank }
+            .sortedBy { it.rank }
     }
+
+    private fun trialAll(
+        record: CompatRecord?,
+        available: Set<Strategy>,
+        settings: PlaybackSettings,
+        installedVersionCode: Long,
+    ): List<Strategy> = available
+        .filter { allowedBySettings(it, settings) }
+        .filter { record == null || appliesTo(record, it, installedVersionCode) }
+        .filter { isTrialable(it, record?.stats?.get(it)) }
+        .sortedWith(compareBy<Strategy>({ record?.stats?.get(it)?.consecutiveFails ?: 0 }, { it.rank }))
 
     /**
      * The strategy a break should try because nothing is proven yet, or null. The one that has failed least goes
@@ -98,11 +116,21 @@ object CompatPolicy {
         available: Set<Strategy>,
         settings: PlaybackSettings,
         installedVersionCode: Long = 0L,
-    ): Strategy? = available
-        .filter { allowedBySettings(it, settings) }
-        .filter { record == null || appliesTo(record, it, installedVersionCode) }
-        .filter { isTrialable(it, record?.stats?.get(it)) }
-        .minWithOrNull(compareBy<Strategy>({ record?.stats?.get(it)?.consecutiveFails ?: 0 }, { it.rank }))
+    ): Strategy? = trialAll(record, available, settings, installedVersionCode).firstOrNull()
+
+    /**
+     * Every strategy a break may use on this app, in the order to try them: the proven ones by rank, then the ones worth
+     * trying. A break moves on to the next when one cannot see the player at all or cannot deliver its command, which
+     * costs the video nothing, so a way that is blind here (no media session through notification access, say) cannot
+     * stand in the way of one that sees (the same sessions through root).
+     */
+    fun candidates(
+        record: CompatRecord?,
+        available: Set<Strategy>,
+        settings: PlaybackSettings,
+        installedVersionCode: Long = 0L,
+    ): List<Strategy> = provenAll(record, available, settings, installedVersionCode) +
+        trialAll(record, available, settings, installedVersionCode)
 
     /**
      * The strategy to use for real, or null to blink without touching playback: a proven one, else one worth trying.
@@ -112,8 +140,7 @@ object CompatPolicy {
         available: Set<Strategy>,
         settings: PlaybackSettings,
         installedVersionCode: Long = 0L,
-    ): Strategy? = proven(record, available, settings, installedVersionCode)
-        ?: trial(record, available, settings, installedVersionCode)
+    ): Strategy? = candidates(record, available, settings, installedVersionCode).firstOrNull()
 
     /** What the person is told about an app; only a proven strategy makes it [CompatStatus.VERIFIED]. */
     fun status(

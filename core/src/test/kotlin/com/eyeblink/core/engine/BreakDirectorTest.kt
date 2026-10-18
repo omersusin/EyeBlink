@@ -60,7 +60,13 @@ private class FakeOverlay(private val scope: TestScope, private val log: Mutable
     }
 }
 
-private class FakeEnv(private val scope: TestScope, val player: FakePlayer?, private val log: MutableList<String>) : DirectorEnvironment {
+private class FakeEnv(
+    private val scope: TestScope,
+    val player: FakePlayer?,
+    private val log: MutableList<String>,
+    /** Backends after the first one, for the break that moves on. */
+    private val later: List<PlaybackBackend> = emptyList(),
+) : DirectorEnvironment {
     var ctx = ContextSnapshot(nowMs = 0, foregroundPackage = APP)
     var policy = GatePolicy(appSelected = true)
     var blinkConfirm = false
@@ -69,6 +75,7 @@ private class FakeEnv(private val scope: TestScope, val player: FakePlayer?, pri
     override fun snapshot() = ctx.copy(nowMs = nowMs())
     override fun gatePolicy(target: String?) = policy
     override suspend fun backendFor(target: String): PlaybackBackend? = player
+    override suspend fun backendsFor(target: String): List<PlaybackBackend> = listOfNotNull(player) + later
     override fun blinkConfirmAvailable() = blinkConfirm
 }
 
@@ -77,10 +84,10 @@ class BreakDirectorTest {
 
     private val settings = EyeBlinkSettings(apps = listOf(AppProfile(APP)))
 
-    private class Rig(scope: TestScope, withPlayer: Boolean = true) {
+    private class Rig(scope: TestScope, withPlayer: Boolean = true, later: List<PlaybackBackend> = emptyList()) {
         val log = mutableListOf<String>()
         val player = if (withPlayer) FakePlayer(clock = { scope.testScheduler.currentTime }) else null
-        val env = FakeEnv(scope, player, log)
+        val env = FakeEnv(scope, player, log, later)
         val overlay = FakeOverlay(scope, log)
         val director = BreakDirector(overlay, PlaybackCoordinator(), env)
 
@@ -197,6 +204,74 @@ class BreakDirectorTest {
         val report = rig.director.run(micro(), settings.copy(playback = PlaybackSettings(resumeAfterBreak = false)))
         assertEquals(PauseSummary.PAUSED, report.pause)
         assertEquals(ResumeSummary.NOT_ATTEMPTED, report.resume)
+    }
+
+    // --- moving on to the next backend ---------------------------------------
+
+    private fun TestScope.spare(strategy: Strategy = Strategy.PRIVILEGED_SESSION) =
+        FakePlayer(clock = { testScheduler.currentTime }, strategy = strategy)
+
+    @Test
+    fun `a backend that cannot see the player is followed by one that can`() = runTest {
+        val second = spare()
+        val rig = Rig(this, later = listOf(second))
+        rig.player!!.state = PlayState.NONE
+        val report = rig.director.run(micro(), settings)
+        assertEquals(PauseSummary.PAUSED, report.pause)
+        assertEquals(ResumeSummary.RESUMED, report.resume)
+        assertEquals("the one that paused is the one named", Strategy.PRIVILEGED_SESSION, report.strategy)
+        assertTrue("the blind one sent nothing", rig.commands().isEmpty())
+        assertEquals(listOf("pause", "play"), second.commands)
+    }
+
+    @Test
+    fun `a backend that cannot deliver its command is followed by one that can, without a stale error`() = runTest {
+        val second = spare()
+        val rig = Rig(this, later = listOf(second))
+        rig.player!!.deliversCommands = false
+        val report = rig.director.run(micro(), settings)
+        assertEquals(PauseSummary.PAUSED, report.pause)
+        assertEquals(null, report.error)
+        assertEquals(listOf("pause", "play"), second.commands)
+    }
+
+    @Test
+    fun `once a command has gone out no other backend is asked`() = runTest {
+        val second = spare()
+        val rig = Rig(this, later = listOf(second))
+        rig.player!!.obeysPause = false
+        val report = rig.director.run(micro(), settings)
+        assertEquals(PauseSummary.UNVERIFIED, report.pause)
+        assertTrue("a second pause could stop something the first one reached late", second.commands.isEmpty())
+    }
+
+    @Test
+    fun `a backend that sees a video that is not playing ends the search`() = runTest {
+        val second = spare()
+        val rig = Rig(this, later = listOf(second))
+        rig.player!!.state = PlayState.PAUSED
+        val report = rig.director.run(micro(), settings)
+        assertEquals(PauseSummary.NOT_PLAYING, report.pause)
+        assertTrue(second.commands.isEmpty())
+        assertEquals("the second was never asked, so it is not the one named", Strategy.MEDIA_SESSION, report.strategy)
+    }
+
+    @Test
+    fun `when no backend can see a player the break says so`() = runTest {
+        val blind = spare().apply { state = PlayState.NONE }
+        val rig = Rig(this, later = listOf(blind))
+        rig.player!!.state = PlayState.NONE
+        assertEquals(PauseSummary.NO_SESSION, rig.director.run(micro(), settings).pause)
+
+        val unreadable = spare().apply { reportsUnknown = true }
+        val rig2 = Rig(this, later = listOf(unreadable))
+        rig2.player!!.reportsUnknown = true
+        assertEquals(PauseSummary.UNREADABLE, rig2.director.run(micro(), settings).pause)
+
+        val mixed = spare().apply { reportsUnknown = true }
+        val rig3 = Rig(this, later = listOf(mixed))
+        rig3.player!!.state = PlayState.NONE
+        assertEquals("one that could look and found no session outweighs one that could not look", PauseSummary.NO_SESSION, rig3.director.run(micro(), settings).pause)
     }
 
     // --- re-check ----------------------------------------------------------

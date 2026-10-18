@@ -176,6 +176,7 @@ class Engine(val app: Application, ports: EnginePorts) {
             quietHoursActive = settings.rhythm.quietHours.contains(minuteOfDay()),
         )
         override suspend fun backendFor(target: String): PlaybackBackend? = compat.backendFor(target)
+        override suspend fun backendsFor(target: String): List<PlaybackBackend> = compat.backendsFor(target)
         override fun blinkConfirmAvailable(): Boolean = tracking.canConfirmBlink(nowMs())
     }
     private val director = BreakDirector(overlay, coordinator, env)

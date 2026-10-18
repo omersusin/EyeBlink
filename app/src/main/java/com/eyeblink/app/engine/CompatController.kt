@@ -117,7 +117,12 @@ class CompatController(
     }
 
     /** The backend a break should use for [target]: a proven one, else one worth trying, else null (blink only). */
-    fun backendFor(target: String): PlaybackBackend? = bestFor(target, fresh = true)?.let { backend(it) }
+    fun backendFor(target: String): PlaybackBackend? = backendsFor(target).firstOrNull()
+
+    /** Every backend a break may use for [target], in the order to try them (see [CompatPolicy.candidates]). */
+    fun backendsFor(target: String): List<PlaybackBackend> =
+        CompatPolicy.candidates(records[target], available(fresh = true), settings().playback, versionOf(target).first)
+            .mapNotNull { backend(it) }
 
     /** Whether a break for [target] could pause its video; asked every turn of the loop, so it may use a half-second-old list. */
     fun canPause(target: String?): Boolean = target != null && bestFor(target, fresh = false) != null

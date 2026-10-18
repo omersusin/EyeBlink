@@ -75,6 +75,24 @@ class CompatPolicyTest {
     }
 
     @Test
+    fun `the candidates are the proven ones by rank, then the ones worth trying, fewest failures first`() {
+        // nothing known: every strategy that can be tried, best ranked first
+        assertEquals(
+            listOf(Strategy.LSPOSED_HOOK, Strategy.MEDIA_SESSION, Strategy.PRIVILEGED_SESSION),
+            CompatPolicy.candidates(null, all, settings),
+        )
+        // MEDIA_SESSION failed once: PRIVILEGED_SESSION (no failures) goes before it, and a proven MEDIA_KEY comes first of all
+        var r = record(Triple(Strategy.MEDIA_KEY, true, true))
+        r = failedAttempt(r, Strategy.MEDIA_SESSION)
+        assertEquals(
+            listOf(Strategy.MEDIA_KEY, Strategy.LSPOSED_HOOK, Strategy.PRIVILEGED_SESSION, Strategy.MEDIA_SESSION),
+            CompatPolicy.candidates(r, all, settings.copy(allowMediaKeys = true)),
+        )
+        assertEquals(Strategy.MEDIA_KEY, CompatPolicy.best(r, all, settings.copy(allowMediaKeys = true)))
+        assertTrue(CompatPolicy.candidates(r, emptySet(), settings).isEmpty())
+    }
+
+    @Test
     fun `a deliberate test that failed rules the strategy out for real breaks`() {
         val r = record(Triple(Strategy.MEDIA_SESSION, false, false))
         assertNull(CompatPolicy.best(r, setOf(Strategy.MEDIA_SESSION), settings))

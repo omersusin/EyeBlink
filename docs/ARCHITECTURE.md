@@ -124,7 +124,10 @@ A break uses a *proven* strategy when the app has one. When it has none, a break
 (`Strategy.canTryUnproven`: LSPosed hook, media session, privileged media session): the coordinator pauses only what is positively playing,
 checks that the pause landed and resumes only what it paused, so a first attempt cannot do harm, and the outcome (`BreakReport.playbackVerdict()`) is
 folded into the app's record - the first successful break verifies the app, three failures in a row switch the strategy off. Strategies that can only
-see "is any audio playing" (media key, audio focus, tap) are never tried without a passed test. Which strategies are *available* is read from the live
+see "is any audio playing" (media key, audio focus, tap) are never tried without a passed test. A break asks the candidates in order (proven ones by rank, then the
+ones worth trying, fewest failures first) and moves on to the next when one cannot see the player or cannot deliver its command - that costs the video nothing -
+but never after a command has gone out; so a way that is blind on this phone (notification access listed but not working, say) cannot stand in the way of
+root reading the very same sessions. Which strategies are *available* is read from the live
 state of the permissions and of the privileged shell on every use, never remembered from start-up, because root and Shizuku finish connecting after the app starts.
 
 The coordinator counts the time a look at the player costs (a `dumpsys` through `su` takes a few hundred milliseconds) as waiting time, waits up to 2.5 s for a

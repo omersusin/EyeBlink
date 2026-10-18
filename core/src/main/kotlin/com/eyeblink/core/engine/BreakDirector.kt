@@ -38,6 +38,12 @@ interface DirectorEnvironment {
     /** The proven, user-permitted playback backend for [target], or null to leave playback alone. */
     suspend fun backendFor(target: String): PlaybackBackend?
 
+    /**
+     * Every backend a break may use for [target], best first. A break moves on to the next one when a backend cannot
+     * see the player or cannot deliver its command; it never moves on after a command has gone out.
+     */
+    suspend fun backendsFor(target: String): List<PlaybackBackend> = listOfNotNull(backendFor(target))
+
     /** The camera is tracking reliably, so a real blink can confirm a rest. */
     fun blinkConfirmAvailable(): Boolean
 }
@@ -153,20 +159,28 @@ class BreakDirector(
         try {
             // 2. Pause and verify - only for a proven backend and only a player that is playing.
             if (target != null && settings.playback.pauseDuringBreaks && (profile?.pauseVideo != false)) {
-                backend = env.backendFor(target)
-                val b = backend
-                if (b != null) {
-                    strategy = b.strategy
-                    when (val r = coordinator.pause(b, target, env::nowMs)) {
-                        is PauseResult.Paused -> { token = r.token; pause = PauseSummary.PAUSED }
-                        is PauseResult.Unverified -> { token = r.token; pause = PauseSummary.UNVERIFIED }
-                        is PauseResult.NotPlaying -> pause = when (r.saw) {
-                            PlayState.NONE -> PauseSummary.NO_SESSION
-                            PlayState.UNKNOWN -> PauseSummary.UNREADABLE
-                            else -> PauseSummary.NOT_PLAYING
+                var sawNoPlayer = false
+                for (candidate in env.backendsFor(target)) {
+                    strategy = candidate.strategy
+                    backend = candidate
+                    var next = false
+                    when (val r = coordinator.pause(candidate, target, env::nowMs)) {
+                        is PauseResult.Paused -> { token = r.token; pause = PauseSummary.PAUSED; failure = null }
+                        is PauseResult.Unverified -> { token = r.token; pause = PauseSummary.UNVERIFIED; failure = null }
+                        is PauseResult.NotPlaying -> {
+                            // A backend that cannot see this app's player says nothing about the player: ask the next.
+                            next = r.saw == PlayState.NONE || r.saw == PlayState.UNKNOWN
+                            if (r.saw == PlayState.NONE) sawNoPlayer = true
+                            pause = when {
+                                r.saw == PlayState.NONE || (r.saw == PlayState.UNKNOWN && sawNoPlayer) -> PauseSummary.NO_SESSION
+                                r.saw == PlayState.UNKNOWN -> PauseSummary.UNREADABLE
+                                else -> PauseSummary.NOT_PLAYING
+                            }
                         }
-                        is PauseResult.Failed -> { pause = PauseSummary.FAILED; failure = r.error }
+                        // Nothing was delivered, so nothing has happened to the video: the next backend may try.
+                        is PauseResult.Failed -> { pause = PauseSummary.FAILED; failure = r.error; next = true }
                     }
+                    if (!next) break
                 }
             }
 
