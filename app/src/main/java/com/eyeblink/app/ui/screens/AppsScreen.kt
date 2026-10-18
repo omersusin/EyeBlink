@@ -149,7 +149,7 @@ private fun AppCard(profile: AppProfile, compat: CompatUi, nowMs: Long, expanded
             )
             SettingRow(s.t("Smart Rest here", "Burada Akıllı Mola"), subtitle = null) { LidSwitch(profile.restEnabled, { v -> set { it.copy(restEnabled = v) } }, description = "Smart Rest") }
             Hairline()
-            SettingRow(s.t("Pause its video", "Videosunu duraklat"), subtitle = s.t("Only if a pause method is verified below.", "Yalnızca aşağıda doğrulanmış bir yöntem varsa.")) { LidSwitch(profile.pauseVideo, { v -> set { it.copy(pauseVideo = v) } }, description = s.t("Pause its video", "Videosunu duraklat")) }
+            SettingRow(s.t("Pause its video", "Videosunu duraklat"), subtitle = s.t("Only a video EyeBlink has seen playing, and only if a way of pausing it works (see below).", "Yalnızca EyeBlink'in oynadığını gördüğü video, ve yalnızca duraklatmanın bir yolu çalışıyorsa (aşağıya bak).")) { LidSwitch(profile.pauseVideo, { v -> set { it.copy(pauseVideo = v) } }, description = s.t("Pause its video", "Videosunu duraklat")) }
             Spacer(Modifier.height(6.dp))
             Hairline()
             Spacer(Modifier.height(12.dp))
@@ -169,8 +169,8 @@ internal fun CompatBadge(status: CompatStatus, trying: Boolean = false) {
     when (status) {
         CompatStatus.VERIFIED -> Badge(s.t("pause verified", "duraklatma doğrulandı"), Tone.Ok)
         CompatStatus.UNTESTED ->
-            if (trying) Badge(s.t("will try at the next break", "sonraki molada denenecek"), Tone.Sky)
-            else Badge(s.t("no way to pause yet", "duraklatma yolu henüz yok"), Tone.Quiet)
+            if (trying) Badge(s.t("will try", "denenecek"), Tone.Sky)
+            else Badge(s.t("no way yet", "yol henüz yok"), Tone.Quiet)
         CompatStatus.FAILING -> Badge(s.t("can't pause", "duraklatılamıyor"), Tone.Bad)
         CompatStatus.RETEST_ADVISED -> Badge(s.t("retest advised", "yeniden test önerilir"), Tone.Warn)
     }

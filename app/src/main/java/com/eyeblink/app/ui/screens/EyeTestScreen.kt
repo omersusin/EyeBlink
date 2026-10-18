@@ -107,7 +107,7 @@ private fun Live(state: UiState, actions: UiActions) {
             Meter(closure, tone = if (t.openness != null && closure >= t.countsAt && t.countsAt > 0f) P.sun else P.sky)
             Spacer(Modifier.height(4.dp))
             EbText(
-                s.t("It counts as a blink once the bar is past ${(t.countsAt * 100).roundToInt()}%.", "Çubuk %${(t.countsAt * 100).roundToInt()}'i geçince kırpma sayılır."),
+                s.t("It counts as a blink once the bar is past ${(t.countsAt * 100).roundToInt()}%.", "Çubuk %${(t.countsAt * 100).roundToInt()} üzerine çıkınca kırpma sayılır."),
                 Ink.Caption, color = P.inkSoft, align = TextAlign.Center,
             )
         }

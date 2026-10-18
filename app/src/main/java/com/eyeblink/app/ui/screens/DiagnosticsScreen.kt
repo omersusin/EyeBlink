@@ -65,7 +65,7 @@ fun DiagnosticsScreen(state: UiState, actions: UiActions, onBack: () -> Unit) {
         Card(Modifier.reveal(1).fillMaxWidth(), tint = if (healthy) P.mint else P.sun) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 EbText(s.t("Health", "Sağlık"), Ink.Title, modifier = Modifier.weight(1f))
-                Badge(if (healthy) s.t("all good", "her şey yolunda") else s.t("needs attention", "ilgi bekliyor"), if (healthy) Tone.Ok else Tone.Warn)
+                Badge(if (healthy) s.t("all good", "her şey yolunda") else s.t("needs attention", "bakman gerek"), if (healthy) Tone.Ok else Tone.Warn)
             }
             Spacer(Modifier.height(8.dp))
             Health(

@@ -221,7 +221,7 @@ fun RhythmScreen(state: UiState, actions: UiActions, onPage: (Page) -> Unit, mod
         Card(Modifier.reveal(5).fillMaxWidth()) {
             SectionHeader(s.t("Your video", "Videon"), null)
             Spacer(Modifier.height(4.dp))
-            SettingRow(s.t("Pause during breaks", "Molalarda duraklat"), subtitle = s.t("Only when EyeBlink can prove the pause worked for that app.", "Yalnızca EyeBlink o uygulamada duraklatmanın işlediğini kanıtlayabiliyorsa.")) {
+            SettingRow(s.t("Pause during breaks", "Molalarda duraklat"), subtitle = s.t("Only a video EyeBlink has seen playing, and it checks that the pause worked.", "Yalnızca EyeBlink'in oynadığını gördüğü video duraklatılır ve duraklatmanın işlediği kontrol edilir.")) {
                 LidSwitch(st.playback.pauseDuringBreaks, { v -> setS { it.copy(playback = it.playback.copy(pauseDuringBreaks = v)) } }, description = s.t("Pause during breaks", "Molalarda duraklat"))
             }
             Hairline()

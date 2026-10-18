@@ -79,7 +79,7 @@ class Notifier(private val app: Application) {
         val n = Notification.Builder(app, CH_TEST)
             .setSmallIcon(R.drawable.ic_stat_eye)
             .setContentTitle(s.t("Testing $appLabel", "$appLabel test ediliyor"))
-            .setContentText(s.t("Play a video in $appLabel and leave it playing. EyeBlink will pause and resume it once or twice.", "$appLabel içinde bir video oynat ve çalmasına izin ver. EyeBlink onu bir iki kez duraklatıp sürdürecek."))
+            .setContentText(s.t("Play a video in $appLabel and leave it playing. EyeBlink will pause and resume it once or twice.", "$appLabel içinde bir video oynat ve oynar halde bırak. EyeBlink onu bir iki kez duraklatıp sürdürecek."))
             .setOngoing(true)
             .setTimeoutAfter(90_000L)
             .build()
@@ -90,7 +90,7 @@ class Notifier(private val app: Application) {
         val text = when (outcome) {
             CompatOutcomeSummary.VERIFIED -> s.t("EyeBlink can pause and resume $appLabel safely.", "EyeBlink $appLabel uygulamasını güvenle duraklatıp sürdürebiliyor.")
             CompatOutcomeSummary.FAILING -> s.t("Nothing could be confirmed. EyeBlink will blink in $appLabel without touching the video.", "Hiçbir şey doğrulanamadı. EyeBlink $appLabel içinde videoya dokunmadan göz kırpacak.")
-            CompatOutcomeSummary.LEFT_PAUSED -> s.t("The video may have stayed paused. Press play. EyeBlink will not touch $appLabel's video.", "Video duraklamış kalmış olabilir. Oynat'a bas. EyeBlink $appLabel videosuna dokunmayacak.")
+            CompatOutcomeSummary.LEFT_PAUSED -> s.t("The video may have stayed paused. Press play. EyeBlink will not touch $appLabel's video.", "Video duraklatılmış halde kalmış olabilir. Oynat'a bas. EyeBlink $appLabel videosuna dokunmayacak.")
             CompatOutcomeSummary.NO_PLAYBACK -> s.t("No video was playing in $appLabel, so nothing was tested.", "$appLabel içinde video oynamıyordu, bu yüzden bir şey test edilmedi.")
             CompatOutcomeSummary.NO_STRATEGY -> s.t("No way of controlling playback is available yet. See Power modes and Apps.", "Henüz oynatmayı denetleyecek bir yol yok. Güç modları ve Uygulamalar'a bak.")
         }

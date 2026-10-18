@@ -30,9 +30,11 @@ enum class Strategy(
      * A break may try this strategy on an app where it has not been proven yet. Only strategies that read the
      * player's own state qualify: the coordinator pauses nothing that is not positively playing, checks that the
      * pause landed and resumes only what it paused, so a first attempt can do no harm - and its outcome is what
-     * proves (or rules out) the strategy for that app. The rest need a deliberate test first.
+     * proves (or rules out) the strategy for that app. A strategy that works through the app's own internals (the
+     * LSPosed hook) is left out as well, because it can do more than send a command; it and the strategies that
+     * cannot read the player back need a deliberate test first.
      */
-    val canTryUnproven: Boolean get() = verification == Verification.SESSION_STATE && !experimental
+    val canTryUnproven: Boolean get() = verification == Verification.SESSION_STATE && !experimental && !versionSensitive
 }
 
 enum class Verification {

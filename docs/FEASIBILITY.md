@@ -33,7 +33,7 @@ run on a physical phone; see [Status](../README.md#status) for what that means f
 
 There is no single Android API for "pause whatever video is playing". EyeBlink tries strategies in this
 order and only uses one that has proved itself for that app and version - by a test, or by a real break that paused, checked and resumed
-(only the strategies that can read the player's own state back may be tried this way; the others need a passed test first):
+(only the strategies that can read the player's own state back without touching the app's internals - media session, and the same through Shizuku or root - may be tried this way; the others, the LSPosed hook included, need a passed test first):
 
 1. **LSPosed hook** (only if the module is installed and the app's test passed) - in-process, most precise, most fragile.
 2. **Media session** - through the notification listener's access to `MediaSessionManager`; `transportControls.pause()`

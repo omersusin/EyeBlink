@@ -121,7 +121,7 @@ Ranked best to last: LSPosed hook, media session, privileged media session, medi
 results into "verified", "failing", "untested" or "retest advised".
 
 A break uses a *proven* strategy when the app has one. When it has none, a break may *try* a strategy that reads the player's own state back
-(`Strategy.canTryUnproven`: LSPosed hook, media session, privileged media session): the coordinator pauses only what is positively playing,
+(`Strategy.canTryUnproven`: media session, privileged media session - not the LSPosed hook, which works through the app's own internals): the coordinator pauses only what is positively playing,
 checks that the pause landed and resumes only what it paused, so a first attempt cannot do harm, and the outcome (`BreakReport.playbackVerdict()`) is
 folded into the app's record - the first successful break verifies the app, three failures in a row switch the strategy off. Strategies that can only
 see "is any audio playing" (media key, audio focus, tap) are never tried without a passed test. A break asks the candidates in order (proven ones by rank, then the

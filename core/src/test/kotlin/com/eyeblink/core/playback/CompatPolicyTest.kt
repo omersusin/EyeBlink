@@ -78,14 +78,14 @@ class CompatPolicyTest {
     fun `the candidates are the proven ones by rank, then the ones worth trying, fewest failures first`() {
         // nothing known: every strategy that can be tried, best ranked first
         assertEquals(
-            listOf(Strategy.LSPOSED_HOOK, Strategy.MEDIA_SESSION, Strategy.PRIVILEGED_SESSION),
+            listOf(Strategy.MEDIA_SESSION, Strategy.PRIVILEGED_SESSION),
             CompatPolicy.candidates(null, all, settings),
         )
         // MEDIA_SESSION failed once: PRIVILEGED_SESSION (no failures) goes before it, and a proven MEDIA_KEY comes first of all
         var r = record(Triple(Strategy.MEDIA_KEY, true, true))
         r = failedAttempt(r, Strategy.MEDIA_SESSION)
         assertEquals(
-            listOf(Strategy.MEDIA_KEY, Strategy.LSPOSED_HOOK, Strategy.PRIVILEGED_SESSION, Strategy.MEDIA_SESSION),
+            listOf(Strategy.MEDIA_KEY, Strategy.PRIVILEGED_SESSION, Strategy.MEDIA_SESSION),
             CompatPolicy.candidates(r, all, settings.copy(allowMediaKeys = true)),
         )
         assertEquals(Strategy.MEDIA_KEY, CompatPolicy.best(r, all, settings.copy(allowMediaKeys = true)))
@@ -156,10 +156,11 @@ class CompatPolicyTest {
     @Test
     fun `only strategies that read the player back may be tried unproven`() {
         assertEquals(
-            setOf(Strategy.LSPOSED_HOOK, Strategy.MEDIA_SESSION, Strategy.PRIVILEGED_SESSION),
+            setOf(Strategy.MEDIA_SESSION, Strategy.PRIVILEGED_SESSION),
             Strategy.entries.filter { it.canTryUnproven }.toSet(),
         )
         assertTrue(Strategy.entries.filter { it.canTryUnproven }.all { it.verification == Verification.SESSION_STATE && !it.experimental })
+        assertTrue("a hook inside the app's own player is never tried without a test", !Strategy.LSPOSED_HOOK.canTryUnproven)
     }
 
     @Test
