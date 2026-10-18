@@ -2,7 +2,9 @@ package com.eyeblink.app.overlay
 
 import com.eyeblink.app.platform.systemService
 import android.app.Application
+import android.content.ComponentCallbacks
 import android.content.Context
+import android.content.res.Configuration
 import android.graphics.PixelFormat
 import android.graphics.Rect
 import android.os.Build
@@ -34,8 +36,30 @@ class OverlayWindows(private val app: Application) {
     @Volatile var kind: String = ""
         private set
 
+    init {
+        // A window is as large as the screen was when it was put up; when the screen turns during a rest it is made as large as the
+        // new one, or a strip of the app would show beside the black.
+        app.registerComponentCallbacks(object : ComponentCallbacks {
+            override fun onConfigurationChanged(newConfig: Configuration) = refit()
+            override fun onLowMemory() = Unit
+        })
+    }
+
     /** Whether any kind of window can be shown right now. */
     fun available(): Boolean = Signals.accessibility != null || Settings.canDrawOverlays(app)
+
+    /** Makes every window that covers the screen as large as the screen is now. Runs on the main thread, where configuration changes arrive. */
+    private fun refit() {
+        attached.values.toList().forEach { a ->
+            val lp = a.view.layoutParams as? WindowManager.LayoutParams ?: return@forEach
+            if (lp.width == 1 && lp.height == 1) return@forEach // the touch sentinel
+            val size = screenSize(a.wm)
+            if (lp.width == size.width() && lp.height == size.height()) return@forEach
+            lp.width = size.width()
+            lp.height = size.height()
+            runCatching { a.wm.updateViewLayout(a.view, lp) }
+        }
+    }
 
     /** Must be called on the main thread. */
     fun attach(view: View, touchable: Boolean, keepScreenOn: Boolean = false): Boolean {
