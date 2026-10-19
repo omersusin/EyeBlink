@@ -149,7 +149,7 @@ folded into the app's record - the first successful break verifies the app, thre
 a break from trying it, until a test passes). A new *version of EyeBlink* gives the failures another chance, once (`CompatPolicy.forgiven`, run by `CompatController` when
 `Stores.compatBuild` differs from the installed version code): a strategy that has never worked on an app is forgotten, a streak of failures is cleared, successes stay -
 because a build can switch a way off by a mistake that the next build no longer makes, and nothing else would ever try it again. Strategies that can only
-see "is any audio playing" (media key, audio focus, tap) are never tried without a passed test. A break asks the candidates in order (proven ones by rank, then the
+see "is any audio playing" (media key, audio focus, tap) are never tried without a passed test, and are off until the user switches each one on (*Rhythm → Your video → Other ways to pause*; `PlaybackSettings.allowMediaKeys / allowAudioFocus / allowGestureTap`) - before 0.3.1 those settings existed and nothing in the app could set them, so an app without a media session could never be paused. A break asks the candidates in order (proven ones by rank, then the
 ones worth trying, fewest failures first) and moves on to the next when one cannot see the player or cannot deliver its command - that costs the video nothing -
 but never after a command has gone out, and only to ways that read the player's own state (a blind precise way is no reason to reach for a media key, which would
 pause whatever else is playing); so a way that is blind on this phone (notification access listed but not working, say) cannot stand in the way of

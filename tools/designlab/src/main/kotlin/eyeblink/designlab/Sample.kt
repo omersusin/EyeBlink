@@ -155,7 +155,7 @@ object Sample {
             personal = PersonalProfile(general = baseline, byContext = mapOf(ContextProfile.VIDEO to baseline.copy(medianIbiMs = 10_100))),
             stats = StatsUi(today = week.last(), week = week.fold(DayStats(), com.eyeblink.core.stats.UsageLedger.Companion::merge), series = week, seriesLabels = listOf("M", "T", "W", "T", "F", "S", "S")),
             night = NightUi(),
-            diag = DiagnosticsUi(appVersion = "0.3.0", androidSdk = 34, device = "Pixel 8", serviceRunning = true, accessibilityConnected = true, listenerConnected = true, overlayKind = "Accessibility overlay", frameP50Ms = 14, frameP95Ms = 31, cameraDutyPercent = 18, batteryPercent = 71),
+            diag = DiagnosticsUi(appVersion = "0.3.1", androidSdk = 34, device = "Pixel 8", serviceRunning = true, accessibilityConnected = true, listenerConnected = true, overlayKind = "Accessibility overlay", frameP50Ms = 14, frameP95Ms = 31, cameraDutyPercent = 18, batteryPercent = 71),
             nowMs = System.currentTimeMillis(), clock = "21:40",
         )
     }

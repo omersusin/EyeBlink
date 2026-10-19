@@ -110,7 +110,7 @@ This is an honest list. "Tested" means unit tests that run in CI; "built" means 
 
 Known limits you should know about before trusting it:
 
-- **Many short-video apps publish no usable media session.** For those, no rootless strategy can be verified, so EyeBlink follows your chosen fallback (blink anyway, wait for the next swipe, or skip the app).
+- **Many short-video apps publish no usable media session.** For those, no media-session strategy can work, so EyeBlink follows your chosen fallback (blink anyway, wait for the next swipe, or skip the app). Three experimental ways can pause some of them - asking Android for the audio focus, a media key, a tap in the middle of the screen. They cannot see what the video is doing, only whether the sound stops, so they are off until you switch them on (*Rhythm → Fine-tune everything → Your video → Other ways to pause*) and each is used only in an app where its own test (*Apps → the app → Test compatibility*) has passed. None of them has been run on a phone yet.
 - **It cannot see your finger lift.** Android only lets it see the *start* of a touch outside its own window, so it waits out a debounce window instead.
 - **The camera runs in short bursts.** Since Android 14 a camera foreground service cannot be started from the background.
 - **On an LCD screen the backlight stays on** during the black hold. EyeBlink says so rather than implying the OLED effect.

@@ -64,7 +64,7 @@ fun main(args: Array<String>) {
     shot("home-tr") { EyeBlinkApp(Sample.state(Language.TR), NoActions, Strings.TR) }
     both("home-off") { d -> EyeBlinkApp(Sample.state(running = false, notReady = true), NoActions, en, systemDark = d) }
     both("rhythm") { d -> EyeBlinkApp(Sample.state(), NoActions, en, initialTab = Tab.RHYTHM, systemDark = d) }
-    shot("rhythm-tall", h = 4000) { EyeBlinkApp(Sample.state().let { it.copy(settings = it.settings.copy(advanced = true)) }, NoActions, en, initialTab = Tab.RHYTHM) }
+    shot("rhythm-tall", h = 5800) { EyeBlinkApp(Sample.state().let { it.copy(settings = it.settings.copy(advanced = true)) }, NoActions, en, initialTab = Tab.RHYTHM) }
     both("calib-intro", h = 2000) { d -> EyeBlinkApp(Sample.calibration(CalibrationStage.INTRO), NoActions, en, initialPage = Page.CALIBRATION, systemDark = d) }
     shot("calib-video", h = 1700) { EyeBlinkApp(Sample.calibration(CalibrationStage.RUNNING, Phase.VIDEO), NoActions, en, initialPage = Page.CALIBRATION) }
     shot("calib-read", h = 1700) { EyeBlinkApp(Sample.calibration(CalibrationStage.RUNNING, Phase.READING), NoActions, en, initialPage = Page.CALIBRATION) }

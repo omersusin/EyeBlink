@@ -180,6 +180,12 @@ internal fun CompatBadge(status: CompatStatus, trying: Boolean = false, noSessio
 @Composable
 private fun CompatSection(profile: AppProfile, compat: CompatUi, nowMs: Long, actions: UiActions) {
     val s = S
+    // None of the experimental ways is on (they are off until switched on under Rhythm -> Your video).
+    val otherWaysOff = compat.available.none { it.experimental }
+    val otherWays = s.t(
+        " Other ways - audio focus, a media key, a tap gesture - can pause some of these apps. They are experimental and off: switch them on under Rhythm → Your video → Other ways to pause (Fine-tune everything), then run the test below.",
+        " Başka yollar - ses odağı, medya tuşu, dokunma hareketi - bu uygulamalardan bazılarını duraklatabilir. Deneysel ve kapalıdır: Ritim → Videon → Duraklatmanın öbür yolları altında aç (her şeyi ince ayarla), sonra aşağıdaki testi çalıştır.",
+    )
     EbText(s.t("Playback control", "Oynatma kontrolü"), Ink.Eyebrow, color = P.sky.text)
     Spacer(Modifier.height(8.dp))
     EbText(
@@ -189,14 +195,14 @@ private fun CompatSection(profile: AppProfile, compat: CompatUi, nowMs: Long, ac
                 if (compat.noSession) s.t(
                     "This app shows no media session, so EyeBlink cannot see or pause what it plays. Blinks happen over the video, or follow the choice under Rhythm → Your video. If that changes (an update, a new permission), it looks again by itself.",
                     "Bu uygulama medya oturumu göstermiyor; EyeBlink neyin oynadığını göremez ve duraklatamaz. Göz kırpmalar videonun üstünde olur ya da Ritim → Videon altındaki seçime uyar. Bu değişirse (güncelleme, yeni izin) kendiliğinden yeniden bakar.",
-                ) else if (compat.trial != null) s.t(
+                ) + (if (otherWaysOff) otherWays else "") else if (compat.trial != null) s.t(
                     "Not proven yet. At the next break EyeBlink will try to pause this app's video through ${strategyName(compat.trial, s).lowercase()}, check that it really paused, and remember how it went.",
                     "Henüz kanıtlanmadı. Bir sonraki molada EyeBlink bu uygulamanın videosunu ${strategyName(compat.trial, s).lowercase()} ile duraklatmayı dener, gerçekten durduğunu kontrol eder ve sonucu hatırlar.",
                 ) else s.t(
                     "EyeBlink has no way to pause this app's video yet. Allow notification access (More → Diagnostics → Permissions), or use Shizuku or Root (More → Power modes), and it will try at the next break. Until then it blinks over the video.",
                     "EyeBlink'in bu uygulamanın videosunu duraklatacak bir yolu henüz yok. Bildirim erişimine izin ver (Diğer → Tanılama → İzinler) ya da Shizuku veya Root kullan (Diğer → Güç modları); sonraki molada dener. O zamana dek videonun üstünde göz kırpar.",
                 )
-            CompatStatus.FAILING -> s.t("No pause method worked here. Blinks happen over the playing video - nothing is paused or resumed.", "Burada hiçbir duraklatma yöntemi çalışmadı. Göz kırpmalar oynayan videonun üstünde olur; hiçbir şey duraklatılmaz ya da sürdürülmez.")
+            CompatStatus.FAILING -> s.t("No pause method worked here. Blinks happen over the playing video - nothing is paused or resumed.", "Burada hiçbir duraklatma yöntemi çalışmadı. Göz kırpmalar oynayan videonun üstünde olur; hiçbir şey duraklatılmaz ya da sürdürülmez.") + (if (otherWaysOff) otherWays else "")
             CompatStatus.RETEST_ADVISED -> s.t("The app updated since the last test, so some results may no longer apply.", "Uygulama son testten beri güncellendi; bazı sonuçlar artık geçerli olmayabilir.")
         },
         Ink.Caption,

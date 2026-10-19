@@ -289,6 +289,40 @@ fun RhythmScreen(state: UiState, actions: UiActions, onPage: (Page) -> Unit, mod
                 })
                 Spacer(Modifier.height(6.dp))
                 EbText(s.t("Not every app lets another app pause it. This is what happens when it doesn't.", "Her uygulama başka bir uygulamanın kendini duraklatmasına izin vermez. İzin vermediğinde olacak şey bu."), Ink.Caption, color = P.inkFaint)
+
+                // The ways for an app that shows no media session (most feed and short-video apps). They cannot read the player, so
+                // they are off until switched on here, and a break uses one only in an app where its own test has passed.
+                Spacer(Modifier.height(16.dp))
+                EbText(s.t("Other ways to pause", "Duraklatmanın öbür yolları"), Ink.Eyebrow, caps = false)
+                Spacer(Modifier.height(4.dp))
+                EbText(
+                    s.t(
+                        "For apps that show no media session. Experimental: none of them can see what the video is doing, only whether the sound stops, so each one is used only in an app where its own test passed (Apps → the app → Test compatibility).",
+                        "Medya oturumu göstermeyen uygulamalar için. Deneyseldir: hiçbiri videonun ne yaptığını göremez, yalnızca sesin kesilip kesilmediğine bakar; bu yüzden her biri yalnızca kendi testini geçtiği uygulamada kullanılır (Uygulamalar → uygulama → Uyumluluğu test et).",
+                    ),
+                    Ink.Caption, color = P.inkFaint,
+                )
+                Spacer(Modifier.height(4.dp))
+                SettingRow(
+                    s.t("Audio focus", "Ses odağı"),
+                    subtitle = s.t("Asks Android for the sound for a moment: players that listen pause themselves, and carry on when it is given back.", "Android'den sesi bir an için ister: dinleyen oynatıcılar kendiliğinden duraklar, ses geri verilince devam eder."),
+                ) {
+                    LidSwitch(st.playback.allowAudioFocus, { v -> setS { it.copy(playback = it.playback.copy(allowAudioFocus = v)) } }, description = s.t("Audio focus", "Ses odağı"))
+                }
+                Hairline()
+                SettingRow(
+                    s.t("Media key", "Medya tuşu"),
+                    subtitle = s.t("Like a headset button. It goes to whichever app played last.", "Kulaklık düğmesi gibi. En son çalan uygulamaya gider."),
+                ) {
+                    LidSwitch(st.playback.allowMediaKeys, { v -> setS { it.copy(playback = it.playback.copy(allowMediaKeys = v)) } }, description = s.t("Media key", "Medya tuşu"))
+                }
+                Hairline()
+                SettingRow(
+                    s.t("Tap gesture", "Dokunma hareketi"),
+                    subtitle = s.t("One tap in the middle through the accessibility service, the way a finger pauses a feed video.", "Erişilebilirlik hizmetiyle ortaya tek dokunuş; parmağın bir akış videosunu duraklatması gibi."),
+                ) {
+                    LidSwitch(st.playback.allowGestureTap, { v -> setS { it.copy(playback = it.playback.copy(allowGestureTap = v)) } }, description = s.t("Tap gesture", "Dokunma hareketi"))
+                }
             }
         }
 
