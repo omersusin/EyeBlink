@@ -166,6 +166,7 @@ Signing secrets, if you have them, are read from `keystore.properties` (git-igno
 | [`app/`](app) | the Android app and its Compose UI |
 | [`lsposed/`](lsposed) | the optional LSPosed module |
 | [`tools/designlab/`](tools/designlab) | the desktop renderer behind the screenshots |
+| [`docs/HOW_IT_WAS_MADE.md`](docs/HOW_IT_WAS_MADE.md) | how the app was made: design, engineering, testing, process |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | how it fits together |
 | [`docs/FEASIBILITY.md`](docs/FEASIBILITY.md) | what Android allows, requirement by requirement |
 | [`docs/DEVICE_TEST.md`](docs/DEVICE_TEST.md) | a step-by-step first test on a real phone |

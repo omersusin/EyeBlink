@@ -4,7 +4,7 @@ EyeBlink is split so that everything that *decides* something is plain Kotlin th
 tested there, and everything that *touches Android* is thin and replaceable.
 
 ```
-core/            pure Kotlin/JVM - the brain. 450 unit tests, no Android, no Compose.
+core/            pure Kotlin/JVM - the brain. More than 600 unit tests, no Android, no Compose.
 app/             the Android app: platform layer + the Compose UI.
   ui/            platform-free Compose: design kit, screens, state. Also compiled by the design lab.
   engine/        the one thread that owns scheduling, breaks, tracking, calibration, night mode.

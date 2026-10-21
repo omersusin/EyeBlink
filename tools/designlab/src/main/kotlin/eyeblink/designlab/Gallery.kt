@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
@@ -22,6 +23,7 @@ import com.eyeblink.app.ui.kit.CurveThumb
 import com.eyeblink.app.ui.kit.Dock
 import com.eyeblink.app.ui.kit.DockItem
 import com.eyeblink.app.ui.kit.EbText
+import com.eyeblink.app.ui.kit.Flow
 import com.eyeblink.app.ui.kit.Horizon
 import com.eyeblink.app.ui.kit.Ico
 import com.eyeblink.app.ui.kit.Icon
@@ -53,7 +55,7 @@ fun KitGallery() {
     val p = P
     com.eyeblink.app.ui.kit.Backdrop {
         Column(Modifier.fillMaxSize().padding(horizontal = 20.dp).padding(top = 28.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            SectionHeader("Kit", "Daybreak components")
+            SectionHeader("Kit", "Components")
             Card {
                 SettingRow("Lid switch", subtitle = "A switch that is a small eye") { LidSwitch(on, { on = it }) }
                 SettingRow("Off state") { LidSwitch(false, {}) }
@@ -61,7 +63,7 @@ fun KitGallery() {
             }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 PillButton("Start EyeBlink", {}, icon = Icon.Eye)
-                PillButton("Rest now", {}, kind = ButtonKind.Soft)
+                PillButton("Rest", {}, kind = ButtonKind.Soft)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 PillButton("Ghost", {}, kind = ButtonKind.Ghost, compact = true)
@@ -75,14 +77,14 @@ fun KitGallery() {
                 Chip("TikTok", false, {})
                 Chip("YouTube", false, {})
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Flow(Modifier.fillMaxWidth()) {
                 Badge("Verified", Tone.Ok); Badge("Untested", Tone.Quiet); Badge("Failing", Tone.Bad); Badge("Retest", Tone.Warn)
                 PulseDot(p.coral.fill)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                Card(Modifier.weight(1f), tint = p.sky) { EbText("0:38", Ink.Headline); EbText("Next blink", Ink.Caption) }
-                Card(Modifier.weight(1f), tint = p.mint) { EbText("82%", Ink.Headline); EbText("Rested", Ink.Caption) }
-                Card(Modifier.weight(1f), tint = p.coral) { EbText("3", Ink.Headline); EbText("Skipped", Ink.Caption) }
+                Card(Modifier.weight(1f), tint = p.sky) { EbText("0:38", Ink.Lead); EbText("Next blink", Ink.Caption) }
+                Card(Modifier.weight(1f), tint = p.mint) { EbText("82%", Ink.Lead); EbText("Rested", Ink.Caption) }
+                Card(Modifier.weight(1f), tint = p.coral) { EbText("3", Ink.Lead); EbText("Skipped", Ink.Caption) }
             }
             Card {
                 Meter(0.62f)

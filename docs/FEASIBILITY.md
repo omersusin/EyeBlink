@@ -5,8 +5,7 @@ against what Android actually allows an ordinary app to do. This page is that ch
 **Yes** means a supported API does the job, **With limits** means it works under conditions that the
 app has to handle, and **Best effort** means it cannot be made reliable and EyeBlink says so instead of pretending.
 
-"Verified" below means covered by the JVM tests in `:core` or by CI. Nothing in this repository has yet been
-run on a physical phone; see [Status](../README.md#status) for what that means for each part.
+"Verified" below means covered by the JVM tests in `:core` or by CI. Only the author has run the app on a physical phone, on one phone; see [Status](../README.md#status) for what that means for each part.
 
 | Ambition | Verdict | How, and what limits it |
 |---|---|---|

@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parents[2]
 SCREENS = (
     "home home-off home-tr rhythm studio apps more night power diag stats privacy about "
     "calib-intro calib-video calib-result onboard-0 onboard-1 onboard-3 onboard-4 rest-focus rest-black "
-    "home-dark rhythm-dark studio-dark apps-dark more-dark night-dark language language-dark eyetest-live calib-blink-close-more"
+    "home-dark rhythm-dark studio-dark apps-dark more-dark night-dark language language-dark eyetest-live calib-blink-close-more gallery gallery-dark"
 ).split()
 
 
